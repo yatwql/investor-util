@@ -1789,7 +1789,7 @@ result = configured + unconfigured            ← 已配置在前，未配置在
 找到 llm_usage，从当前位置删除 → 追加到 result 末尾 ← 强制末位
     │
     ▼
-返回 result（20 项，key/number/type/data_flag）
+返回 result（19 项，key/number/type/data_flag）
 ```
 
 #### 渲染实现
@@ -3371,7 +3371,7 @@ make_http_client(timeout=10.0) → httpx.Client
 | `news_dedup_rules` | 去重规则原语模块（阈值常量 / 模板词表与掩码 / 标题归一化 / 实体 bigram / 相似度口径 / 方向词对 / 规则指纹的唯一实现） | 财经新闻热点与持仓关联分析 | 数据获取 | 随 `enable_news` |
 | `record_prosperity_diagnosis` | 景气度框架诊断挂载点（实验组开关；守卫 + 契约注入 `pipeline_data` 由 `_experimental_seams` 统一提供） | 行动建议（章内嵌块） | 报告输出 | 实验开关 `prosperity_framework`（默认关） |
 | `inject_holding_change_data` | 持仓变动复盘挂载点（实验组开关；守卫 + 契约注入 `pipeline_data` 由 `_experimental_seams` 统一提供） | 持仓变动复盘（报告独立章，type=holding_change） | 报告输出 | 实验开关 `holding_change_review`（默认关） |
-| `inject_event_impact_data` | 事件窗量化对照挂载点（实验组开关；守卫 + 契约注入 `pipeline_data` 由 `_experimental_seams` 统一提供；新闻先行串行段内注入，供分歧例附录块同轮进 LLM） | 事件窗量化对照（报告独立章，type=event_impact） | 报告输出 | 实验开关 `event_window_impact`（默认关） |
+| `inject_event_impact_data` | 事件窗量化对照挂载点（实验组开关；守卫 + 契约注入 `pipeline_data` 由 `_experimental_seams` 统一提供；新闻先行串行段内注入，供分歧例附录块同轮进 LLM） | 事件窗量化对照（财经新闻章内区块，随父章；注册表无独立条目） | 报告输出 | 实验开关 `event_window_impact`（默认关） |
 | `inject_schedule_replay_data` | 调仓纪律回放挂载点（实验组开关；守卫 + 契约注入 `pipeline_data` 由 `_experimental_seams` 统一提供；快照与持仓变动注入后串行装配，回放引用 `prompt_block` 经统一附录进 LLM） | 调仓纪律回放（报告独立章，type=schedule_replay） | 报告输出 | 实验开关 `rebalance_schedule_replay`（默认关） |
 | `event_impact_panel` | 事件窗对照表数据编排与双端单源展示（事件行/降级/占位 + view 与页签同文 + 分歧例附录块） | 事件窗量化对照 | 报告输出 | 随 `event_window_impact` |
 | `event_window_impact` | 事件窗量化对照（新闻事件 → 交易日映射的严格 ±5 交易日窗收益 vs 文本极性方向比对，分歧例进 LLM 统一附录） | 事件窗量化对照 | 报告输出 | 实验开关 `event_window_impact`（默认关） |

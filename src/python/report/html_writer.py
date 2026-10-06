@@ -264,7 +264,7 @@ def _render_template(
     | None = None,  # 市场温度数据契约 market_temperature_data（汇总温度行，None=开关关闭）
     decision_review_data: dict | None = None,  # 历史决策复盘 decision_review_data（行动章内嵌块，None=开关关闭）
     holding_change_view: dict | None = None,  # 持仓变动复盘双端单源视图（预格式化行；None=章隐藏）
-    event_impact_view: dict | None = None,  # 事件窗量化对照双端单源视图（预格式化行；None=章隐藏）
+    event_impact_view: dict | None = None,  # 事件窗量化对照双端单源视图（预格式化行；None=新闻章内区块隐藏）
     schedule_replay_view: dict | None = None,  # 调仓纪律回放双端单源视图（预格式化行；None=章隐藏）
     financial_report_digest_data: dict | None = None,  # 持仓个股财报摘要契约（None=开关关闭/无数据）
     financial_indicator_data: dict | None = None,  # 财务指标契约（None=开关关闭/无数据）
@@ -568,8 +568,8 @@ def write_html_report(
         from src.python.report.holding_change_panel import build_holding_change_view
 
         holding_change_view = build_holding_change_view(holding_change_data)
-    # 事件窗量化对照视图（双端单源）：与 Excel 页签消费同一份预格式化字符串；
-    # 契约缺席（开关关闭/未注入）→ None → 章隐藏，逐字节回退既有输出
+    # 事件窗量化对照视图（双端单源）：与 Excel 新闻页签尾部区块消费同一份预格式化字符串；
+    # 契约缺席（开关关闭/未注入）→ None → 新闻章内区块隐藏，逐字节回退既有输出
     event_impact_view = None
     if event_impact_data:
         from src.python.report.event_impact_panel import build_event_impact_view
@@ -605,7 +605,6 @@ def write_html_report(
         position_relationship_data=position_relationship_data,
         evolution_data=evolution_data,
         holding_change_data=holding_change_data,
-        event_impact_data=event_impact_data,
         schedule_replay_data=schedule_replay_data,
         enable_fundamental_snapshot=enable_fundamental_snapshot,
         financial_report_digest_data=financial_report_digest_data,

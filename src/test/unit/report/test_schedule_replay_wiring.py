@@ -185,11 +185,11 @@ class TestRegistryWiring:
         assert entry["data_flag"] == "schedule_replay_data"
         assert entry["name"] == "调仓纪律回放"
 
-    def test_section_number_follows_event_impact(self):
-        """默认序：回放紧随事件窗，后续章顺延（号序连续由 drift 守护）。"""
+    def test_section_number_follows_holding_change(self):
+        """默认序：回放紧随持仓变动复盘，后续章顺延（号序连续由 drift 守护）。"""
         keys = [s["key"] for s in _REPORT_SECTION_DEFAULT]
         numbers = [s["number"] for s in _REPORT_SECTION_DEFAULT]
-        assert keys[keys.index("event_impact") + 1] == "schedule_replay"
+        assert keys[keys.index("holding_change") + 1] == "schedule_replay"
         assert numbers == list(range(1, len(keys) + 1))
 
     def test_sheet_name_registered(self):
@@ -351,11 +351,11 @@ class TestTemplateWiring:
     def test_main_template_includes_partial(self):
         tmpl = (_TMPL_DIR / "report_template.html").read_text(encoding="utf-8")
         assert '{% include "partials/schedule_replay_section.html" with context %}' in tmpl
-        # include 位于事件窗之后、基本面快照之前（正文顺序 = 注册表顺序）
-        ev_idx = tmpl.index("partials/event_impact_section.html")
+        # include 位于持仓变动复盘与基本面快照之间（正文顺序 = 注册表顺序）
+        hc_idx = tmpl.index("partials/holding_change_section.html")
         sr_idx = tmpl.index("partials/schedule_replay_section.html")
         fs_idx = tmpl.index("partials/fundamental_snapshot_section.html")
-        assert ev_idx < sr_idx < fs_idx
+        assert hc_idx < sr_idx < fs_idx
 
     def test_chart_init_registers_schedule_replay(self):
         js = (Path(PROJECT_ROOT) / "src" / "static" / "chart-init.js").read_text(encoding="utf-8")

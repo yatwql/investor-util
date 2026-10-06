@@ -457,7 +457,6 @@ _REPORT_SHEET_NAMES: dict[str, str] = {
     "portfolio_history_drawdown": "组合历史走势与回撤",
     "portfolio_evolution": "组合演进",
     "holding_change": "持仓变动复盘",
-    "event_impact": "事件窗量化对照",
     "schedule_replay": "调仓纪律回放",
     "action": "行动建议",
     "data_source_status": "数据源可用性矩阵",
@@ -674,41 +673,32 @@ _REPORT_SECTION_DEFAULT: list[dict] = [
         "type": "holding_change",
         "data_flag": "holding_change_data",
     },
-    # ── event_impact 类型（实验开关 event_window_impact 控制，经实验挂载点注入） ──
-    # 事件窗量化对照：新闻事件 ±5 交易日窗口的品种/基准收益与文本极性对照表
-    # （事件表/降级清单/口径标注 + 分歧例提示词块）。data_flag 控制双端可见性：
-    # 开关关闭（默认）时 pipeline_data 键缺席 → 标志 False → 整章隐藏，两条输出路径
-    # 保持既有输出；开注但数据不足时双端写占位
-    {
-        "key": "event_impact",
-        "name": "事件窗量化对照",
-        "number": 16,
-        "type": "event_impact",
-        "data_flag": "event_impact_data",
-    },
+    # 事件窗量化对照：并入「财经新闻热点与持仓关联分析」章内区块（partial 在新闻章内以
+    # block-title 渲染，可见性由契约 event_impact_view 决定），不占独立注册表条目、不消耗
+    # 连续编号；实验开关 event_window_impact 经实验挂载点注入 pipeline_data["event_impact_data"]。
     # ── schedule_replay 类型（实验开关 rebalance_schedule_replay 控制，经实验挂载点注入）：调仓纪律回放——月度定期/阈值偏离纪律多期回放 vs 买入持有；data_flag 控制双端可见性（关态键缺席隐藏 / 开启但数据不足双端占位） ──
     {
         "key": "schedule_replay",
         "name": "调仓纪律回放",
-        "number": 17,
+        "number": 16,
         "type": "schedule_replay",
         "data_flag": "schedule_replay_data",
     },
     # ── always 类型（始终显示） ──
-    {"key": "data_source_status", "name": "数据源可用性矩阵", "number": 18, "type": "always", "data_flag": None},
+    {"key": "data_source_status", "name": "数据源可用性矩阵", "number": 17, "type": "always", "data_flag": None},
     # ── fundamental_snapshot 类型（两功能开关各控一块，默认关）──
     # 持仓基本面 = 财务指标（financial_indicator）+ 持仓个股财报摘要（financial_report_digest）；
     # 两契约 OR 决定章节可见性（任一块就绪即显示，块级开关各控各的渲染）
     {
         "key": "fundamental_snapshot",
         "name": "持仓基本面",
-        "number": 19,
+        "number": 18,
         "type": "fundamental_snapshot",
         "data_flag": None,
         "data_flag_any": ("financial_indicator_data", "financial_report_digest_data"),
     },
     # ── llm_usage 强制末位（技术约束） ──
-    {"key": "llm_usage", "name": "LLM API 用量", "number": 20, "type": "llm", "data_flag": "llm_data_available"},
+    {"key": "llm_usage", "name": "LLM API 用量", "number": 19, "type": "llm", "data_flag": "llm_data_available"},
 ]
 
 

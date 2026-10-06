@@ -2280,6 +2280,9 @@ window.drawSimpleChart = function(canvasId, a, b, c) {
         {% endif %}
         {% endif %}
         </details>
+
+        {% include "partials/event_impact_section.html" with context %}
+
         {{ render_back_to_top() }}
     </div>
 
@@ -2794,8 +2797,6 @@ window.drawSimpleChart = function(canvasId, a, b, c) {
     {% include "partials/evolution_section.html" with context %}
 
     {% include "partials/holding_change_section.html" with context %}
-
-    {% include "partials/event_impact_section.html" with context %}
 
     {% include "partials/schedule_replay_section.html" with context %}
 

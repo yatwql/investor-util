@@ -1,27 +1,30 @@
 {# ==============================================================
-   事件窗量化对照章节 partial（供 report_template.html 经 include 引入）。
+   事件窗量化对照区块 partial（并入「财经新闻热点与持仓关联分析」章内，
+   经 report_template.html 在新闻章正文之后 include 引入）。
 
-   依赖 context 变量：section_visible / section_numbers / event_impact_view；
+   注册表不占独立条目、不消耗连续编号（连续编号/导航/页签均由注册表驱动，
+   本区块随父章）；区块标题用 block-title 级（与持仓基本面章内区块同构）。
+
+   依赖 context 变量：event_impact_view；
    视图由 report/event_impact_panel.build_event_impact_view 生成——全部行是
-   预格式化字符串，与 Excel 页签消费同一份 view（双端逐字节同文，不发散）。
+   预格式化字符串，与 Excel 财经新闻页签尾部区块消费同一份 view
+   （双端逐字节同文，不发散）。
 
    「口径」标注（limitations_note：事件日映射 / ±5 窗口 / LOCF / 超额基准）
    与事件表同现——两端渲染分支成对出现，缺失即红（由双端一致性测试锁定）。
 
    可见性：实验开关 event_window_impact 关闭（默认）时 pipeline_data 键缺席
-   → data_flag False → 整章隐藏，模板零贡献（逐字节回退既有输出）。
-
-   底部「回到顶部」与 report_template.html 的 render_back_to_top() 宏同构
-   （partial 无法访问父模板宏，此处内联等价 HTML）。
+   → 视图 None → 区块零渲染，新闻章逐字节回退既有输出；新闻板层关闭时随
+   父章一并隐藏（事件源自新闻，从属关系成立）。
    ============================================================== #}
-{% if section_visible("event_impact") and event_impact_view %}
+{% if event_impact_view %}
 <!-- ═══════════════════════════════════════════════════════ -->
 <!--  事件窗量化对照（新闻事件 × 持仓行情窗口比对）          -->
 <!-- ═══════════════════════════════════════════════════════ -->
 {% set _ev = event_impact_view %}
-<div class="section" id="sec-event_impact" style="order: {{ section_numbers['event_impact'] }};">
-    <div class="section-title">
-        {{ section_numbers['event_impact'] }}、事件窗量化对照
+<div id="sec-event_impact" style="margin-top: 16px;">
+    <div class="block-title">
+        事件窗量化对照
         <span style="font-size:12px;font-weight:400;opacity:0.8;margin-left:8px;">新闻事件 × 持仓行情窗口比对</span>
     </div>
     <details class="section-fold">
@@ -69,6 +72,5 @@
     </div>
     {% endif %}
     </details>
-    <div class="back-to-top-link"><a href="#report-top" title="回到报告顶部">↑ 回到顶部</a></div>
 </div>
 {% endif %}

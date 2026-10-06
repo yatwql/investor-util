@@ -25,7 +25,6 @@ from src.python.analysis.event_window_impact import (
     compute_event_impact,
 )
 from src.python.core.code_utils import is_a_share_code, is_a_share_stock
-from src.python.core.registry import get_report_sheet_name
 
 logger = logging.getLogger("invest")
 
@@ -35,7 +34,7 @@ __all__ = [
     "build_event_rows",
     "build_event_impact_panel",
     "build_event_impact_view",
-    "write_event_impact_sheet",
+    "write_event_impact_footer",
     "EVENT_TABLE_HEADER",
     "LIMITATIONS_NOTE",
 ]
@@ -445,30 +444,31 @@ def build_event_impact_panel(
     return contract
 
 
-def write_event_impact_sheet(ws: Any, event_impact_data: dict[str, Any] | None) -> None:
-    """写入「事件窗量化对照」页签（与 HTML partial 消费同一份 view 字符串）。"""
+def write_event_impact_footer(ws: Any, event_impact_data: dict[str, Any] | None, *, start_row: int) -> None:
+    """在财经新闻页签尾部写入「事件窗量化对照」区块（与 HTML partial 消费同一份 view 字符串）。
+
+    事件窗量化对照已并入财经新闻章（注册表不占独立条目、不消耗连续编号），
+    Excel 端对应为财经新闻页签尾部区块而非独立页签；``start_row`` 为区块首行
+    （新闻内容之后留一空行）。区块标题与 partial 章内标题同为「事件窗量化对照」。
+    """
     from src.python.report.excel_writer import (
         _write_placeholder,
         auto_width,
-        freeze_header,
         write_data_row,
         write_header_row,
         write_title_row,
     )
 
     view = build_event_impact_view(event_impact_data)
-    _name = get_report_sheet_name("event_impact")
     _ncols = len(EVENT_TABLE_HEADER)
-    write_title_row(ws, 1, _name, ncols=_ncols)
+    row = write_title_row(ws, start_row, "事件窗量化对照", ncols=_ncols)
 
     if not view["available"]:
-        _write_placeholder(ws, view["reason"], row=3, max_cols=_ncols)
-        freeze_header(ws, row=2)
+        _write_placeholder(ws, view["reason"], row=row + 1, max_cols=_ncols)
         auto_width(ws)
-        logger.info("事件窗量化对照：数据不足，写入占位")
+        logger.info("事件窗量化对照区块：数据不足，写入占位")
         return
 
-    row = 2
     # ── 1. 口径摘要 ──
     for line in view["summary_lines"]:
         row = write_data_row(ws, row, [line] + [""] * (_ncols - 1))
@@ -483,5 +483,4 @@ def write_event_impact_sheet(ws: Any, event_impact_data: dict[str, Any] | None) 
         row = write_data_row(ws, row, [view["degraded_line"]] + [""] * (_ncols - 1))
     row = write_data_row(ws, row, [view["limitations_note"]] + [""] * (_ncols - 1))
 
-    freeze_header(ws, row=2)
     auto_width(ws)

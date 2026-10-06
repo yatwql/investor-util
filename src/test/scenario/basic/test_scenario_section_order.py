@@ -136,7 +136,6 @@ class TestScenarioSectionOrder(unittest.TestCase):
                 "action",
                 "fundamental_snapshot",
                 "holding_change",
-                "event_impact",
                 "schedule_replay",
             },
         )
@@ -149,7 +148,6 @@ class TestScenarioSectionOrder(unittest.TestCase):
         self.assertEqual(type_counts["action"], 1)
         self.assertEqual(type_counts["fundamental_snapshot"], 1)
         self.assertEqual(type_counts["holding_change"], 1)
-        self.assertEqual(type_counts["event_impact"], 1)
         self.assertEqual(type_counts["schedule_replay"], 1)
 
 

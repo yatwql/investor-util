@@ -3,11 +3,11 @@
 覆盖（迭代 3 验收）：
   - 开关注册表：event_window_impact 已登记（实验组、默认关、影响报告）
   - 挂载点：seam 开关关闭零行为、开关注入契约、下游异常只告警不外抛
-  - 注册表：章节条目（type/data_flag/序号）、页签名、导航分组、两端 board 层
-  - 关态回退：契约缺席 → 章隐藏且不消耗连续编号（与「注册表无此章」逐位相等）
-  - 双端单源：Excel 页签单元格 ⊇ view 同源行；口径标注与事件表同现
+  - 注册表：无独立条目（并入新闻章）、号序连续、页签名/导航/两端派生点无残留
+  - 关态回退：契约缺席 → 新闻章内区块零渲染；新闻父章关 → 区块随父章隐藏
+  - 双端单源：财经新闻页签尾部区块单元格 ⊇ view 同源行；口径标注与事件表同现
   - 分歧例块：全部分歧例 100% 进块；无分歧/不可用 → 空串（附录零贡献）
-  - 模板接线：partial 存在且被 report_template include（位于持仓变动之后）
+  - 模板接线：partial 存在且被 report_template include 在新闻章内（block-title 区块级守卫）
   - LLM 编排串行化：开关开启 → 新闻先行（seam 注入后才提交 LLM）；
     开关关闭 → 并行原路径且 seam 不被调用
 
@@ -25,14 +25,14 @@ import pytest
 
 from src.python.config.features import feature_switch_registry, is_feature_enabled
 from src.python.core.constants import PROJECT_ROOT
-from src.python.core.registry import _REPORT_SECTION_DEFAULT, get_report_sheet_name
+from src.python.core.registry import _REPORT_SECTION_DEFAULT
 from src.python.report import _experimental_seams as seams
 from src.python.report.event_impact_panel import (
     EVENT_TABLE_HEADER,
     LIMITATIONS_NOTE,
     build_event_impact_panel,
     build_event_impact_view,
-    write_event_impact_sheet,
+    write_event_impact_footer,
 )
 from src.python.report.progress import ProgressReporter
 
@@ -197,101 +197,83 @@ class TestEventImpactMount:
 
 
 class TestRegistryWiring:
-    """章节注册表条目与两端派生点（序号/类型/页签名/导航分组）。"""
+    """事件窗并入新闻章：注册表无独立条目，两端派生点（号序/页签名/导航）无残留。"""
 
-    @staticmethod
-    def _entry() -> dict:
-        return next(s for s in _REPORT_SECTION_DEFAULT if s["key"] == "event_impact")
+    def test_no_section_entry(self):
+        assert all(s["key"] != "event_impact" for s in _REPORT_SECTION_DEFAULT)
 
-    def test_section_entry_shape(self):
-        entry = self._entry()
-        assert entry["type"] == "event_impact"
-        assert entry["data_flag"] == "event_impact_data"
-        assert entry["name"] == "事件窗量化对照"
-
-    def test_section_number_follows_holding_change(self):
-        """默认序：事件窗紧随持仓变动复盘，附录三项顺延（号序连续由 drift 守护）。"""
+    def test_numbering_contiguous_after_removal(self):
+        """移除独立条目后号序仍连续（区段无断号）。"""
         keys = [s["key"] for s in _REPORT_SECTION_DEFAULT]
         numbers = [s["number"] for s in _REPORT_SECTION_DEFAULT]
-        assert keys[keys.index("holding_change") + 1] == "event_impact"
+        assert "event_impact" not in keys
         assert numbers == list(range(1, len(keys) + 1))
 
-    def test_sheet_name_registered(self):
-        assert get_report_sheet_name("event_impact") == "事件窗量化对照"
+    def test_no_sheet_name_registered(self):
+        from src.python.core.registry import _REPORT_SHEET_NAMES
 
-    def test_nav_group_is_history(self):
+        assert "event_impact" not in _REPORT_SHEET_NAMES
+
+    def test_no_nav_group_entry(self):
         from src.python.report.html_writer_nav import _SECTION_NAV_GROUP_MAP
 
-        assert _SECTION_NAV_GROUP_MAP["event_impact"] == "history"
+        assert "event_impact" not in _SECTION_NAV_GROUP_MAP
 
-    def test_board_flags_default_true_on_both_sides(self):
-        """实验章 board 层恒 True（两端一致），可见性由 data 层决定。"""
+    def test_no_board_or_data_flag_on_either_side(self):
+        """两端可见性派生点均无事件窗键（区块随父章，不参与章级判定）。"""
         from src.python.report.excel_sheet_factory import build_data_availability
         from src.python.report.html_writer_nav import _compute_section_visibility
 
         _nums, visible, _ = _compute_section_visibility(
             list(_REPORT_SECTION_DEFAULT), {}, {}, {}, {}, include_news=True, llm_enabled_flag=True
         )
-        assert "event_impact" in visible
-        assert visible["event_impact"] is False  # data 层缺席 → 隐藏（board 层非否决）
-        assert build_data_availability(event_impact_data={})["event_impact_data"] is True
+        assert "event_impact" not in visible
+        assert "event_impact_data" not in build_data_availability()
 
 
-# ── 关态回退：隐藏章不消耗连续编号 ───────────────────────
+# ── 关态回退：区块不占编号，随父章可见性 ───────────────
 
 
 class TestOffStateVisibility:
-    """契约缺席 → 章隐藏且不消耗连续编号，两端缺省口径锁定。"""
+    """区块不占章级可见性/编号；新闻父章关 → 区块随父章一并隐藏。"""
 
-    def test_hidden_section_consumes_no_visible_number(self):
-        from src.python.core.registry import get_report_section_order
-        from src.python.report.html_writer_nav import _compute_section_visibility
-
-        order = get_report_section_order()
-        kwargs = dict(
-            include_news=True,
-            llm_enabled_flag=True,
-            event_impact_data=None,  # 开关关闭：键缺席
-        )
-        visible_numbers, visible_dict, _ = _compute_section_visibility(order, {}, {}, {}, {}, **kwargs)
-        assert visible_dict["event_impact"] is False
-        assert "event_impact" not in visible_numbers
-        # 逐字节回退：隐藏章对既有编号零影响 —— 与「注册表里根本没这一章」时
-        # 计算出的可见性/编号完全相等
-        order_without = [s for s in order if s["key"] != "event_impact"]
-        ref_numbers, _, _ = _compute_section_visibility(order_without, {}, {}, {}, {}, **kwargs)
-        assert visible_numbers == ref_numbers
-        assert list(visible_numbers.values()) == list(range(1, len(visible_numbers) + 1))
-
-    def test_build_data_availability_defaults_flag_false(self):
-        from src.python.report.excel_sheet_factory import build_data_availability
-
-        avail = build_data_availability()
-        assert avail["event_impact_data"] is False  # 显式 False（非缺省 True）
-
-        avail_on = build_data_availability(event_impact_data={"available": True})
-        assert avail_on["event_impact_data"] is True
-
-    def test_hidden_when_data_present_false_availability(self):
-        """契约在场但 available=False → 章可见（走占位），非隐藏。"""
+    def test_news_numbering_contiguous_without_event_key(self):
         from src.python.core.registry import get_report_section_order
         from src.python.report.html_writer_nav import _compute_section_visibility
 
         order = get_report_section_order()
         visible_numbers, visible_dict, _ = _compute_section_visibility(
-            order, {}, {}, {}, {}, include_news=True, llm_enabled_flag=True, event_impact_data={"available": False}
+            order, {}, {}, {}, {}, include_news=True, llm_enabled_flag=True
         )
-        assert visible_dict["event_impact"] is True
-        assert "event_impact" in visible_numbers
+        assert visible_dict["news_correlation"] is True
+        assert "event_impact" not in visible_dict
+        assert list(visible_numbers.values()) == list(range(1, len(visible_numbers) + 1))
+
+    def test_news_board_off_hides_news_parent_of_block(self):
+        """新闻 board 层关闭 → 父章隐藏，事件窗区块随之不可达（从属关系）。"""
+        from src.python.core.registry import get_report_section_order
+        from src.python.report.html_writer_nav import _compute_section_visibility
+
+        order = get_report_section_order()
+        visible_numbers, visible_dict, _ = _compute_section_visibility(
+            order, {}, {}, {}, {}, include_news=True, llm_enabled_flag=True, enable_news=False
+        )
+        assert visible_dict["news_correlation"] is False
+        assert "news_correlation" not in visible_numbers
+
+    def test_build_data_availability_has_no_event_key(self):
+        from src.python.report.excel_sheet_factory import build_data_availability
+
+        assert "event_impact_data" not in build_data_availability()
 
 
-# ── 双端单源：view ↔ Excel 页签 ─────────────────────────
+# ── 双端单源：view ↔ 财经新闻页签尾部区块 ──────────────
 
 
 class TestViewSheetSingleSource:
-    """view 预格式化行与页签单元格逐字节同文；口径标注与事件表同现。"""
+    """view 预格式化行与财经新闻页签尾部区块逐字节同文；口径标注与事件表同现。"""
 
-    def test_sheet_rows_superset_of_view_rows(self):
+    def test_footer_rows_superset_of_view_rows(self):
         from openpyxl import Workbook
 
         contract = _contract([_event(1, "一致", "利空"), _event(2, "分歧", "利好")])
@@ -299,11 +281,12 @@ class TestViewSheetSingleSource:
 
         wb = Workbook()
         ws = wb.active
-        write_event_impact_sheet(ws, contract)
+        write_event_impact_footer(ws, contract, start_row=5)
+        assert ws.cell(row=5, column=1).value == "事件窗量化对照", "区块标题必须落在 start_row"
         cells = [str(c) for row in ws.iter_rows(values_only=True) for c in row if c is not None]
 
         for line in view["summary_lines"]:
-            assert line in cells, "口径摘要行未逐字节写入页签"
+            assert line in cells, "口径摘要行未逐字节写入页签尾部区块"
         for row in view["event_rows"]:
             for cell in row:
                 assert cell in cells, f"事件行单元格缺失: {cell}"
@@ -325,9 +308,9 @@ class TestViewSheetSingleSource:
 
         wb = Workbook()
         ws = wb.active
-        write_event_impact_sheet(ws, contract)
+        write_event_impact_footer(ws, contract, start_row=3)
         texts = [str(c) for row in ws.iter_rows(values_only=True) for c in row if c is not None]
-        assert contract["reason"] in texts, "不可用时页签必须写占位原因"
+        assert contract["reason"] in texts, "不可用时页签尾部区块必须写占位原因"
 
 
 # ── 分歧例块：召回 100% / 空串回退 ──────────────────────
@@ -370,23 +353,26 @@ class TestPromptBlock:
 
 
 class TestTemplateWiring:
-    """partial 已建且被主模板 include，按 section_visible + view 双守卫。"""
+    """partial 已建且被主模板 include 在新闻章内，按 event_impact_view 区块级守卫。"""
 
     def test_partial_exists_and_guarded(self):
         partial = (_TMPL_DIR / "partials" / "event_impact_section.html").read_text(encoding="utf-8")
-        assert 'section_visible("event_impact")' in partial
+        assert "{% if event_impact_view %}" in partial
+        assert 'section_visible("event_impact")' not in partial  # 不再有章级可见性键
         assert "event_impact_view" in partial
         assert "limitations_note" in partial  # 标注经同源 view 渲染
         assert "sec-event_impact" in partial
+        assert 'class="block-title"' in partial  # 章内区块标题级（与持仓基本面同构）
 
-    def test_main_template_includes_partial(self):
+    def test_main_template_includes_partial_inside_news_chapter(self):
         tmpl = (_TMPL_DIR / "report_template.html").read_text(encoding="utf-8")
         assert '{% include "partials/event_impact_section.html" with context %}' in tmpl
-        # include 位于持仓变动复盘与基本面快照之间（正文顺序 = 注册表顺序）
-        hc_idx = tmpl.index("partials/holding_change_section.html")
+        # include 位于新闻章内（新闻章起点之后、下一章起点之前），仅一处
+        news_idx = tmpl.index('id="sec-news_correlation"')
         ev_idx = tmpl.index("partials/event_impact_section.html")
-        fs_idx = tmpl.index("partials/fundamental_snapshot_section.html")
-        assert hc_idx < ev_idx < fs_idx
+        next_idx = tmpl.index('id="sec-global_macro"')
+        assert news_idx < ev_idx < next_idx
+        assert tmpl.count("partials/event_impact_section.html") == 1
 
 
 # ── LLM 编排串行化（_fetch_llm_and_news） ───────────────
