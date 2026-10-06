@@ -33,7 +33,27 @@ def capture_snapshot(
 
     Returns:
         pipeline_data 字典（含 diff），首次运行或异常时返回 None。
+
+    持仓源守卫：快照写入共享主目录（``snapshot_namespace=None``）前先经
+    ``config.is_formal_holdings_source`` 校验，非正式源（demo/试算/临时持仓，
+    路径不在 ``data/holdings/`` 下）直接返回 None——不落盘、不与真实历史对比，
+    下游历史章（快照对比/组合演进/持仓变动复盘）随 pipeline_data 缺席同首次
+    运行口径隐藏。命名空间域（如 web 试算域）域内闭环，不受守卫限制。
     """
+    # ── 持仓源守卫（共享主目录）────────────────────────
+    # 非正式持仓源不得写入/比对真实快照历史，否则幻影持仓会污染用户历史
+    # （症状：未持有品种被报成清仓）；命名空间域天然隔离，不受此限制。
+    if snapshot_namespace is None:
+        from src.python.config import is_formal_holdings_source
+
+        if not is_formal_holdings_source(config):
+            logger.info("[快照] 非正式持仓源，跳过快照捕获与环比对比（不落盘、不与真实历史比对）")
+            reporter.info(
+                "持仓源不在正式持仓目录（data/holdings/）：本次不写入持仓快照历史，"
+                "快照对比/组合演进/持仓变动复盘章不出现（demo/临时持仓防污染）"
+            )
+            return None
+
     from src.python.fetcher.history_diff import HistoryDiff
     from src.python.report.data_status import get_tracker as _get_degradation_tracker
     from src.python.report.history_snapshot import load_latest, save

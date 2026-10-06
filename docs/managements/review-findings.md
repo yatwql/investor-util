@@ -1,6 +1,6 @@
 # 投资复盘助手 - 自我审查问题记录
 > 文档版本：0.12.4-dev
-> **编号源**：`rf-next = 599`（新增问题取此编号，完成后更新为 +1；已用最大 rf-598，递增保证唯一，归档不回收。若与历史归档冲突，运行 `scripts/check-task-numbering.py` 校验）
+> **编号源**：`rf-next = 600`（新增问题取此编号，完成后更新为 +1；已用最大 rf-599，递增保证唯一，归档不回收。若与历史归档冲突，运行 `scripts/check-task-numbering.py` 校验）
 
 ---
 
@@ -67,6 +67,7 @@
 
 | # | 摘要 | 状态 |
 |---|------|------|
+| **rf-599** | demo/临时持仓经报告管线写入真实快照历史（10-02 CLI 以 `/tmp/demo/holdings/示例持仓.xlsx` 运行 4 次，`capture_snapshot` 始终执行 → 4 份幻影快照混入 `data/history/snapshots/`，持仓变动复盘把未持有品种报成清仓） | 已修复 2026-10-07（新增 `config.is_formal_holdings_source` 持仓源守卫：共享主目录只接受 `data/holdings/` 正式源，非正式源 capture 返回 None 不落盘不比对、命名空间域不受限、解析异常 fail-closed；删除 4 份污染快照；回归用例 `test_snapshot_source_guard(_edge).py` 11 项，web 正式模式两用例显式声明正式源） |
 | **rf-594** | `how-to-config.md` Web 面板配置项对照表「实验性功能」行缺 `whatif_trade_cost` 且编号段 `8-11` 陈旧（Web 白名单按注册表自动全收，行内容为文档滞留） | 已修复 2026-10-06（该行补 whatif/事件窗两键、编号段更正 `8-13`，随 plan-79 开关同步；`check-doc-drift --ci` 复核通过） |
 | **rf-595** | 事件窗接线测试的日历注入 fixture 为独立 autouse，先于 `offline_external_sources` 装配——offline 桩把日历 MagicMock 存为「原值」并在逆序终化时还原出来（patch 泄漏到后续用例，实测把 `test_market_value` 并发串行化用例打红） | 已修复 2026-10-06（`_calendar` 显式依赖 `offline_external_sources` 强制装配序；回归用例 `TestCalendarFixtureStackOrder` 锁依赖声明与逐层还原） |
 | **rf-596** | OpenAI/Gemini 协议分支缓存命中计量缺口：`_log_token_usage` 与 `track_session_usage` 非 claude 分支 `cache_hit = 0` 硬编码，`prompt_tokens_details.cached_tokens` 未读——OpenAI 系端点「缓存命中」恒 0、费用按全价 input 估算（低估折扣）、会话 `cache_hit_tokens` 少计 | 已修复 2026-10-06（单源 `_normalize_usage_tokens` 三字段归一，`session` 持有、`api_base` 复用本就存在的依赖方向；回归 7 用例覆盖 claude/openai×有无 details/Gemini 归一形/空值/会话累计；纯读数修复不改任何 prompt 与调用行为） |

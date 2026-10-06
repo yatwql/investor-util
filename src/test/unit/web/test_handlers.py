@@ -427,8 +427,11 @@ class TestInputModeDispatch:
 
     # ── 正式 + 上传（提升正式文件 + 共享快照）──
     @patch("src.python.report.orchestrator.generate_report")
-    def test_formal_upload_promotes_and_shared_snapshot(self, mock_gen, tmp_path, holdings_path_isolated):
+    def test_formal_upload_promotes_and_shared_snapshot(self, mock_gen, tmp_path, holdings_path_isolated, monkeypatch):
         """正式+上传：正式文件被覆盖、.bak 生成、快照落共享、temp 清理。"""
+        # 持仓源守卫按真实 data/holdings/ 判定；本用例以 tmp 隔离目录模拟正式
+        # 持仓目录，显式声明正式源以验证 web 正式模式的共享快照接线
+        monkeypatch.setattr("src.python.config.is_formal_holdings_source", lambda _cfg=None: True)
         import src.python.report.history_snapshot as hs
 
         mock_gen.side_effect = self._capture_side_effect
@@ -460,8 +463,11 @@ class TestInputModeDispatch:
 
     # ── 正式 + 用存量（直接读正式文件）──
     @patch("src.python.report.orchestrator.generate_report")
-    def test_formal_use_existing_reads_formal_file(self, mock_gen, tmp_path, holdings_path_isolated):
+    def test_formal_use_existing_reads_formal_file(self, mock_gen, tmp_path, holdings_path_isolated, monkeypatch):
         """正式+用存量（无 file_id）：读正式文件、快照共享、无需上传。"""
+        # 持仓源守卫按真实 data/holdings/ 判定；本用例以 tmp 隔离目录模拟正式
+        # 持仓目录，显式声明正式源以验证 web 正式模式的共享快照接线
+        monkeypatch.setattr("src.python.config.is_formal_holdings_source", lambda _cfg=None: True)
         import src.python.report.history_snapshot as hs
 
         mock_gen.side_effect = self._capture_side_effect
