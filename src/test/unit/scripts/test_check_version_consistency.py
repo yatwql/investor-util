@@ -19,6 +19,7 @@ _auto_fix_header / _check_evolution_head / _auto_fix_evolution_head，
 from __future__ import annotations
 
 import importlib.util
+import warnings
 from pathlib import Path
 
 import pytest
@@ -109,6 +110,17 @@ class TestAutoFixHeader:
         p.write_text("# 标题\n\n> 文档版本：0.9.13-dev\n\n## 章节\n", encoding="utf-8")
         assert version_script._auto_fix_header(p, "0.10.0") is True
         assert p.read_text(encoding="utf-8") == "# 标题\n\n> 文档版本：0.10.0\n\n## 章节\n"
+
+
+class TestScriptSyntaxWarnings:
+    r"""脚本源码无警告编译（回归：docstring 裸 `\s` 转义触发 SyntaxWarning）。"""
+
+    def test_compiles_without_syntaxwarning(self):
+        path = _SCRIPTS_DIR / "check-version-consistency.py"
+        with warnings.catch_warnings():
+            warnings.simplefilter("error", SyntaxWarning)
+            code = compile(path.read_text(encoding="utf-8"), str(path), "exec")
+        assert code is not None
 
 
 class TestDocHeaderRegistration:

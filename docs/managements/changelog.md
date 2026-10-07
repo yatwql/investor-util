@@ -9,6 +9,8 @@
 
 ## [0.12.7-dev] - 开发中（未发布）
 
+- **工程效能/发布**：**版本一致性 `--fix` 不再吞空行 + 消除脚本 SyntaxWarning**——`_auto_fix_header` 行首空白类改同行字符类（原 `\s` 含换行，MULTILINE 下吞掉版本头前空行，developer-guide 受损已恢复），docstring 改 raw 串消除 invalid escape 警告；回归补「空行保留 + 跨行不误判 + 无警告编译」用例 | rf-624
+- **工程效能/发布**：**`release.py publish` 归一化 `--title`**——新增 `normalize_release_title()` 剥离 title 自带的 `release: v… —— ` 前缀，防双前缀 subject（v0.12.6 发布提交实测出现，历史不可变，修复防再犯） | rf-625
 
 （本次发布内容见下方归档索引）
 

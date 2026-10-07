@@ -116,6 +116,16 @@ def render_readme_version(text: str, version: str) -> str:
     return new_text
 
 
+def normalize_release_title(title: str) -> str:
+    """剥离 `--title` 中多余的 `release: v… —— ` 前缀。
+
+    commit subject 由 publish 统一加前缀；title 自带前缀时会拼出双前缀
+    （发布提交实测）。剥离后为空（title 本身就是前缀）则按原样使用。
+    """
+    stripped = re.sub(r"^release:\s*v\S+\s*—+\s*", "", title.strip())
+    return stripped or title.strip()
+
+
 def archive_paths_for(release_version: str) -> tuple[Path, str]:
     """按小版本推导归档目录与文件名（如 0.12.6 → docs/archive/v0.12.x/…）。"""
     m = _RELEASE_VERSION_RE.match(release_version)
@@ -670,7 +680,11 @@ def cmd_publish(args: argparse.Namespace, runner=None) -> int:
         return 1
     if staged.strip():
         _git_ok(["add", "-A"], REPO_ROOT, runner)
-        rc, out, err = _git_ok(["commit", "-m", f"release: v{release_version} —— {args.title}"], REPO_ROOT, runner)
+        rc, out, err = _git_ok(
+            ["commit", "-m", f"release: v{release_version} —— {normalize_release_title(args.title)}"],
+            REPO_ROOT,
+            runner,
+        )
         if rc != 0:
             print(f"[ERR] release 提交失败：{(err or out).strip()}")
             return rc
