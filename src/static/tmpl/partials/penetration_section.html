@@ -1,0 +1,118 @@
+    <div class="section" id="sec-penetration" style="order: {{ section_numbers['penetration'] }};">
+        <div class="section-title">{{ section_numbers['penetration'] }}、{{ section_names['penetration'] }}</div>
+        {% if penetration and penetration.get("top10") %}
+        <div class="section-content" style="padding: 0;">
+            {% if enable_interactive_charts %}
+            {# 行业分布 + 穿透 TOP10：两个垂直柱状图分两行显示、居中，避免小屏并排不齐。
+               空值语义（§4.12）：dataset 无 labels 时不渲染 canvas，显示占位提示。 #}
+            <div class="penetration-charts" style="display: flex; flex-wrap: wrap; gap: 16px; padding: 12px;">
+                <div style="flex: 1 1 100%; max-width: 720px; margin: 0 auto;">
+                    <div class="chart-box" style="height: 320px;">
+                        {% if chart_datasets and chart_datasets.get("industry_bar", {}).get("labels") %}
+                        <canvas id="chart_industry_bar" width="500" height="320" style="width:100%;height:100%;" aria-label="行业分布垂直柱状图（悬停查看市值）" role="img">图表无法显示，数据见穿透分析表</canvas>
+                        {% else %}
+                        <div class="chart-empty-note">行业数据暂不可用</div>
+                        {% endif %}
+                    </div>
+                    {% if chart_datasets and chart_datasets.get("industry_bar", {}).get("labels") %}
+                    <div class="chart-caption">持仓行业分布</div>
+                    {% endif %}
+                </div>
+                <div style="flex: 1 1 100%; max-width: 720px; margin: 0 auto;">
+                    <div class="chart-box" style="height: 320px;">
+                        {% if chart_datasets and chart_datasets.get("penetration_bar", {}).get("labels") %}
+                        <canvas id="chart_penetration_bar" width="500" height="320" style="width:100%;height:100%;" aria-label="穿透 TOP10 垂直柱状图（悬停查看市值）" role="img">图表无法显示，数据见资产穿透表</canvas>
+                        {% else %}
+                        <div class="chart-empty-note">穿透数据暂不可用</div>
+                        {% endif %}
+                    </div>
+                    {% if chart_datasets and chart_datasets.get("penetration_bar", {}).get("labels") %}
+                    <div class="chart-caption">TOP 10 持仓资产</div>
+                    {% endif %}
+                </div>
+            </div>
+            {% endif %}
+            <table>
+                <thead>
+                    <tr>
+                        <th>排名</th><th>名称</th><th>代码</th><th>穿透市值</th><th>占比</th><th>板块</th><th>概念</th><th>预测EPS({{ report_year }}E)</th><th>年均股息</th>{% if valuation_enabled %}<th>估值分位</th>{% endif %}<th>来源明细</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% set pen_total_mv = penetration["summary"]["total_mv"] %}
+                    {% for entry in penetration["top10"] %}
+                    <tr>
+                        <td>{{ entry["rank"] }}</td>
+                        <td class="text-left">{{ entry["name"] }}</td>
+                        <td>{{ entry["codes"] | join(", ") if entry["codes"] else "--" }}</td>
+                        <td class="text-right">{{ entry["mv"] | money }}</td>
+                        <td class="text-right">{{ (entry["ratio_pct"] / 100) | pct }}</td>
+                        <td>{{ entry.get("sector", "--") }}</td>
+                        <td style="font-size: 12px;">{{ entry.get("concepts", []) | join(" / ") if entry.get("concepts") else "--" }}</td>
+                        <td>{{ entry.get("eps_text", "--") }}</td>
+                        <td>{{ entry.get("dividend_text", "--") }}</td>
+                        {% if valuation_enabled %}<td style="font-size: 12px;">{{ entry.get("valuation_text", "--") }}</td>{% endif %}
+                        <td class="text-left" style="font-size: 12px;">
+                            {% for src in entry["sources"] %}
+                            <span class="source-tag">{{ src }}</span>
+                            {% endfor %}
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        <div class="penetration-notes">
+            {% set s = penetration["summary"] %}
+            {% if s.get("unknown_mv", 0) > 0 %}
+            <div>* {{ s["total_funds"] }} 只基金中，有
+                {%- if s["failed_funds"] %} {{ s["failed_funds"] }} 只无法获取穿透数据{% endif -%}
+                {%- if s["failed_funds"] and s.get("stale_funds") %}、{% endif -%}
+                {%- if s.get("stale_funds") %} {{ s["stale_funds"] }} 只因持仓报告期陈旧被剔除{% endif -%}
+                ，合计市值 {{ s["unknown_mv"] | money }} 元未计入穿透 TOP10</div>
+            {% set failed_details = s.get("failed_fund_details", []) %}
+            {% if failed_details %}
+            <div style="margin-left: 1.5em; font-size: 12px;">
+                无法获取穿透的基金：
+                {% for f in failed_details %}
+                <span class="source-tag">{{ f["name"] }}({{ f["code"] }})</span>
+                {% endfor %}
+            </div>
+            {% endif %}
+            {% set stale_details = s.get("stale_fund_details", []) %}
+            {% if stale_details %}
+            <div style="margin-left: 1.5em; font-size: 12px;">
+                报告期陈旧被剔除的基金：
+                {% for f in stale_details %}
+                <span class="source-tag">{{ f["name"] }}({{ f["code"] }}) 报告期 {{ f["period"] }}，距今 {{ f["quarters"] }} 个完整季度</span>
+                {% endfor %}
+            </div>
+            {% endif %}
+            {% endif %}
+            <div>
+                基金 {{ s["total_funds"] }} 只（{{ s["fund_breakdown"] }}） + 直接持股 {{ s["total_stocks"] }} 只
+                → 穿透合并 {{ s["merged_count"] }} 个标的，TOP10 覆盖 {{ s["top10_coverage_pct"] }}%
+            </div>
+            {% set report_periods = s.get("report_periods", []) %}
+            {% if report_periods %}
+            <div style="font-size: 12px;">
+                各基金持仓报告期：
+                {% for p in report_periods %}
+                <span class="source-tag">{{ p["name"] }}({{ p["code"] }}) {{ p["period"] }}</span>
+                {% endfor %}
+            </div>
+            {% endif %}
+            {% if valuation_enabled %}
+            {% if valuation_real_basis %}
+            <div>* 估值分位说明：真实历史估值分位（TTM 口径，按法定披露截止日生效）优先；无基本面覆盖时回落价格分位代理（非真实历史估值分位）。PE/PB 为当前行情值</div>
+            {% else %}
+            <div>* 估值分位说明：价格分位代理，非真实历史估值分位（PE/PB 为当前行情值）</div>
+            {% endif %}
+            {% endif %}
+        </div>
+        {% else %}
+        <div class="empty-note">暂无穿透数据</div>
+        {% endif %}
+        {{ render_data_status(data_status_penetration) }}
+        {{ render_back_to_top() }}
+    </div>

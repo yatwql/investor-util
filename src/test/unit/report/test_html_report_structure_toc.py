@@ -385,7 +385,7 @@ class TestHtmlTocGroupedNav(unittest.TestCase):
     def test_action_visible_adds_action_group(self):
         """enable_action 开启（action 可见）时，「行动建议」组出现且含行动建议章。"""
         order = [dict(sec) for sec in _REPORT_SECTION_DEFAULT]
-        order.append({"key": "action", "name": "行动建议", "number": 17})
+        order.append({"key": "action", "name": "行动建议", "number": 17, "nav_group": "action"})
         numbers = {sec["key"]: sec["number"] for sec in order}
         sv_dict = {sec["key"]: True for sec in order}
         soup = _render_template(_build_minimal_render_data(order, numbers, sv_dict))

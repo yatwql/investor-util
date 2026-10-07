@@ -24,6 +24,8 @@ import unittest
 import pytest
 from bs4 import BeautifulSoup
 
+from src.python.core.registry import _REPORT_SECTION_DEFAULT as _REGISTRY_SECTION_DEFAULT
+
 pytestmark = [pytest.mark.unit, pytest.mark.unit_report]
 
 
@@ -67,20 +69,13 @@ _LLM_SUPPORTED_KEYS = {
     "llm_usage",
 }
 
+# 场景章节序（真值取自 core/registry.py 章节注册表，nav_group/llm_supported/显示名
+# 等字段同源）：裁剪到 _ALL_KEYS_DEFAULT 并重排号为可见连续序 1..N——模拟生产端
+# 可见重编号；不再自持第二份字段字面量（注册表改名/改分组测试自动跟随）。
+_REGISTRY_SECTION_BY_KEY = {sec["key"]: sec for sec in _REGISTRY_SECTION_DEFAULT}
+
 _REPORT_SECTION_DEFAULT: list[dict] = [
-    {"key": "summary", "name": "投资分析汇总", "number": 1},
-    {"key": "holdings_detail", "name": "持仓明细与分类", "number": 2},
-    {"key": "penetration", "name": "资产穿透TOP10", "number": 3},
-    {"key": "fund_performance", "name": "基金业绩分析", "number": 4},
-    {"key": "position_structure", "name": "持仓结构与集中度", "number": 5},
-    {"key": "style_factor", "name": "风格与因子分析", "number": 6},
-    {"key": "news_correlation", "name": "财经新闻热点与持仓关联分析", "number": 7},
-    {"key": "global_macro", "name": "全球政经局势", "number": 8},
-    {"key": "expert_review", "name": "智囊团深度复盘", "number": 9},
-    {"key": "health_check", "name": "持仓体检报告", "number": 10},
-    {"key": "penetration_deep", "name": "穿透深度分析", "number": 11},
-    {"key": "portfolio_history_drawdown", "name": "组合历史走势与回撤", "number": 12},
-    {"key": "llm_usage", "name": "LLM API 用量", "number": 13},
+    {**_REGISTRY_SECTION_BY_KEY[key], "number": idx} for idx, key in enumerate(_ALL_KEYS_DEFAULT, start=1)
 ]
 
 
@@ -329,6 +324,22 @@ class TestHtmlNavStructure(unittest.TestCase):
                 re.match(rf"^{expected}[、. ]", text),
                 f"#{sec_id} 标题 '{text}' 格式异常，应为 '{expected}、...'",
             )
+
+    def test_titles_rendered_from_registry_names(self):
+        """模板与 partials 章节标题一律 `section_names` 动态取名（改名收敛为注册表单点变更）。"""
+        hard_re = re.compile(r"section_numbers\[['\"](\w+)['\"]\]\s*}}\s*、\s*([^\s{<]+)")
+        tmpl_dir = os.path.dirname(_TEMPLATE_PATH)
+        files = [os.path.join(tmpl_dir, "report_template.html")]
+        partial_dir = os.path.join(tmpl_dir, "partials")
+        files += [os.path.join(partial_dir, f) for f in sorted(os.listdir(partial_dir)) if f.endswith(".html")]
+        violations: list[str] = []
+        for path in files:
+            with open(path, encoding="utf-8") as fh:
+                text = fh.read()
+            for m in hard_re.finditer(text):
+                if not m.group(2).startswith("{"):
+                    violations.append(f"{os.path.basename(path)}: …}}}}、{m.group(2)!r}（硬编码显示名）")
+        assert not violations, "章节标题须用 {{ section_names[key] }} 取名：" + "; ".join(violations)
 
     # ── Nav as integer ─────────────────────────────────────────
 
@@ -641,6 +652,8 @@ class TestSectionFoldMoreChapters(unittest.TestCase):
         "position_structure",
         "style_factor",
         "data_source_status",
+        "holding_change",
+        "schedule_replay",
     )
 
     @classmethod
@@ -689,6 +702,22 @@ class TestSectionFoldMoreChapters(unittest.TestCase):
                 "matched_keywords": ["示例关键词"],
             }
         ]
+        # 持仓变动/调仓回放两章需视图 truthy 才渲染（局部缺省均可 .get 兜底）
+        data["holding_change_view"] = {
+            "available": True,
+            "title_summary": "2 起变动事件",
+            "window_lines": ["窗口：2026-09-01 ~ 2026-10-06"],
+            "event_header": ["日期", "名称", "方向", "数量", "金额"],
+            "event_rows": [],
+            "limitations_note": "区间净额推断，非逐笔",
+        }
+        data["schedule_replay_view"] = {
+            "available": True,
+            "title_summary": "回放窗口 8 个调仓日",
+            "summary_lines": ["纪律回放 vs 买入持有"],
+            "metric_header": ["策略", "区间收益"],
+            "metric_rows": [],
+        }
         cls.soup = _render_template(data)
 
     def _fold_of(self, key: str):
@@ -747,6 +776,8 @@ class TestSectionFoldMoreChapters(unittest.TestCase):
             "position_structure": "只基金",
             "style_factor": "只基金风格",
             "data_source_status": "个数据源",
+            "holding_change": "事件清单与结构演变",
+            "schedule_replay": "回放对照",
         }
         for key, needle in expectations.items():
             with self.subTest(section=key):

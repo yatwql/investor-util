@@ -72,6 +72,7 @@ def write_content_sheets(
         us_indices=us_indices,
         fund_flow_data=fund_flow_data,
         market_temperature_data=market_temperature_data,
+        section_nav=[ws.title for ws in sheets.values() if ws is not None],
     )
 
     prog.call_sheet(

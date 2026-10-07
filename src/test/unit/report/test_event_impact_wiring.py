@@ -215,9 +215,9 @@ class TestRegistryWiring:
         assert "event_impact" not in _REPORT_SHEET_NAMES
 
     def test_no_nav_group_entry(self):
-        from src.python.report.html_writer_nav import _SECTION_NAV_GROUP_MAP
+        from src.python.core.registry import get_report_section_keys
 
-        assert "event_impact" not in _SECTION_NAV_GROUP_MAP
+        assert "event_impact" not in get_report_section_keys()
 
     def test_no_board_or_data_flag_on_either_side(self):
         """两端可见性派生点均无事件窗键（区块随父章，不参与章级判定）。"""
@@ -365,14 +365,16 @@ class TestTemplateWiring:
         assert 'class="block-title"' in partial  # 章内区块标题级（与持仓基本面同构）
 
     def test_main_template_includes_partial_inside_news_chapter(self):
+        """event_impact include 位于新闻章 partial 内，主模板经新闻章 include 挂载，全库仅一处。"""
         tmpl = (_TMPL_DIR / "report_template.html").read_text(encoding="utf-8")
-        assert '{% include "partials/event_impact_section.html" with context %}' in tmpl
-        # include 位于新闻章内（新闻章起点之后、下一章起点之前），仅一处
-        news_idx = tmpl.index('id="sec-news_correlation"')
-        ev_idx = tmpl.index("partials/event_impact_section.html")
-        next_idx = tmpl.index('id="sec-global_macro"')
-        assert news_idx < ev_idx < next_idx
-        assert tmpl.count("partials/event_impact_section.html") == 1
+        news = (_TMPL_DIR / "partials" / "news_correlation_section.html").read_text(encoding="utf-8")
+        assert '{% include "partials/news_correlation_section.html" with context %}' in tmpl
+        assert '{% include "partials/event_impact_section.html" with context %}' in news
+        # include 在新闻章起点之后，且新闻章 partial 不含下一章（章边界 = partial 边界）
+        assert news.index('id="sec-news_correlation"') < news.index("partials/event_impact_section.html")
+        assert 'id="sec-global_macro"' not in news
+        sources = [tmpl] + [p.read_text(encoding="utf-8") for p in sorted((_TMPL_DIR / "partials").glob("*.html"))]
+        assert sum(s.count("partials/event_impact_section.html") for s in sources) == 1
 
 
 # ── LLM 编排串行化（_fetch_llm_and_news） ───────────────

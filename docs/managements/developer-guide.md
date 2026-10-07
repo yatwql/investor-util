@@ -104,7 +104,7 @@ ln -sf "$PWD/.pi/models.json" ~/.pi/agent/models.json
 .venv/bin/python scripts/check-doc-traces.py --ci           # 文档历史痕迹检查
 .venv/bin/python scripts/check-task-numbering.py --ci       # 任务编号全局一致性检查
 .venv/bin/python scripts/check-semantic-index.py --ci       # 语义命名索引正反向校验
-.venv/bin/python scripts/check-doc-drift.py --ci            # 文档与实现一致性（章节/开关/默认值/面板编号/目录树/统计表/归档索引/分区纪律/Thinking 支持矩阵）
+.venv/bin/python scripts/check-doc-drift.py --ci            # 文档与实现一致性（章节/开关/默认值/面板编号/目录树/统计表/归档索引/分区纪律/Thinking 支持矩阵/章节-区块矩阵）
 .venv/bin/python scripts/check-test-redundancy.py --ci      # 测试用例冗余与无效（死用例/无断言/完全重复/自证用例/硬编码演进总数）
 .venv/bin/python scripts/check-requirement-trace.py --ci   # 需求 ID ↔ 验证载体追溯（已补全域全覆盖 + 载体文件存在）
 .venv/bin/python scripts/check-version-consistency.py --ci   # 版本号全局一致性（APP_VERSION ↔ README/pyproject/管理文档 10 份）
@@ -1619,7 +1619,7 @@ from src.python.core.registry import (
 - `get_report_sheet_name("summary")` → `"投资分析汇总"`
 - `get_report_section_order(config)` → 解析 `report_section_order` 配置，返回有序键列表
 - `get_report_section_number("position_structure")` → 当前配置下该模块的序号（被基金深度分析各页签写入器调用）
-- `get_report_section_keys()` → 全部 18 个模块键名（键名→中文标题对照见 [配置指南 → report_section_order](../manuals/how-to-config.md#report_section_order-报告序号配置)）
+- `get_report_section_keys()` → 全部 19 个模块键名（键名→中文标题对照见 [配置指南 → report_section_order](../manuals/how-to-config.md#report_section_order-报告序号配置)）
 
 **计算模块查询**：
 
@@ -1733,7 +1733,7 @@ DataModuleDef("我的固定键", "fixed",
 
 ### 计算模块注册表（_COMPUTATION_REGISTRY）
 
-除 `_MODULE_REGISTRY`（有缓存的数据模块）外，`core/registry.py` 还维护 `_COMPUTATION_REGISTRY`——纯计算模块（无缓存）的注册表：
+除 `_MODULE_REGISTRY`（有缓存的数据模块）外，还维护 `_COMPUTATION_REGISTRY`——纯计算模块（无缓存）的注册表，实现在 `core/computation_registry.py`（`core/registry.py` 顶部 re-export，原访问面不变）：
 
 ```python
 @dataclass(frozen=True)
@@ -1767,10 +1767,10 @@ class ComputModuleDef:
 - LLM 模块名称 → `get_llm_module_names()`
 
 > 报表页签标题与顺序由两张**独立**注册表分别驱动，**不**随 `_MODULE_REGISTRY` 自动派生：
-> - `get_report_sheet_name(sheet_key)` → 读 `_REPORT_SHEET_NAMES`（sheet key → 中文标题映射）
+> - `get_report_sheet_name(sheet_key)` → 读 `_REPORT_SHEET_NAMES`（sheet key → 中文标题映射；派生视图：非 LLM 章键值由 `_REPORT_SECTION_DEFAULT` 条目派生，LLM 章标题显式登记、差集键集为 `_LLM_SHEET_NAME_KEYS`）
 > - `get_report_section_order(config)` → 读 `_REPORT_SECTION_DEFAULT`（章顺序与分组）
 >
-> 二者职责不同：前者管「页签叫什么」，后者管「章按什么顺序排」。新增页签需在 `_REPORT_SHEET_NAMES` 登记标题；若该页签属报告章，还需在 `_REPORT_SECTION_DEFAULT` 登记顺序（`scripts/check-semantic-index.py` 校验合并章引用的 sheet key 存在于 `_REPORT_SECTION_DEFAULT`）。
+> 二者职责不同：前者管「页签叫什么」，后者管「章按什么顺序排」。新增报告章在 `_REPORT_SECTION_DEFAULT` 登记后，页签标题由派生视图自动跟进（LLM 章例外：其显示名在 `_REPORT_SHEET_NAMES` 显式登记并把键声明进 `_LLM_SHEET_NAME_KEYS`）；若该页签属报告章，还需在 `_REPORT_SECTION_DEFAULT` 登记顺序（`scripts/check-semantic-index.py` 校验合并章引用的 sheet key 存在于 `_REPORT_SECTION_DEFAULT`）。
 
 ### 测试
 

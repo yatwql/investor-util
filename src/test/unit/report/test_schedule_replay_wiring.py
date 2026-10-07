@@ -196,9 +196,10 @@ class TestRegistryWiring:
         assert get_report_sheet_name("schedule_replay") == "调仓纪律回放"
 
     def test_nav_group_is_history(self):
-        from src.python.report.html_writer_nav import _SECTION_NAV_GROUP_MAP
+        from src.python.core.registry import _REPORT_SECTION_DEFAULT
 
-        assert _SECTION_NAV_GROUP_MAP["schedule_replay"] == "history"
+        entry = next(sec for sec in _REPORT_SECTION_DEFAULT if sec["key"] == "schedule_replay")
+        assert entry["nav_group"] == "history"
 
     def test_board_flags_default_true_on_both_sides(self):
         """实验章 board 层恒 True（两端一致），可见性由 data 层决定。"""

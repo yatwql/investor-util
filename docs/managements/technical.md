@@ -49,6 +49,7 @@
   - [4.19 持仓基本面（财务指标 + 持仓个股财报摘要）](#419-持仓基本面财务指标--持仓个股财报摘要一章两区块)
   - [4.20 景气度框架诊断（实验性功能 prosperity_framework）](#420-景气度框架诊断实验性功能-prosperity_framework)
   - [4.21 正文大块默认折叠（HTML 报告）](#421-正文大块默认折叠html-报告)
+  - [4.22 章节-区块矩阵](#422-章节-区块矩阵)
 - [5. LLM 集成层（概要设计）](#5-llm-集成层概要设计)
   - [5.1 架构总览](#51-架构总览)
   - [5.2 调用链概览](#52-调用链概览)
@@ -282,7 +283,7 @@ llm/generators_orchestrator.py ──→ cache/（可选）
 
 #### 1.4.4 报告配置化
 
-**决策**：报告 18 个模块的序号、显示名称、章节可见性由配置驱动，消除硬编码。渲染期数据通过模板 context 传递，禁止写入模块级全局变量。
+**决策**：报告 19 个模块的序号、显示名称、章节可见性由配置驱动，消除硬编码。渲染期数据通过模板 context 传递，禁止写入模块级全局变量。
 
 **两层可见性模型 + 章级维度**：
 
@@ -1656,7 +1657,7 @@ verbose 模式颜色由 `stderr.isatty()` + `NO_COLOR` 环境变量控制，使�
 | 编排器 | `html_writer.py` | 调用 builders → 渲染 → 保存 |
 | 数据构建器 | `html_builders.py` | 原始数据 → 结构化渲染对象 |
 | 渲染器 | `html_renderers.py` | Markdown→HTML 转换、格式处理 |
-| 模板 | `tmpl/report_template.html` | Jinja2 模板 + 宏 |
+| 模板 | `tmpl/report_template.html` + `tmpl/partials/` | Jinja2 模板 + 宏 + 章节级 partial（主模板经 include 按组拆入） |
 | 环境 | `html_jinja_env.py` | Jinja2 环境初始化、过滤器注册 |
 | 保存 | `html_save.py` | HTML 文件写入 |
 | JS 资产 | `html_writer_assets.py` | `_copy_js_assets` 复制 Chart.js bundle 到输出目录；`_inline_js_assets` 保存前内嵌为行内脚本（单文件自包含） |
@@ -1745,7 +1746,7 @@ for sec in section_order:
 
 ### 4.6 报告序号可配置
 
-报告 18 个模块的序号/显示名称由 `core/registry.py` 的 `_REPORT_SECTION_DEFAULT` 注册表驱动，支持用户通过 `config.json` 自定义。
+报告 19 个模块的序号/显示名称由 `core/registry.py` 的 `_REPORT_SECTION_DEFAULT` 注册表驱动，支持用户通过 `config.json` 自定义。
 
 #### 注册表结构
 
@@ -1761,7 +1762,7 @@ for sec in section_order:
 }
 ```
 
-18 个模块分布：`always`×5、`fund_deep_analysis`×2、`news`×1、`llm`×5、`history`×1、`evolution`×1、`action`×1、`fundamental_snapshot`×1、`holding_change`×1。
+19 个模块分布：`always`×5、`fund_deep_analysis`×2、`news`×1、`llm`×5、`history`×1、`evolution`×1、`action`×1、`fundamental_snapshot`×1、`holding_change`×1、`schedule_replay`×1。
 
 #### 合并规则流程
 
@@ -2179,7 +2180,7 @@ report/ 渲染                   # 模板 context 传递（C14）→ 风格表 +
 |:-----|:---------|
 | **C1** (代码类型判定中心化) | 因子代理指数代码统一走 `core/code_utils.py::is_index_code()` 判定；因子指数**不作为 `_A_INDICES` 成员**（避免污染实时指数行情循环与报告"指数对比"章节噪声），代码集合定义为分析模块内部常量 |
 | **C6** (Provider Chain 必经) | 指数历史 K 线经 `fetcher/index.py::fetch_index_history()` 复用 `history_index` chain（`["tencent", "eastmoney", "sina", "hithink"]`），不绕过 Chain 直调 Provider。Sina 备用链路当前 404（降级接受），故补东方财富 push2his 为实际可用的第二源；腾讯与东方财富均故障时因子章节落 §1.4.5 数据不足分支 |
-| **C7** (报告序号可配置) | 在 `core/registry.py` 的 `_REPORT_SECTION_DEFAULT` 注册条目（type=`fund_deep_analysis`、data_flag=`style_factor_data`），支持用户通过 `config.json` 自定义序号与开关，不硬编码序号。注册表 18 个模块序号连续（1~18），`style_factor` 为基金深度分析一章四区块（风格表 + 风格因子回归 + 行业 Beta 子表 + 因子目录区块） |
+| **C7** (报告序号可配置) | 在 `core/registry.py` 的 `_REPORT_SECTION_DEFAULT` 注册条目（type=`fund_deep_analysis`、data_flag=`style_factor_data`），支持用户通过 `config.json` 自定义序号与开关，不硬编码序号。注册表 19 个模块序号连续（1~19），`style_factor` 为基金深度分析一章四区块（风格表 + 风格因子回归 + 行业 Beta 子表 + 因子目录区块） |
 | **C14** (渲染期数据不可写入模块级全局变量) | 风格与因子数据通过模板 `render()` 的 context 参数传递，不写入 `_ENV.globals` 或模块级 dict |
 | **C19** (pipeline_data Schema 契约) | 新增 `style_factor_data` 键（类型 `dict`，内嵌 `industry_beta` 子键），键结构见附录 H，先定义类型再使用 |
 | **§1.4.5** (数据降级治理) | 区分两分支：① **数据不足**——因子指数历史不足 36 期或有效样本 < 36，标记 `style_factor_data.available=false`，显示"数据不足"占位文本，**不走 DegradationTracker**（系数据量不足，非故障）；② **数据源故障**——`fetch_index_history` 返回空（chain 全失败），走 DegradationTracker 记录 T2 降级事件，显示"数据源暂不可用"，与数据不足文案区分。行业 Beta 子表独立降级（`industry_beta=None` 开关关闭隐藏 / `available=false` 标题+占位），**绝不输出误导性数字** |
@@ -2902,7 +2903,7 @@ llm/skeleton.py                 # 教训区块注入专家复盘提示词（开�
 
 ### 4.21 正文大块默认折叠（HTML 报告）
 
-**定位**：长内容章节的正文整体包进原生 `<details class="section-fold">`，章标题与「回到顶部」留在折叠块外常显；`summary.section-fold-summary` 提示条携带该章关键摘要并自带「点击展开/收起」指引（原生键盘可达，无 JS 也能收放）。折叠覆盖章节（结构回归 `test_html_report_structure.py` 的 `_FOLD_KEYS` 为单源，后续新增折叠章只需改清单即逐章生效）：
+**定位**：长内容章节的正文整体包进原生 `<details class="section-fold">`，章标题与「回到顶部」留在折叠块外常显；`summary.section-fold-summary` 提示条携带该章关键摘要并自带「点击展开/收起」指引（原生键盘可达，无 JS 也能收放）。折叠覆盖章节（结构回归 `test_html_report_structure.py` 的 `_FOLD_KEYS` 为单源，后续新增折叠章只需改清单即逐章生效；历史章由 `TestSectionFold` 单测覆盖）：
 
 | 章节 | sheet key | 提示条关键摘要 |
 |:--|:--|:--|
@@ -2913,11 +2914,45 @@ llm/skeleton.py                 # 教训区块注入专家复盘提示词（开�
 | 持仓结构与集中度 | `position_structure` | 基金数与组合对数 |
 | 风格与因子分析 | `style_factor` | 基金风格数 |
 | 数据源可用性矩阵 | `data_source_status` | 数据源数 |
+| 持仓变动复盘 | `holding_change` | `title_summary`（事件清单与结构演变） |
+| 调仓纪律回放 | `schedule_replay` | `title_summary`（回放对照） |
 
 - **缺省一律收起**：模板不写 `open` 属性（收起是原生行为、不依赖 JS）；`fold.js` 初始 load 不执行锚点展开——打开报告（地址带 `#sec-…` / 浏览器恢复会话）全部收起，仅会话内 `hashchange`（点击目录原生锚点链接）自动展开目标章折叠块保证跳转后可见；回归用例 `test_fold_js_keeps_collapsed_on_initial_load` 锁死初始不展开。
 - **打印**：`beforeprint` 以捕获阶段注册（先于 chart-print.js 快照）全展开 + 同步 resize 内部 Chart.js 图表（收起态 canvas 为 0 尺寸），`afterprint` 恢复用户原折叠状态；`@media print` 隐藏 `summary` 提示条并去边框/背景，打印稿不显示提示条。
 - **手动展开**：`details` 的 `toggle` 事件逐块绑定，展开时对内部 canvas `resize()`（ResizeObserver 兜底）。
-- **载体**：`details.section-fold` 共 7 处（主模板 `report_template.html` 5 处：历史走势/新闻关联/持仓结构/风格因子/数据源矩阵；`partials/evolution_section.html` 与 `partials/fundamental_snapshot_section.html` 各 1 处）；结构回归 `TestSectionFold`（历史章）+ `TestSectionFoldMoreChapters`（其余折叠章节逐章遍历五类断言：包裹收起/summary 首元素/标题回顶在外/关键摘要/初始收起）。需求 `R-OUT-12`。
+- **载体**：`details.section-fold` 共 10 处，全部位于章节 partial（模板拆分后主模板仅剩 CSS 注释与 fold.js 装配）：9 个章节各 1 处（`portfolio_history_drawdown_section` / `news_correlation_section` / `holding_change_section` / `schedule_replay_section` / `position_structure_section` / `style_factor_section` / `data_source_status_section` / `evolution_section` / `fundamental_snapshot_section`）+ 章内块级 1 处（`event_impact_section` 事件窗对照块）；结构回归 `TestSectionFold`（历史章）+ `TestSectionFoldMoreChapters`（`_FOLD_KEYS` 八个章节逐章遍历五类断言：包裹收起/summary 首元素/标题回顶在外/关键摘要/初始收起）。需求 `R-OUT-12`。
+
+### 4.22 章节-区块矩阵
+
+**用途**：双端一致性契约此前只覆盖「名称 + 顺序 + 集合」（章级），**章内区块级**清单只散落在文字描述里——某端增/删/漏区块（Excel 少写一节、HTML 多渲染一块）无机检。本节把全部报告章节的双端区块清单固化为矩阵表，`check-doc-drift` 第 17 项按同口径重算/对账，漂移在提交前暴露；后续再升级为代码级契约（注册表条目增 `blocks` 字段，清单以注册表为真值）。
+
+**计数口径**（检查脚本与本节文字同源，改口径须同步两处）：
+
+- **HTML 区块数**——对章节 partial（`src/static/tmpl/partials/`，多文件用 ` + ` 分隔）按「序号标记去重重算」：三类序号取并集——block-title 标题首字符序号（`一、` / `①` 式）、`>` 后的加粗序号 div、结构注释 `<!-- ── 一、… ── -->`；有序号时计集合大小，无序号但存在 block-title 则计去重标题数，两者皆无记「—」（流式章，不计数）。
+- **Excel 区块清单**——各页签写入器的子块标题清单（多模块用 ` + ` 分隔、多区块用 ` / ` 分隔），检查逐串在载体模块内做存在性对账（防区块删除/改名后矩阵不失真）；「—」为单表章。
+- **备注**记录条件（开关门控）区块与双端差异；矩阵首列序号无语义（仅行标），章节集合与顺序以注册表为准（缺行/多行由检查报出）。
+
+| # | 章节（key） | HTML 区块数 | HTML 载体（`src/static/tmpl/partials/`） | Excel 区块清单 | Excel 载体（`src/python/report/`） | 备注 |
+|---|---|---|---|---|---|---|
+| 1 | `summary` | — | summary_section.html | 持仓概况 / 盈亏汇总 / 市场温度 / 市场指数 | summary.py | 流式章：HTML 端数字卡非区块 |
+| 2 | `holdings_detail` | 2 | holdings_detail_section.html | 市值核算明细 / 持仓分类汇总 | holdings_detail_sheet.py | 双端对等 |
+| 3 | `penetration` | — | penetration_section.html | — | penetration_sheet.py | 单表章 |
+| 4 | `fund_performance` | 2 | fund_performance_section.html | 候选基金比较 / 基金经理变更监控 | fund_performance.py | 候选比较为开关门控区块（两态标题去重后计 1） |
+| 5 | `position_structure` | 3 | position_structure_section.html | 持仓重合度矩阵 / 持仓相关性矩阵 / 持仓集中度监控 | position_structure_sheet.py | 双端对等 |
+| 6 | `style_factor` | 4 | style_factor_section.html | 基金风格表 / 风格因子回归 / 行业 Beta / 因子目录 | style_factor_sheet.py | 行业 Beta 子表与因子目录默认关（条件区块，序号去重计 4） |
+| 7 | `action` | 7 | action_section.html | 再平衡信号 / 交易纪律 / 调仓建议清单 / 收益归因 / 历史决策复盘 / 景气度框架诊断 / 市场情绪 | action_sheet.py | ⑤⑥⑦ 门控（决策复盘/景气度/市场情绪，默认关） |
+| 8 | `news_correlation` | 1 | news_correlation_section.html + event_impact_section.html | 事件窗量化对照 | news_correlation.py + event_impact_panel.py | 事件窗对照为章内块级；新闻主表为章主体 |
+| 9 | `global_macro` | — | global_macro_section.html | 事实校验摘要 | llm_content.py | LLM 流式章；事实校验块 Excel 端条件写入 |
+| 10 | `expert_review` | — | expert_review_section.html | 事实校验摘要 | llm_content.py | 同上 |
+| 11 | `health_check` | — | health_check_section.html | 事实校验摘要 | llm_content.py | 同上 |
+| 12 | `penetration_deep` | — | penetration_deep_section.html | 事实校验摘要 | llm_content.py | 同上 |
+| 13 | `portfolio_history_drawdown` | 3 | portfolio_history_drawdown_section.html | 走势表 / 回撤矩阵 / 危机区间标注 | portfolio_history_drawdown_sheet.py | 双端对等 |
+| 14 | `portfolio_evolution` | 5 | evolution_section.html | 总市值趋势 / 自上次快照变化摘要 | evolution_sheet.py | HTML 端五序号 vs Excel 两子块（已知差异，后续对齐） |
+| 15 | `holding_change` | 4 | holding_change_section.html | 变动事件清单 / 频率与结构演变 / 意图对账 / 变动动因 LLM 归因 | holding_change_panel.py | LLM 归因块条件写入，双端四对四 |
+| 16 | `schedule_replay` | 2 | schedule_replay_section.html | 纪律回放 vs 买入持有 / 规则 A 逐期调仓与成本 | schedule_replay_panel.py | 双端对等 |
+| 17 | `data_source_status` | — | data_source_status_section.html | 源健康 / 数据源说明 / 品种覆盖 / 可信度 | data_quality_sheet.py | HTML 端表格直排无序号标记；Excel 端四子块 |
+| 18 | `fundamental_snapshot` | 2 | fundamental_snapshot_section.html | 财务指标 / 财报摘要 | fundamental_snapshot_sheet.py | 两区块各由功能开关门控 |
+| 19 | `llm_usage` | — | llm_usage_section.html | — | excel_llm_usage.py | 单表章 |
 
 ## 5. LLM 集成层（概要设计）
 
@@ -3475,7 +3510,7 @@ make_http_client(timeout=10.0) → httpx.Client
 | `extract_purchase_constraint_block` | 约束块提取唯一单源（编排层与新闻链两侧共用，契约键/嵌套调整只改此处） | 申购限购 | LLM 生成 | 无 |
 <!-- semantic-index:end -->
 
-> **registry.number 重排**：`registry._REPORT_SECTION_DEFAULT` 的 `number` 连续编号 1~18（章节合并后条目曾由 21 降为 17，后新增持仓变动复盘至 18，序号整体重排；`llm_usage` 强制末位）。
+> **registry.number 重排**：`registry._REPORT_SECTION_DEFAULT` 的 `number` 连续编号 1~19（历次章节合并与新增后整体重排；`llm_usage` 强制末位）。
 
 [↑ 回到顶部](#目录)
 
@@ -3593,7 +3628,7 @@ web/ (Web 服务层，薄入口)
 
 | # | 约束 | 设计目的 | 违反后果 | 适用范围 |
 |:---|:-----|:---------|:---------|:---------|
-| **C7** | **报告序号与显示名不可硬编码** — 报告 18 个模块的章节顺序/可见性由 `core/registry.py` 的 `_REPORT_SECTION_DEFAULT` 注册表驱动，页签显示名由同文件的 `_REPORT_SHEET_NAMES` 注册表驱动（两表键一一对应、同名显示名由测试锁定，页签名一律经 `get_report_sheet_name()` 取用），均支持 `config.json` 自定义覆盖 | 硬编码序号使得用户无法通过配置调整报告章节顺序，且新增/删除模块时需要全局修改序号；显示名散落在写入层则重命名页签必须全局搜索，两处清单一旦不同步便出现「配置里叫一个名、页签上叫另一个名」 | 序号配置失效、用户自定义顺序不生效；页签显示名与注册表/配置脱节 | report/ 编排器与写入层（excel_generator.py、html_writer.py、fund_style_classify.py 等）；任何写入页签名的模块均须经 `get_report_sheet_name()`，不得直接写中文字面量 |
+| **C7** | **报告序号与显示名不可硬编码** — 报告 19 个模块的章节顺序/可见性由 `core/registry.py` 的 `_REPORT_SECTION_DEFAULT` 注册表驱动，页签显示名由同文件的派生视图 `_REPORT_SHEET_NAMES` 驱动（键集 = 章节注册表减 LLM 章差集 `_LLM_SHEET_NAME_KEYS`：非 LLM 章键值由注册表条目派生、LLM 章显示名显式登记，值同源由测试锁定，页签名一律经 `get_report_sheet_name()` 取用），均支持 `config.json` 自定义覆盖 | 硬编码序号使得用户无法通过配置调整报告章节顺序，且新增/删除模块时需要全局修改序号；显示名散落在写入层则重命名页签必须全局搜索，两处清单一旦不同步便出现「配置里叫一个名、页签上叫另一个名」 | 序号配置失效、用户自定义顺序不生效；页签显示名与注册表/配置脱节 | report/ 编排器与写入层（excel_generator.py、html_writer.py、fund_style_classify.py 等）；任何写入页签名的模块均须经 `get_report_sheet_name()`，不得直接写中文字面量 |
 | **C10** | **新闻召回策略可配置** — `per_source` 每源获取数量必须与 `news_top_count` 最终截取数量解耦，`per_source` 动态计算为 `max(500, news_top_count × 2)`，不可写死 | 固定值会导致去重后候选新闻不足，最终截取数不满足用户配置 | 新闻候选不足、用户配置不生效 | `providers/news_aggregator.py` |
 | **C14** | **渲染期数据不可写入模块级全局变量** — 所有渲染期数据（如 `section_visible_dict`）必须通过模板 `render()` 的 context 参数传递，不得写入 `_ENV.globals` 或模块级 dict | 模块级全局变量在并发/多次渲染场景下产生状态污染，且难以追踪数据流向 | 并发不安全、渲染状态污染、数据流向不可追踪 | report/html_writer.py、模板渲染相关模块 |
 | **C19** | **pipeline_data Schema 契约** — 所有 pipeline_data 键必须先在附录 H（pipeline_data Schema 定义）中预定义类型、可选性、写入/消费模块后，才能在代码中使用该键 | 无 schema 定义的键在管线中类型不匹配时引发难调试的 KeyError，且多人并行开发时互相不知道对方新增的键 | 违反时集成测试不通过 | report/orchestrator.py、所有向 pipeline_data 注入数据的模块 |

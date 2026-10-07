@@ -1,6 +1,6 @@
 # 投资复盘助手 - 自我审查问题记录
 > 文档版本：0.12.5-dev
-> **编号源**：`rf-next = 616`（新增问题取此编号，完成后更新为 +1；已用最大 rf-615，递增保证唯一，归档不回收。若与历史归档冲突，运行 `scripts/check-task-numbering.py` 校验）
+> **编号源**：`rf-next = 617`（新增问题取此编号，完成后更新为 +1；已用最大 rf-616，递增保证唯一，归档不回收。若与历史归档冲突，运行 `scripts/check-task-numbering.py` 校验）
 
 ---
 
@@ -21,7 +21,7 @@
 
 | # | 文件 | 行数 | 状态 | 拆分建议 |
 |---|------|------|------|----------|
-| **rf-75** | `core/registry.py` | 743 | 维持现状（中央注册表被 56 文件引用，数据表内聚；2026-10-05 脚本实测 743，较 2026-10-02 的 716 增长 27——plan-50 财报域槽位/plan-57 等注册项增补） | 报告章节/缓存TTL/LLM模块/数据模块 4 个注册职责（不拆） |
+| **rf-75** | `core/registry.py` | 780 | 维持现状但**临界**（中央注册表被 56 文件引用，数据表内聚；2026-10-07 实测 780，较登记 743 增 37——报告导航分组 `nav_group`/`llm_supported` 字段增补；同批已把计算注册表拆出 `core/computation_registry.py` 控住 800 红线，余量 20 行，后续注册项增补须优先下沉子模块） | 报告章节/缓存TTL/LLM模块/数据模块 4 个注册职责（不拆） |
 | **rf-78** | `fetcher/batch.py` | 520 | 维持现状（BatchDispatcher 本身内聚，复核确认不拆；2026-10-02 实测 520，回落至登记值附近（rf-522 重试退避原语收编后下降）） | BatchDispatcher 本身内聚，可维持现状（不拆） |
 | **rf-79** | `core/code_utils.py` | 671 | 维持现状（仍在 500-800 区间内聚；2026-10-02 实测 671，较登记值 542 增长 129，主要为符号映射/判定函数增补） | 可考虑将 `estimate_market_cap_by_prefix()` 等非核心判定函数移出（不拆） |
 | **rf-80** | `report/data_status.py` | 621 | 维持现状（DegradationTracker 单类，内部职责内聚；2026-10-02 实测 621，较 2026-09-10 的 544 增长 77——provider 归属登记与失败原因可读化增补） | DegradationTracker 单类偏大（不拆） |
@@ -51,11 +51,7 @@
 
 | # | 问题 | 修复方向 |
 |---|------|----------|
-| **rf-601** | HTML 目录导航元数据是 HTML 端私有硬编码，与注册表并列为第二事实源：`html_writer_nav.py` 的 `_NAV_GROUP_LABELS`（基础信息/基金深度分析/行动建议/历史/LLM/附录 六组）、`_SECTION_NAV_GROUP_MAP`（章→组映射）、`_LLM_SUPPORTED_SECTIONS`（🧠 标记集合）三张表都不在 `_REPORT_SECTION_DEFAULT` 里——新增章节须两处注册，漏配时静默回退「基础信息」组不报错；且 LLM 口径存在三套并行集合（注册表 `type=llm`、🧠 集合、`LLM_MODULE_GATED_SECTIONS`），边界各异（如 `news_correlation` 有 🧠 但 type=news、`llm_usage` 属附录组但带 🧠）；Excel 端完全拿不到分组信息（rf-602 的前置依赖） | 注册表条目增 `nav_group` 字段（🧠 标记并入或由注册表字段派生），HTML 三张表改为注册表派生或删除；补「注册表键集 ⊆ 分组映射键集」防漂移测试，现有散点断言（`test_financial_indicator` / `test_schedule_replay_wiring` 等处直接 import 私有常量比对）收口迁移；入库时一并评审分组归属是否符合阅读流（如「持仓基本面」现归附录组、与基金深度分析组仅隔数据源矩阵一章） |
-| **rf-602** | Excel 端导航能力与 HTML 三件套不对等：HTML 有左侧 TOC 分组目录、顶部横向章节导航、每章「回到顶部」链接；Excel 三者皆无——全库无 `tabColor` 页签颜色（六组分组在 Excel 端零体现）、汇总页无章节清单、各页签无「返回汇总」跳转，最多 19 个页签只能靠底部标签栏线性翻找 | 依赖 rf-601 分组同源后双端落地：① 页签 `tabColor` 按 `nav_group` 上色（六组六色，与 HTML 目录分组一眼对应）；② 汇总页顶部加「章节导航」区（Excel 内部超链接指向各页签，按可见章节动态生成，与 HTML TOC 对应）；③ 各页签标题行下加「返回汇总」链接（与 HTML「回到顶部」对应）；补双端导航一致性测试（TOC 分组 ↔ 页签颜色、可见章节集 ↔ 导航链接集） |
-| **rf-603** | 章节显示名三处（实为四条路径）维护：① 注册表 `_REPORT_SECTION_DEFAULT[].name`——Excel 页签标签 `f"{n}.{name}"` 与 HTML 导航由此取；② `_REPORT_SHEET_NAMES` 14 键子集——Excel 章内 A1 标题行走 `get_report_sheet_name()`，LLM 章另走 `get_llm_module_name()` 第四条路径；③ 模板正文硬编码中文标题 14 处（`{{ section_numbers['summary'] }}、投资分析汇总` 只动态了序号）+ 5 个 partial 内同款硬编码。现有测试（`test_sheet_names_match_section_names`、导航↔section-title 一致、section-title 格式）能把漂移打红，但一次改名需手工同步 3-4 处，测试只能事后报错、改名过程没有单一真值 | 模板与 partials 标题改为 context 注入动态章名（渲染层从注册表一次性构造 `section_names`，模板写 `{{ section_names[key] }}`），改名收敛为注册表单点变更；`_REPORT_SHEET_NAMES` 降级为注册表派生视图或删除（LLM 章仍走 `get_llm_module_name`，差集显式声明）；既有三处一致性测试改为断言派生关系，防漂移强度不降 |
-| **rf-604** | `src/static/tmpl/report_template.html` 3131 行单文件：报告章节中仅 5 个拆到 partials（action/evolution/holding_change/schedule_replay/fundamental_snapshot，另有新闻章内 event_impact 区块 partial），其余 14 个章节仍内联（基础信息、基金深度、LLM 分析、历史主章、附录各组），CSS/JS/正文/导航同文件；且 `check-file-length.py` 只扫 `*.py`，模板体量无任何红线监控——归档 rf-198 已开章节级 partial 拆分先例（当时 2570→2410 行），现已回涨至 3131（+721） | 按 TOC 六组继续章节级 partial 拆分（沿用 `partials/*_section.html` 命名与 `with context` 透传约定），输出零变化由 `test_html_report_structure*` 系列结构测试护航；同步 `folders.md` 目录树与行数快照；可选：`check-file-length.py` 增列 `.html` 模板观察名单（仅 `-v` 提示，不设红线，豁免与观察项显式声明） |
-| **rf-605** | 双端一致性契约只覆盖「名称 + 顺序 + 集合」（`test_report_chapter_consistency`），**章内区块级**内容无契约：风格与因子 4 区块、持仓结构 3 区块、组合历史 2 区块、持仓基本面 2 区块、行动建议 4 区块等的区块清单只存在于 `technical.md` 文字描述——某端增/删/漏区块（Excel 少写一节、HTML 多渲染一块）无机检，两端内容不对等不会被任何测试发现 | 建立「章节-区块矩阵」双端契约：区块清单以数据契约/渲染注册为真值（或注册表条目增 `blocks` 字段），测试断言 Excel 写入区块与 HTML 渲染区块集合双向一致；至少先在 `technical.md` 固化矩阵表，并由 `check-doc-drift` 抽查区块计数（与既有「统计表核对」机制合流），后续再升级为代码级契约 |
+| **rf-616** | 章节-区块矩阵首版即暴露的双端章内区块清单不对等：「组合演进」HTML 端五个序号区块（①~⑤）vs Excel 端两子块（总市值趋势 / 自上次快照变化摘要）；矩阵已记为「已知差异」，但无机检强制收敛，单端增删仍可能静默发生 | 升级区块级代码契约（注册表条目增 `blocks` 字段，Excel 写入区块 ↔ HTML 渲染区块集合双向断言）时对齐组合演进两端区块划分，并把矩阵计数改为由注册表派生 |
 
 ### P2E — 任务执行流程耗时优化（质量 × 时间平衡）（2026-10-07）
 
@@ -67,6 +63,11 @@
 ## 已解决问题
 
 - rf-600 已修复（2026-10-07）：仓库 config `report_section_order` 与章节注册表失同步 —— config 移除废弃键 `event_impact`、补 `schedule_replay`=16（18 键与注册表 19 键减 `llm_usage` 双向一致、逐键出厂同序），`validate_config` 未知模块标识升级为计 1 问题 + 内存自动清理，契约测试 `TestRepoConfigSectionOrderContract` 绕过测试隔离直读仓库 config 兜底键集漂移 + `TestReportSectionOrderAutoClean` 锁定清理，并同步 how-to-config/faq/technical「本仓库配置 N 项」镜像表述
+- rf-601 已修复（2026-10-07）：导航分组三张 HTML 私有表收敛注册表单源 —— `_REPORT_SECTION_DEFAULT` 条目增 `nav_group`（六组）与 `llm_supported` 字段，`_SECTION_NAV_GROUP_MAP` 删除、`_NAV_GROUP_LABELS`/`_LLM_SUPPORTED_SECTIONS` 派生，计算注册表拆出 `core/computation_registry.py`（`registry.py` 顶部 re-export）控住行数红线，`TestNavGroupRegistry` 防漂移 + 三处散点断言收口迁移至注册表条目断言
+- rf-602 已修复（2026-10-07）：Excel 导航三件套落地 —— 页签 `tabColor` 六组六色（`nav_group` 派生，与 HTML 目录分组同源）、汇总页「章节导航」超链接区（每 8 列一行，表头/冻结行随导航动态化）、各页签标题行尾「↩ 返回汇总」链接（不挪动 20+ 写入器表头行），`test_excel_navigation.py` 覆盖分组配色双向键集、导航链接集 ↔ 可见页签集、返回链接与双端分组一致性
+- rf-603 已修复（2026-10-07）：章节显示名单源化 —— 模板 14 处 + partials 5 处硬编码标题改 `{{ section_names[key] }}`（env globals 从注册表一次性构造），`_REPORT_SHEET_NAMES` 降为派生视图（LLM 章差集 `_LLM_SHEET_NAME_KEYS` 显式声明）+ 派生关系测试 + 「模板与 partials 无硬编码标题」守卫用例
+- rf-604 已修复（2026-10-07）：模板按 TOC 六组章节级拆分 —— `report_template.html` 3131 → 1143 行、14 个章节 partial（`partials/*_section.html` + `with context` 约定沿用），渲染输出与拆分前按空白归一逐字一致；raw 读模板的 4 个测试改读「模板 + partials」拼接源，`_FOLD_KEYS` 补持仓变动/调仓回放两章折叠结构断言；可选项（`check-file-length` 增列 `.html` 观察名单）因拆分后主模板仅 1143 行、失去监控动机，不启用
+- rf-605 已修复（2026-10-07）：章节-区块矩阵双端契约基线 —— `technical.md` §4.22 固化 19 个章节的矩阵（HTML 序号标记重算口径 + Excel 子块清单存在性对账 + key 双向对注册表），`check-doc-drift` 第 17 项机检（计数重算/清单逐串/缺行多行）配 7 项回归用例；顺带修正组合历史「一章两区块」陈旧 docstring 为三区块、§4.21 折叠载体口径随模板拆分重写
 - rf-606 已修复（2026-10-07）：同一待提交树守护重复执行 —— dev-verify 预检精简为 <100ms 任务编号快检，pre-commit 为本地守护唯一执行点、CI guards 全量兜底；回归用例 `test_test_runner_modes.py` 3 项锁定预检内容
 - rf-607 已修复（2026-10-07）：P0 门禁文档三处口径矛盾 —— CLAUDE.md / developer-guide / testplan 统一为「dev-verify 手动 + 十守护由 pre-commit 钩子自动执行 + CI 恒全量兜底」，守护清单五处同源校验保持不变
 - rf-608 已修复（2026-10-07）：`check-doc-drift --sync` 无条件 pytest 收集 —— 测试树指纹磁盘缓存（`DOC_DRIFT_SNAPSHOT_CACHE` 测试隔离重定向），收集冷 4.1s → 命中 0.6s；回归用例 `test_check_doc_drift_crosscheck.py` 6 项（命中免收集 / 失效重算回写 / 损坏降级 / 树指纹敏感 / 同树确定性 / 隔离生效）

@@ -1,0 +1,307 @@
+    <div class="section" id="sec-position_structure" style="order: {{ section_numbers['position_structure'] }};">
+        <div class="section-title">{{ section_numbers['position_structure'] }}、{{ section_names['position_structure'] }}</div>
+        <details class="section-fold">
+            <summary class="section-fold-summary">
+                {{ _funds | length }} 只基金、{{ _pairs | length }} 对组合 —— 点击展开/收起重合度矩阵、相关性矩阵与集中度监控
+            </summary>
+        <div class="section-content">
+            <!-- 区块一：持仓重合度矩阵 -->
+            <div class="block-title">一、持仓重合度矩阵</div>
+            {% set _stale_notes = overlap_matrix.get("stale_fund_notes", []) %}
+            {% if _stale_notes %}
+            <div class="notice-banner" style="margin-bottom: 8px; font-size: 12px;">
+                ⚠ 持仓报告期陈旧、已从矩阵剔除：{{ _stale_notes | join("；") }}
+            </div>
+            {% endif %}
+            {% if _funds and _pairs %}
+            <div class="summary-tag" style="margin-bottom: 8px;">
+                📊 <strong>{{ _funds | length }}</strong> 只基金，共 <strong>{{ _pairs | length }}</strong> 对组合
+            </div>
+            {% if _pairs and _pairs[0].common_count > 0 %}
+            {% set top = _pairs[0] %}
+            {% set top_a = _fund_names.get(top.fund_a, top.fund_a) %}
+            {% set top_b = _fund_names.get(top.fund_b, top.fund_b) %}
+            <div class="notice-banner" style="margin-bottom: 12px;">
+                🔔 最高重叠：<strong>{{ top_a }}({{ top.fund_a }})</strong> × <strong>{{ top_b }}({{ top.fund_b }})</strong>
+                — Jaccard {{ "%.2f"|format(top.jaccard * 100) }}%，共同持有 {{ top.common_count }} 只标的
+            </div>
+            {% endif %}
+
+            <!-- 矩阵表 -->
+            <div style="overflow-x: auto;">
+            <table class="heatmap-matrix">
+                <thead>
+                    <tr>
+                        <th></th>
+                        <th></th>
+                        {% for f in _funds %}
+                        <th style="font-size: 11px; max-width: 80px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;"
+                            title="{{ _fund_names.get(f, f) }}">{{ _fund_names.get(f, f) }}</th>
+                        {% endfor %}
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for i in range(_funds | length) %}
+                    <tr>
+                        <td style="font-weight: bold; font-size: 11px; max-width: 80px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;"
+                            title="{{ _fund_names.get(_funds[i], _funds[i]) }}">{{ _fund_names.get(_funds[i], _funds[i]) }}</td>
+                        <td style="font-size: 11px; color: #888;">({{ _funds[i] }})</td>
+                        {% for j in range(_funds | length) %}
+                        {% set val = _matrix[i][j] %}
+                        <td style="text-align: center; font-size: 12px;
+                            {% if val >= 0.50 %}background-color: #FF4444; color: white; font-weight: bold;
+                            {% elif val >= 0.30 %}background-color: #FF8C00; color: white;
+                            {% elif val >= 0.15 %}background-color: #FFD700;
+                            {% elif val > 0 %}background-color: #CCFFCC;
+                            {% endif %}">
+                            {{ "%.2f"|format(val * 100) }}%
+                        </td>
+                        {% endfor %}
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+            </div>
+
+            <!-- 配对明细 -->
+            {% if _pairs %}
+            <br>
+            <div style="font-weight: bold; font-size: 14px; margin-bottom: 6px;">配对明细（按重合度降序）</div>
+            <table>
+                <thead>
+                    <tr>
+                        <th>序号</th>
+                        <th>基金A</th>
+                        <th>基金B</th>
+                        <th>共同标的数</th>
+                        <th>Jaccard</th>
+                        <th>共同标的</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for p in _pairs %}
+                    <tr>
+                        <td>{{ loop.index }}</td>
+                        <td class="text-left">{{ _fund_names.get(p.fund_a, p.fund_a) }}({{ p.fund_a }})</td>
+                        <td class="text-left">{{ _fund_names.get(p.fund_b, p.fund_b) }}({{ p.fund_b }})</td>
+                        <td>{{ p.common_count }}</td>
+                        <td>{{ "%.2f"|format(p.jaccard * 100) }}%</td>
+                        <td class="text-left" style="font-size: 12px;">
+                            {% if p.common_stocks %}
+                            {% set stock_names = [] %}
+                            {% for s in p.common_stocks %}
+                            {% set _ = stock_names.append(s.name or s.code) %}
+                            {% endfor %}
+                            {{ stock_names | join("、") }}
+                            {% else %}
+                            —
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+            {% endif %}
+            {% else %}
+            <div class="empty-section">📭 暂无重合度数据（需要至少 2 只基金持仓方可计算持仓重合度矩阵）</div>
+            {% endif %}
+            <!-- 区块二：持仓相关性矩阵 -->
+            <br>
+            <div class="block-title">二、持仓相关性矩阵</div>
+            {% if position_relationship_data and position_relationship_data.get("available") and _corr_codes %}
+            <div class="summary-tag" style="margin-bottom: 8px;">
+                📊 <strong>{{ _corr_codes | length }}</strong> 个品种，最近 <strong>{{ position_relationship_data["window"] }}</strong> 个交易日重叠样本（有效 {{ position_relationship_data["sample_count"] }} 期）
+            </div>
+            {% if _corr_pairs %}
+            {% set _corr_top = _corr_pairs[0] %}
+            <div class="notice-banner" style="margin-bottom: 12px;">
+                🔔 相关度最高：<strong>{{ _corr_top.name_a }}({{ _corr_top.code_a }})</strong> × <strong>{{ _corr_top.name_b }}({{ _corr_top.code_b }})</strong>
+                — r={{ "%.2f"|format(_corr_top.pearson) }}，p={{ "%.4f"|format(_corr_top.p_value) }}{% if _corr_top.significant %}（显著）{% else %}（不显著）{% endif %}
+            </div>
+            {% endif %}
+
+            <!-- 矩阵表（下三角；红=正相关 / 蓝=负相关 / 白=不显著 / 灰=N/A） -->
+            <div style="overflow-x: auto;">
+            <table class="heatmap-matrix">
+                <thead>
+                    <tr>
+                        <th></th>
+                        <th></th>
+                        {% for c in _corr_codes %}
+                        <th style="font-size: 11px; max-width: 80px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;"
+                            title="{{ _corr_names.get(c, c) }}">{{ _corr_names.get(c, c) }}</th>
+                        {% endfor %}
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for i in range(_corr_codes | length) %}
+                    <tr>
+                        <td style="font-weight: bold; font-size: 11px; max-width: 80px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;"
+                            title="{{ _corr_names.get(_corr_codes[i], _corr_codes[i]) }}">{{ _corr_names.get(_corr_codes[i], _corr_codes[i]) }}</td>
+                        <td style="font-size: 11px; color: #888;">({{ _corr_codes[i] }})</td>
+                        {% for j in range(_corr_codes | length) %}
+                        {% if j == i %}
+                        <td style="background-color: #f5f5f5; color: #bbb;" title="自相关">1.00</td>
+                        {% elif j < i %}
+                        {% set _corr_r = _corr_matrix[i][j] %}
+                        {% if _corr_r is none %}
+                        <td style="background-color: #eeeeee; color: var(--text-faint);" title="重叠样本不足，未计算">N/A</td>
+                        {% else %}
+                        {% set _corr_p = _corr_pvals[i][j] %}
+                        {% if _corr_p is not none and _corr_p >= 0.05 %}
+                        <td style="background-color: #ffffff; color: var(--text-faint);" title="p={{ "%.4f"|format(_corr_p) }}，不显著">{{ "%.2f"|format(_corr_r) }}</td>
+                        {% elif _corr_r >= 0.5 %}
+                        <td style="background-color: #C00000; color: white; font-weight: bold;" title="r={{ "%.2f"|format(_corr_r) }}，p={{ "%.4f"|format(_corr_p) }}">强正</td>
+                        {% elif _corr_r >= 0.3 %}
+                        <td style="background-color: #FF7F7F; color: #333;" title="r={{ "%.2f"|format(_corr_r) }}，p={{ "%.4f"|format(_corr_p) }}">{{ "%.2f"|format(_corr_r) }}</td>
+                        {% elif _corr_r > 0 %}
+                        <td style="background-color: #FFE0E0; color: #333;" title="r={{ "%.2f"|format(_corr_r) }}，p={{ "%.4f"|format(_corr_p) }}">{{ "%.2f"|format(_corr_r) }}</td>
+                        {% elif _corr_r <= -0.5 %}
+                        <td style="background-color: #1F4E79; color: white; font-weight: bold;" title="r={{ "%.2f"|format(_corr_r) }}，p={{ "%.4f"|format(_corr_p) }}">强负</td>
+                        {% elif _corr_r <= -0.3 %}
+                        <td style="background-color: #8DB4E2; color: #333;" title="r={{ "%.2f"|format(_corr_r) }}，p={{ "%.4f"|format(_corr_p) }}">{{ "%.2f"|format(_corr_r) }}</td>
+                        {% else %}
+                        <td style="background-color: #E0ECF7; color: #333;" title="r={{ "%.2f"|format(_corr_r) }}，p={{ "%.4f"|format(_corr_p) }}">{{ "%.2f"|format(_corr_r) }}</td>
+                        {% endif %}
+                        {% endif %}
+                        {% else %}
+                        <td></td>
+                        {% endif %}
+                        {% endfor %}
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+            </div>
+
+            <!-- 图例 -->
+            <div class="penetration-notes" style="margin-top: 8px;">
+                <div>
+                    图例：<span style="display:inline-block; width:16px; height:12px; background:#C00000; margin-right:3px; vertical-align:middle;"></span> 强正相关(r≥0.5)
+                    <span style="display:inline-block; width:16px; height:12px; background:#FF7F7F; margin:0 3px 0 10px; vertical-align:middle;"></span> 正相关
+                    <span style="display:inline-block; width:16px; height:12px; background:#FFE0E0; margin:0 3px 0 10px; vertical-align:middle;"></span> 弱正相关
+                    <span style="display:inline-block; width:16px; height:12px; background:#1F4E79; margin:0 3px 0 10px; vertical-align:middle;"></span> 强负相关(r≤-0.5)
+                    <span style="display:inline-block; width:16px; height:12px; background:#8DB4E2; margin:0 3px 0 10px; vertical-align:middle;"></span> 负相关
+                    <span style="display:inline-block; width:16px; height:12px; background:#E0ECF7; margin:0 3px 0 10px; vertical-align:middle;"></span> 弱负相关
+                    <span style="display:inline-block; width:16px; height:12px; background:#ffffff; border:1px solid #ccc; margin:0 3px 0 10px; vertical-align:middle;"></span> 不显著(p≥0.05)
+                    <span style="display:inline-block; width:16px; height:12px; background:#eeeeee; margin:0 3px 0 10px; vertical-align:middle;"></span> 数据不足
+                </div>
+            </div>
+
+            <!-- 配对明细 -->
+            {% if _corr_pairs %}
+            <br>
+            <div style="font-weight: bold; font-size: 14px; margin-bottom: 6px;">配对明细（按 |r| 降序）</div>
+            <table>
+                <thead>
+                    <tr>
+                        <th>序号</th>
+                        <th>品种A</th>
+                        <th>品种B</th>
+                        <th>相关系数 r</th>
+                        <th>p 值</th>
+                        <th>样本数</th>
+                        <th>显著性</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for p in _corr_pairs %}
+                    <tr>
+                        <td>{{ loop.index }}</td>
+                        <td class="text-left">{{ p.name_a }}({{ p.code_a }})</td>
+                        <td class="text-left">{{ p.name_b }}({{ p.code_b }})</td>
+                        <td style="color: {% if p.pearson >= 0.5 %}#C00000{% elif p.pearson > 0 %}#E65C00{% elif p.pearson <= -0.5 %}#1F4E79{% else %}#2E75B6{% endif %}; font-weight: 600;">
+                            {{ "%.2f"|format(p.pearson) }}
+                        </td>
+                        <td>{{ "%.4f"|format(p.p_value) }}</td>
+                        <td>{{ p.samples }}</td>
+                        <td>{% if p.significant %}✅ 显著{% else %}— 不显著{% endif %}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+            {% endif %}
+
+            {% if position_relationship_data.get("insufficient_codes") %}
+            <div class="penetration-notes">
+                <div style="color:var(--warn-text);">* 下列品种重叠样本不足 {{ position_relationship_data["window"] }} 期，相关性格标为 N/A（灰色）：{{ position_relationship_data["insufficient_codes"] | join("、") }}</div>
+            </div>
+            {% endif %}
+            <div class="penetration-notes">
+                <div>* 相关系数 r = 两品种日收益率的 Pearson 相关系数（窗口内重叠样本）；显著性采用 95% 双尾 t 检验（复用 _math_utils）</div>
+                <div>* 下三角矩阵：数值为行品种 × 列品种 的相关性；r&gt;0 同向波动（伪分散风险），r&lt;0 反向对冲</div>
+            </div>
+            {% elif position_relationship_data %}
+            {% if position_relationship_data.get("status") == "source_failed" %}
+            <div class="empty-section">📭 持仓相关性数据源暂不可用，请稍后重试</div>
+            {% else %}
+            <div class="empty-section">📭 持仓相关性数据不足（有效样本 {{ position_relationship_data.get("sample_count", 0) }} 期，低于阈值 {{ position_relationship_data.get("window", 60) }}），暂不计算</div>
+            {% endif %}
+            {% else %}
+            <div class="empty-section">📭 持仓相关性数据不足（需要至少 2 只重叠样本品种方可计算持仓相关性矩阵）</div>
+            {% endif %}
+            <div class="block-title">三、持仓集中度监控</div>
+            {% set conc_results = concentration_analysis["results"] if concentration_analysis else [] %}
+            {% if conc_results %}
+            {% set high_risk = conc_results | selectattr("alert_level", "in", ["紧急", "关注"]) | list %}
+            {% if high_risk %}
+            <div class="summary-tag" style="margin-bottom: 8px;">
+                ⚠️ <strong>{{ high_risk | length }}</strong> 只基金存在集中度风险
+            </div>
+            {% endif %}
+            <table>
+                <thead>
+                    <tr>
+                        <th>基金名称</th><th>代码</th><th>报告期</th><th>前3占比</th><th>前5占比</th><th>前10占比</th>
+                        <th>上期前10</th><th>环比变化</th><th>预警</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for r in conc_results %}
+                    {% set _alert = r.get("alert_level", "") %}
+                    <tr class="{% if _alert == '紧急' %}row-danger{% elif _alert == '关注' %}row-warning{% endif %}">
+                        <td class="text-left">{{ r["name"] }}</td>
+                        <td>{{ r["code"] }}</td>
+                        <td style="font-size: 12px; {{ 'color: #b06a00;' if r.get('report_stale') }}">
+                            {{ r.get("report_period", "") }}{% if r.get("report_stale") %}（陈旧）{% endif %}
+                        </td>
+                        <td>{{ "%.2f"|format(r["top3_pct"]) }}%</td>
+                        <td>{{ "%.2f"|format(r["top5_pct"]) }}%</td>
+                        <td>{{ "%.2f"|format(r["top10_pct"]) }}%</td>
+                        {% if r.get("prev_top10_pct") is not none %}
+                        <td>{{ "%.2f"|format(r["prev_top10_pct"]) }}%</td>
+                        {% else %}
+                        <td style="color: #888;">—</td>
+                        {% endif %}
+                        {% if r.get("is_first_check") %}
+                        <td><span class="gray-text">基线已记录</span></td>
+                        <td><span class="gray-text">📋 首次</span></td>
+                        {% elif r.get("period_unchanged") %}
+                        <td><span class="gray-text">无对比意义</span></td>
+                        <td><span class="gray-text">⎯ 报告期未推进</span></td>
+                        {% elif r.get("change_pct") is not none %}
+                        {% set cp = r["change_pct"] %}
+                        <td style="{% if cp > 10 %}color: var(--profit); font-weight: bold;{% endif %}">
+                            {% if cp > 0 %}↑{% elif cp < 0 %}↓{% else %}→{% endif %}
+                            {{ "%+.2f"|format(cp) }}%
+                        </td>
+                        <td>{{ r["alert_level"] }}</td>
+                        {% else %}
+                        <td>—</td>
+                        <td>{{ r["alert_level"] }}</td>
+                        {% endif %}
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+            <div class="penetration-notes">
+                <div>* 环比变化 >+20% → 🔴 紧急，>+10% → ⚠️ 关注，前10占比 >80% → ⚠️ 关注</div>
+                <div>* 报告期 = 本期持仓所依据的定期报告期次；报告期与上期相同时环比无对比意义（本次与上期读的是同一份报告），据实标注而非报 0</div>
+            </div>
+            {% else %}
+            <div class="empty-section">📭 暂无持仓集中度数据（未检测到基金持仓或 API 返回为空）</div>
+            {% endif %}
+        </div>
+        </details>
+        {{ render_back_to_top() }}
+    </div>

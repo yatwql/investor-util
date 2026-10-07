@@ -382,6 +382,12 @@ class TestPurchaseStatusTemplate:
         )
         with open(tmpl_path, encoding="utf-8") as f:
             self.html = f.read()
+        # 章节已拆分到 partials：拼接主模板与全部 partial（标记查找与 if/endif 配平不受拆分影响）
+        _partial_dir = os.path.join(os.path.dirname(tmpl_path), "partials")
+        for _name in sorted(os.listdir(_partial_dir)):
+            if _name.endswith(".html"):
+                with open(os.path.join(_partial_dir, _name), encoding="utf-8") as f:
+                    self.html += "\n" + f.read()
 
     def _extract_balanced_from(self, start: int) -> str:
         """按 if/endif 配平从 start 起截取一段（含起点标记本身）。"""
@@ -712,6 +718,12 @@ class TestCategoryPurchaseTemplate:
         )
         with open(tmpl_path, encoding="utf-8") as f:
             self.html = f.read()
+        # 章节已拆分到 partials：拼接主模板与全部 partial（标记查找与 if/endif 配平不受拆分影响）
+        _partial_dir = os.path.join(os.path.dirname(tmpl_path), "partials")
+        for _name in sorted(os.listdir(_partial_dir)):
+            if _name.endswith(".html"):
+                with open(os.path.join(_partial_dir, _name), encoding="utf-8") as f:
+                    self.html += "\n" + f.read()
 
     def _row(self, marker: str) -> str:
         """截取 marker 所在的整行 <tr>…</tr> 片段。"""

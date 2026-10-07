@@ -80,5 +80,11 @@ class TestLlmPlaceholderDistinction(unittest.TestCase):
         tmpl_path = os.path.normpath(tmpl_path)
         with open(tmpl_path, encoding="utf-8") as f:
             html = f.read()
+        # LLM 章已拆分到 partials：拼接主模板与全部 partial 后断言占位文案
+        _partial_dir = os.path.join(os.path.dirname(tmpl_path), "partials")
+        for _name in sorted(os.listdir(_partial_dir)):
+            if _name.endswith(".html"):
+                with open(os.path.join(_partial_dir, _name), encoding="utf-8") as f:
+                    html += f.read()
         self.assertIn("本节内容待生成", html)
         self.assertIn("需配置 LLM API Key 后自动启用", html)

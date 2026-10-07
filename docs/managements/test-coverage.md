@@ -10,18 +10,18 @@
 <!-- mode-count-table:start -->
 | `--mode` 值 | 覆盖项数 | 典型耗时 |
 |:------------|:--------:|:--------:|
-| `unit` | **8869** | ~31s |
-| `standard` | **7699** | ~22s |
-| `scenario` | **257** | ~6s |
+| `unit` | **8893** | ~31s |
+| `standard` | **7723** | ~30s |
+| `scenario` | **257** | ~7s |
 | `regression` | **257** | ~7s |
-| `dev-verify` | **5920** | ~30s |
-| `verify` | **8567** | ~24s |
-| `integration` | **299** | ~9s |
+| `dev-verify` | **5942** | ~31s |
+| `verify` | **8591** | ~32s |
+| `integration` | **299** | ~8s |
 | `edge` | **1102** | ~11s |
 | `data` | **70** | ~3s |
-| `all` | **9198** | ~33s |
+| `all` | **9222** | ~34s |
 | `smoke` | **26** | ~3s |
-| `report` | **2313** | ~22s |
+| `report` | **2324** | ~27s |
 | `all_no_unit` | **329** | ~7s |
 | `scenario_extreme` | **9** | ~3s |
 <!-- mode-count-table:end -->
@@ -39,7 +39,7 @@
 #### 采集环境属性
 
 <!-- env-table:start -->
-| 环境属性 | dragonball（2026-10-06 实测） | stallman-NB1（2026-10-02 实测） |
+| 环境属性 | dragonball（2026-10-07 实测） | stallman-NB1（2026-10-02 实测） |
 |:---------|:---------------------------|:---|
 | 操作系统 | Linux | Windows |
 | 系统版本 | 6.18.25-x64v3-xanmod1 | 11 |
@@ -54,30 +54,30 @@
 | Python 版本 | 3.13.5 | 3.13.0 |
 | 并行级别 | medium | medium |
 | worker 数 | 8 | 4 |
-| 采集日期 | 2026-10-06 | 2026-10-02 |
+| 采集日期 | 2026-10-07 | 2026-10-02 |
 <!-- env-table:end -->
 
 #### 各模式耗时对照
 
 <!-- duration-table:start -->
-| `--mode` | dragonball（2026-10-06 实测） | stallman-NB1（2026-10-02 实测） |
+| `--mode` | dragonball（2026-10-07 实测） | stallman-NB1（2026-10-02 实测） |
 |:---------|:---------------------------:|:---:|
 | `unit` | ~31s | ~3min |
-| `standard` | ~22s | ~3min |
-| `scenario` | ~6s | ~51s |
+| `standard` | ~30s | ~3min |
+| `scenario` | ~7s | ~51s |
 | `regression` | ~7s | ~1min |
-| `verify,regression` | ~30s（verify+regression 顺序之和） | ~5min（verify+regression 顺序之和） |
-| `dev-verify` | ~30s | ~4min |
-| `verify` | ~24s | ~4min |
-| `integration` | ~9s | ~2min |
+| `verify,regression` | ~39s（verify+regression 顺序之和） | ~5min（verify+regression 顺序之和） |
+| `dev-verify` | ~31s | ~4min |
+| `verify` | ~32s | ~4min |
+| `integration` | ~8s | ~2min |
 | `edge` | ~11s | ~1min |
 | `data` | ~3s | ~31s |
-| `all` | ~33s | ~4min |
+| `all` | ~34s | ~4min |
 | `smoke` | ~3s | ~28s |
-| `report` | ~22s | ~2min |
+| `report` | ~27s | ~2min |
 | `all_no_unit` | ~7s | ~1min |
 | `scenario_extreme` | ~3s | ~32s |
-| 数据更新时间 | 2026-10-06 | 2026-10-02 |
+| 数据更新时间 | 2026-10-07 | 2026-10-02 |
 <!-- duration-table:end -->
 
 > **2026-10-03 门禁口径变更**：P0 `dev-verify` 与 P1 `verify` 的 marker 已并入 `unit_report` 域（98 文件 / 2,130 用例此前不进任何门禁档），新量级见上方「模式对应测试量」表（本机实测 ~38s / ~32s）；上方对照表中 `dev-verify`/`verify` 两行为**并入前快照**，跨档对比时以新口径为准。

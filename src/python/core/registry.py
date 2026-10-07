@@ -18,6 +18,12 @@ import logging
 from dataclasses import dataclass
 
 from src.python.core.constants import CACHE_DAILY, CACHE_MONTHLY, CACHE_TWO_WEEKS, CACHE_WEEKLY
+from src.python.core.computation_registry import (  # noqa: F401
+    ComputModuleDef,
+    _COMPUTATION_REGISTRY,
+    get_computation_module,
+    get_computation_registry,
+)
 
 logger = logging.getLogger("invest")
 
@@ -442,26 +448,235 @@ def visible_llm_module_names() -> dict[str, str]:
     return {k: v for k, v in get_llm_module_names().items() if k not in LLM_HIDDEN_KEYS}
 
 
-# ── 非 LLM 报表页签名称 ──────────────────────────────────
-# 对应 Excel 报告的各功能页签中文标题。
+# ── 计算模块注册表（_COMPUTATION_REGISTRY） ──────────────────
+# 计算模块不能反向导入 report/，此注册表确保分析模块与报表层的
+# 单向依赖关系（analysis 层隔离约束）；条目与访问器持于
+# core/computation_registry.py（顶部 import re-export，单入口不变）。
+
+
+# ── 报告模块注册表（序号可配置） ──────────────────────────────
+# 条目字段：key / name / number / type / data_flag（单契约可见性旗标）/
+# nav_group（目录导航分组，取值 ∈ NAV_GROUPS 键集：HTML 目录折叠导航与
+# Excel 页签配色的分组同源，新增章节必须声明）；可选 llm_supported
+# （🧠 标记：该章由 LLM 参与生成，缺省 False，与导航分组解耦）；
+# 可选 data_flag_any（多契约 OR：任一契约就绪则该条目可见，供章节合并后一条目承载
+# 多个区块使用；OR 采用悲观判定——未登记视为未就绪，避免契约缺省时显示空章节。
+# 未声明 data_flag_any 时行为与单契约判定完全一致）。
+
+# ── 目录导航分组注册表（六组） ────────────────────────────────
+# 章节条目经 nav_group 字段挂到组；列表顺序 = 目录分组展示顺序。
+# HTML 端目录折叠导航（core 消费方：report/html_writer_nav.py）与 Excel 端
+# 页签 tabColor 配色（report/excel_*）同源于此——新增分组或章节在此登记，
+# 两端自动同步（防漂移测试双向断言键集）。
+NAV_GROUPS: list[dict] = [
+    {"key": "basic", "label": "基础信息"},
+    {"key": "fund_deep", "label": "基金深度分析"},
+    {"key": "action", "label": "行动建议"},
+    {"key": "history", "label": "历史"},
+    {"key": "llm", "label": "LLM"},
+    {"key": "appendix", "label": "附录"},
+]
+
+
+_REPORT_SECTION_DEFAULT: list[dict] = [
+    # ── always 类型（始终显示，无 data_flag 依赖） ──
+    {"key": "summary", "name": "投资分析汇总", "number": 1, "type": "always", "data_flag": None, "nav_group": "basic"},
+    {
+        "key": "holdings_detail",
+        "name": "持仓明细与分类",
+        "number": 2,
+        "type": "always",
+        "nav_group": "basic",
+        "data_flag": None,
+    },
+    {
+        "key": "penetration",
+        "name": "资产穿透TOP10",
+        "number": 3,
+        "type": "always",
+        "data_flag": None,
+        "nav_group": "basic",
+    },
+    {
+        "key": "fund_performance",
+        "name": "基金业绩分析",
+        "number": 4,
+        "type": "always",
+        "nav_group": "fund_deep",
+        "data_flag": None,
+    },
+    # ── 基金深度分析 类型（有数据才显示） ──
+    {
+        "key": "position_structure",
+        "name": "持仓结构与集中度",
+        "number": 5,
+        "type": "fund_deep_analysis",
+        "nav_group": "fund_deep",
+        "data_flag": None,
+        "data_flag_any": ("position_relationship_data", "concentration_data"),
+    },
+    # ── 风格与因子分析（「基金风格表 + 风格因子回归」两区块 + 行业 Beta 子表） ──
+    # 区块一：基金风格表（渲染期派生）· 区块二：风格因子回归（style_factor_data 子键）
+    # · 区块三：行业 Beta 子表（style_factor_data.industry_beta，功能开关 industry_beta 默认关）
+    # · 区块四：因子目录（factor_catalog_data 主键，实验开关 factor_catalog 默认关）
+    {
+        "key": "style_factor",
+        "name": "风格与因子分析",
+        "number": 6,
+        "type": "fund_deep_analysis",
+        "nav_group": "fund_deep",
+        "data_flag": "style_factor_data",
+    },
+    # ── action 类型（独立顶层开关 enable_action 控制，默认开，菜单 P 可切换） ──
+    # 行动建议：再平衡信号 + 交易纪律 + 调仓建议 + 收益归因（纯算法，basic/both/full 均可见）
+    # 出厂序号 7，与仓库 config.json 的 report_section_order 取值相同——该配置清空为 {}
+    # 时即回到本默认顺序，故两者必须同序，改动其一须同步另一处
+    {
+        "key": "action",
+        "name": "行动建议",
+        "number": 7,
+        "type": "action",
+        "nav_group": "action",
+        "data_flag": None,
+    },
+    # ── news 类型（需启用新闻功能） ──
+    {
+        "key": "news_correlation",
+        "name": "财经新闻热点与持仓关联分析",
+        "number": 8,
+        "type": "news",
+        "nav_group": "llm",
+        "llm_supported": True,
+        "data_flag": "news_data_available",
+    },
+    # ── llm 类型（需启用 LLM 功能） ──
+    {
+        "key": "global_macro",
+        "name": "全球政经局势",
+        "number": 9,
+        "type": "llm",
+        "nav_group": "llm",
+        "llm_supported": True,
+        "data_flag": "llm_data_available",
+    },
+    {
+        "key": "expert_review",
+        "name": "智囊团深度复盘",
+        "number": 10,
+        "type": "llm",
+        "nav_group": "llm",
+        "llm_supported": True,
+        "data_flag": "llm_data_available",
+    },
+    {
+        "key": "health_check",
+        "name": "持仓体检报告",
+        "number": 11,
+        "type": "llm",
+        "nav_group": "llm",
+        "llm_supported": True,
+        "data_flag": "llm_data_available",
+    },
+    {
+        "key": "penetration_deep",
+        "name": "穿透深度分析",
+        "number": 12,
+        "type": "llm",
+        "nav_group": "llm",
+        "llm_supported": True,
+        "data_flag": "llm_data_available",
+    },
+    # ── history 类型（始终显示，数据不可用时显示占位文本） ──
+    # 组合历史走势与回撤：一章分「走势表 + 回撤矩阵」两区块 + 危机区间标注（2015/2018/2020/2022）
+    {
+        "key": "portfolio_history_drawdown",
+        "name": "组合历史走势与回撤",
+        "number": 13,
+        "type": "history",
+        "nav_group": "history",
+        "data_flag": None,
+    },
+    # ── evolution 类型（独立开关 enable_portfolio_evolution 控制） ──
+    # 组合演进：聚合本地多期快照，data_flag 控制章节可见性，
+    # available=False 时模板/页签写占位（与持仓关系矩阵的降级模式一致）
+    {
+        "key": "portfolio_evolution",
+        "name": "组合演进",
+        "number": 14,
+        "type": "evolution",
+        "nav_group": "history",
+        "data_flag": "evolution_data",
+    },
+    # ── holding_change 类型（实验开关 holding_change_review 控制，经实验挂载点注入） ──
+    # 持仓变动复盘：快照差分事件级操作侧复盘（事件清单/频率/结构演变/意图对账 +
+    # LLM 归因块）。data_flag 控制双端可见性：开关关闭（默认）时
+    # pipeline_data 键缺席 → 标志 False → 整章隐藏，两条输出路径保持既有输出；
+    # 开关注入但数据不足时双端写占位
+    {
+        "key": "holding_change",
+        "name": "持仓变动复盘",
+        "number": 15,
+        "type": "holding_change",
+        "nav_group": "history",
+        "data_flag": "holding_change_data",
+    },
+    # 事件窗量化对照：并入「财经新闻热点与持仓关联分析」章内区块（partial 在新闻章内以
+    # block-title 渲染，可见性由契约 event_impact_view 决定），不占独立注册表条目、不消耗
+    # 连续编号；实验开关 event_window_impact 经实验挂载点注入 pipeline_data["event_impact_data"]。
+    # ── schedule_replay 类型（实验开关 rebalance_schedule_replay 控制，经实验挂载点注入）：调仓纪律回放——月度定期/阈值偏离纪律多期回放 vs 买入持有；data_flag 控制双端可见性（关态键缺席隐藏 / 开启但数据不足双端占位） ──
+    {
+        "key": "schedule_replay",
+        "name": "调仓纪律回放",
+        "number": 16,
+        "type": "schedule_replay",
+        "nav_group": "history",
+        "data_flag": "schedule_replay_data",
+    },
+    # ── always 类型（始终显示） ──
+    {
+        "key": "data_source_status",
+        "name": "数据源可用性矩阵",
+        "number": 17,
+        "type": "always",
+        "nav_group": "appendix",
+        "data_flag": None,
+    },
+    # ── fundamental_snapshot 类型（两功能开关各控一块，默认关）──
+    # 持仓基本面 = 财务指标（financial_indicator）+ 持仓个股财报摘要（financial_report_digest）；
+    # 两契约 OR 决定章节可见性（任一块就绪即显示，块级开关各控各的渲染）
+    {
+        "key": "fundamental_snapshot",
+        "name": "持仓基本面",
+        "number": 18,
+        "type": "fundamental_snapshot",
+        "nav_group": "appendix",
+        "data_flag": None,
+        "data_flag_any": ("financial_indicator_data", "financial_report_digest_data"),
+    },
+    # ── llm_usage 强制末位（技术约束） ──
+    {
+        "key": "llm_usage",
+        "name": "LLM API 用量",
+        "number": 19,
+        "type": "llm",
+        "nav_group": "appendix",
+        "llm_supported": True,
+        "data_flag": "llm_data_available",
+    },
+]
+
+
+# ── 非 LLM 报表页签名称（章节注册表派生视图） ──────────────
+# 页签中文标题与章节显示名同源（单一真值 = 条目 name），改名只需改注册表；
 # LLM 模块页签（global_macro/expert_review/health_check/penetration_deep）
-# 以及 news_correlation 已通过 get_llm_module_name() 注册，无需再列于此。
+# 以及 news_correlation 的页签 A1 标题走 get_llm_module_name() 路径，
+# 差集在此显式声明——注册表新增章须归入其一（派生关系由测试锁定）。
+_LLM_SHEET_NAME_KEYS: frozenset[str] = frozenset(
+    {"global_macro", "expert_review", "health_check", "penetration_deep", "news_correlation"}
+)
 
 _REPORT_SHEET_NAMES: dict[str, str] = {
-    "summary": "投资分析汇总",
-    "holdings_detail": "持仓明细与分类",
-    "penetration": "资产穿透TOP10",
-    "fund_performance": "基金业绩分析",
-    "position_structure": "持仓结构与集中度",
-    "style_factor": "风格与因子分析",
-    "portfolio_history_drawdown": "组合历史走势与回撤",
-    "portfolio_evolution": "组合演进",
-    "holding_change": "持仓变动复盘",
-    "schedule_replay": "调仓纪律回放",
-    "action": "行动建议",
-    "data_source_status": "数据源可用性矩阵",
-    "fundamental_snapshot": "持仓基本面",
-    "llm_usage": "LLM API 用量",
+    sec["key"]: sec["name"] for sec in _REPORT_SECTION_DEFAULT if sec["key"] not in _LLM_SHEET_NAME_KEYS
 }
 
 
@@ -475,231 +690,6 @@ def get_report_sheet_name(sheet_key: str) -> str:
         中文标题；未找到时返回 sheet_key 本身
     """
     return _REPORT_SHEET_NAMES.get(sheet_key, sheet_key)
-
-
-# ── 计算模块注册表（_COMPUTATION_REGISTRY） ──────────────────
-# 计算模块不能反向导入 report/，此注册表确保分析模块与报表层的
-# 单向依赖关系（analysis 层隔离约束）得以维持。
-
-
-@dataclass(frozen=True)
-class ComputModuleDef:
-    """计算模块注册表条目。
-
-    记录所有计算/分析模块的元信息，
-    用于运行时发现、依赖管理和指标级断路的注册基础。
-
-    Attributes:
-        name: 模块中文名称。
-        module_key: 模块键名，如 "analytics_metrics"、"analytics_liquidity"。
-        label: 短标签（用于日志/提示）。
-        dependencies: 前置数据模块键名列表（如 "bond_yield"、"history"）。
-        description: 模块功能说明，用于文档生成。
-        status: 实现状态（planned / implemented）。
-    """
-
-    name: str
-    module_key: str
-    label: str = ""
-    dependencies: tuple[str, ...] = ()
-    description: str = ""
-    status: str = "planned"
-
-
-_COMPUTATION_REGISTRY: tuple[ComputModuleDef, ...] = (
-    ComputModuleDef(
-        name="量化指标计算",
-        module_key="analytics_metrics",
-        label="指标",
-        dependencies=("bond_yield", "history"),
-        description="夏普比率、卡玛比率、HHI 集中度、组合 Beta、持仓胜率、换手率、波动率、最大回撤等指标",
-        status="implemented",
-    ),
-    ComputModuleDef(
-        name="流动性分析",
-        module_key="analytics_liquidity",
-        label="流动性",
-        dependencies=(),
-        description="场内/场外比例、停牌风险、基金封闭期分析",
-        status="implemented",
-    ),
-    ComputModuleDef(
-        name="外汇敞口分析",
-        module_key="analytics_fx_exposure",
-        label="外汇",
-        dependencies=(),
-        description="A股/港股/美股 国别分布与外汇风险敞口判断",
-        status="implemented",
-    ),
-    ComputModuleDef(
-        name="情景分析",
-        module_key="analytics_scenario",
-        label="情景",
-        dependencies=("history",),
-        description="市场上涨/下跌的情景模拟与影响评估（±10%/±20%/±30% 六情景，含置信区间传播）",
-        status="implemented",
-    ),
-    ComputModuleDef(
-        name="组合校准分析",
-        module_key="analytics_alignment",
-        label="校准",
-        dependencies=(),
-        description="组合校准修正因子：费率估算、现金剥离、时间加权收益率（TWR）",
-        status="implemented",
-    ),
-    ComputModuleDef(
-        name="用户画像推断",
-        module_key="analytics_inferrer",
-        label="画像",
-        dependencies=(),
-        description="从持仓结构推断用户风险偏好与投资风格",
-        status="planned",
-    ),
-    ComputModuleDef(
-        name="事实锚定校验器",
-        module_key="analytics_fact_checker",
-        label="事实校验",
-        dependencies=(),
-        description="LLM 输出的事实锚定校验：数值一致性、品种存在性、排名正确性（纯算法层）",
-        status="implemented",
-    ),
-)
-
-
-def get_computation_registry() -> tuple[ComputModuleDef, ...]:
-    """返回完整的计算模块注册表副本。"""
-    return _COMPUTATION_REGISTRY
-
-
-def get_computation_module(module_key: str) -> ComputModuleDef | None:
-    """根据 module_key 查找计算模块定义。
-
-    Args:
-        module_key: 模块键名，如 "analytics_metrics"
-
-    Returns:
-        ComputModuleDef 或 None（未找到）
-    """
-    for m in _COMPUTATION_REGISTRY:
-        if m.module_key == module_key:
-            return m
-    return None
-
-
-# ── 报告模块注册表（序号可配置） ──────────────────────────────
-# 条目字段：key / name / number / type / data_flag（单契约可见性旗标）；
-# 可选 data_flag_any（多契约 OR：任一契约就绪则该条目可见，供章节合并后一条目承载
-# 多个区块使用；OR 采用悲观判定——未登记视为未就绪，避免契约缺省时显示空章节。
-# 未声明 data_flag_any 时行为与单契约判定完全一致）。
-
-_REPORT_SECTION_DEFAULT: list[dict] = [
-    # ── always 类型（始终显示，无 data_flag 依赖） ──
-    {"key": "summary", "name": "投资分析汇总", "number": 1, "type": "always", "data_flag": None},
-    {"key": "holdings_detail", "name": "持仓明细与分类", "number": 2, "type": "always", "data_flag": None},
-    {"key": "penetration", "name": "资产穿透TOP10", "number": 3, "type": "always", "data_flag": None},
-    {"key": "fund_performance", "name": "基金业绩分析", "number": 4, "type": "always", "data_flag": None},
-    # ── 基金深度分析 类型（有数据才显示） ──
-    {
-        "key": "position_structure",
-        "name": "持仓结构与集中度",
-        "number": 5,
-        "type": "fund_deep_analysis",
-        "data_flag": None,
-        "data_flag_any": ("position_relationship_data", "concentration_data"),
-    },
-    # ── 风格与因子分析（「基金风格表 + 风格因子回归」两区块 + 行业 Beta 子表） ──
-    # 区块一：基金风格表（渲染期派生）· 区块二：风格因子回归（style_factor_data 子键）
-    # · 区块三：行业 Beta 子表（style_factor_data.industry_beta，功能开关 industry_beta 默认关）
-    # · 区块四：因子目录（factor_catalog_data 主键，实验开关 factor_catalog 默认关）
-    {
-        "key": "style_factor",
-        "name": "风格与因子分析",
-        "number": 6,
-        "type": "fund_deep_analysis",
-        "data_flag": "style_factor_data",
-    },
-    # ── action 类型（独立顶层开关 enable_action 控制，默认开，菜单 P 可切换） ──
-    # 行动建议：再平衡信号 + 交易纪律 + 调仓建议 + 收益归因（纯算法，basic/both/full 均可见）
-    # 出厂序号 7，与仓库 config.json 的 report_section_order 取值相同——该配置清空为 {}
-    # 时即回到本默认顺序，故两者必须同序，改动其一须同步另一处
-    {
-        "key": "action",
-        "name": "行动建议",
-        "number": 7,
-        "type": "action",
-        "data_flag": None,
-    },
-    # ── news 类型（需启用新闻功能） ──
-    {
-        "key": "news_correlation",
-        "name": "财经新闻热点与持仓关联分析",
-        "number": 8,
-        "type": "news",
-        "data_flag": "news_data_available",
-    },
-    # ── llm 类型（需启用 LLM 功能） ──
-    {"key": "global_macro", "name": "全球政经局势", "number": 9, "type": "llm", "data_flag": "llm_data_available"},
-    {"key": "expert_review", "name": "智囊团深度复盘", "number": 10, "type": "llm", "data_flag": "llm_data_available"},
-    {"key": "health_check", "name": "持仓体检报告", "number": 11, "type": "llm", "data_flag": "llm_data_available"},
-    {"key": "penetration_deep", "name": "穿透深度分析", "number": 12, "type": "llm", "data_flag": "llm_data_available"},
-    # ── history 类型（始终显示，数据不可用时显示占位文本） ──
-    # 组合历史走势与回撤：一章分「走势表 + 回撤矩阵」两区块 + 危机区间标注（2015/2018/2020/2022）
-    {
-        "key": "portfolio_history_drawdown",
-        "name": "组合历史走势与回撤",
-        "number": 13,
-        "type": "history",
-        "data_flag": None,
-    },
-    # ── evolution 类型（独立开关 enable_portfolio_evolution 控制） ──
-    # 组合演进：聚合本地多期快照，data_flag 控制章节可见性，
-    # available=False 时模板/页签写占位（与持仓关系矩阵的降级模式一致）
-    {
-        "key": "portfolio_evolution",
-        "name": "组合演进",
-        "number": 14,
-        "type": "evolution",
-        "data_flag": "evolution_data",
-    },
-    # ── holding_change 类型（实验开关 holding_change_review 控制，经实验挂载点注入） ──
-    # 持仓变动复盘：快照差分事件级操作侧复盘（事件清单/频率/结构演变/意图对账 +
-    # LLM 归因块）。data_flag 控制双端可见性：开关关闭（默认）时
-    # pipeline_data 键缺席 → 标志 False → 整章隐藏，两条输出路径保持既有输出；
-    # 开关注入但数据不足时双端写占位
-    {
-        "key": "holding_change",
-        "name": "持仓变动复盘",
-        "number": 15,
-        "type": "holding_change",
-        "data_flag": "holding_change_data",
-    },
-    # 事件窗量化对照：并入「财经新闻热点与持仓关联分析」章内区块（partial 在新闻章内以
-    # block-title 渲染，可见性由契约 event_impact_view 决定），不占独立注册表条目、不消耗
-    # 连续编号；实验开关 event_window_impact 经实验挂载点注入 pipeline_data["event_impact_data"]。
-    # ── schedule_replay 类型（实验开关 rebalance_schedule_replay 控制，经实验挂载点注入）：调仓纪律回放——月度定期/阈值偏离纪律多期回放 vs 买入持有；data_flag 控制双端可见性（关态键缺席隐藏 / 开启但数据不足双端占位） ──
-    {
-        "key": "schedule_replay",
-        "name": "调仓纪律回放",
-        "number": 16,
-        "type": "schedule_replay",
-        "data_flag": "schedule_replay_data",
-    },
-    # ── always 类型（始终显示） ──
-    {"key": "data_source_status", "name": "数据源可用性矩阵", "number": 17, "type": "always", "data_flag": None},
-    # ── fundamental_snapshot 类型（两功能开关各控一块，默认关）──
-    # 持仓基本面 = 财务指标（financial_indicator）+ 持仓个股财报摘要（financial_report_digest）；
-    # 两契约 OR 决定章节可见性（任一块就绪即显示，块级开关各控各的渲染）
-    {
-        "key": "fundamental_snapshot",
-        "name": "持仓基本面",
-        "number": 18,
-        "type": "fundamental_snapshot",
-        "data_flag": None,
-        "data_flag_any": ("financial_indicator_data", "financial_report_digest_data"),
-    },
-    # ── llm_usage 强制末位（技术约束） ──
-    {"key": "llm_usage", "name": "LLM API 用量", "number": 19, "type": "llm", "data_flag": "llm_data_available"},
-]
 
 
 def get_report_section_keys() -> set[str]:

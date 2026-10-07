@@ -1,0 +1,112 @@
+    <div class="section" id="sec-news_correlation" style="order: {{ section_numbers['news_correlation'] }};">
+        <div class="section-title">{{ section_numbers['news_correlation'] }}、{{ section_names['news_correlation'] }}</div>
+        <details class="section-fold">
+            <summary class="section-fold-summary">
+                {% if news_data %}共 {{ news_data | length }} 条关联新闻{% else %}暂无关联新闻{% endif %} —— 点击展开/收起新闻列表与关联分析
+            </summary>
+        {% if news_data %}
+        <div class="section-content" style="padding: 0;">
+            <table class="news-table">
+                <thead>
+                    <tr>
+                        <th>序号</th><th>新闻标题</th><th>摘要</th><th>来源</th><th>发布时间</th><th>关联关键词</th>
+                        {% if has_llm_analysis %}<th>LLM 关联分析</th>{% endif %}
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for item in news_data %}
+                    <tr>
+                        <td class="news-seq">{{ loop.index }}</td>
+                        <td class="text-left news-title" data-label="新闻标题">
+                            <a href="{{ item.url }}" target="_blank" rel="noopener" style="color: #2E75B6; text-decoration: none;">{{ item.title }}</a>
+                        </td>
+                        <td class="text-left" data-label="摘要" style="font-size: 12px; max-width: 300px;">{{ item.intro }}</td>
+                        <td data-label="来源">{{ item.media_name }}</td>
+                        <td data-label="发布时间" style="font-size: 12px;">{{ item.ctime }}</td>
+                        <td class="text-left" data-label="关联关键词" style="font-size: 12px;">
+                            {% if item.enriched_keywords and item.enriched_keywords|length > 0 %}
+                                {% for ekw in item.enriched_keywords %}
+                                {# ⚠️ ekw.display 来自外部 API，依赖 autoescape 防 XSS —— 勿加 |safe 过滤器 #}
+                                <span class="source-tag-{{ ekw.type }}">{{ ekw.display }}</span>
+                                {% endfor %}
+                            {% else %}
+                                {% for kw in item.matched_keywords %}
+                                <span class="source-tag">{{ kw }}</span>
+                                {% endfor %}
+                            {% endif %}
+                        </td>
+                        {% if has_llm_analysis %}
+                        <td class="text-left" data-label="LLM 关联分析" style="font-size: 12px; max-width: 200px;">
+                            {% if item.llm_analysis %}
+                            <span>{{ item.llm_analysis | sentiment_colorize | safe }}</span>
+                            {% else %}
+                            <span style="color: var(--text-faint);">—</span>
+                            {% endif %}
+                        </td>
+                        {% endif %}
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        <div class="penetration-notes">
+            {% set ns = namespace(llm_notes=[]) %}
+            {% set _ = ns.llm_notes.append("共 " ~ (news_data | length) ~ " 条关联新闻") %}
+            {% if news_llm_meta and news_llm_meta.get("llm_enabled") %}
+                {% if news_llm_meta.get("llm_cached") %}
+                    {% set _cache_hint = "本次使用LLM缓存，未直接使用LLM服务能力" %}
+                    {% if news_llm_meta.get("thinking_enabled", false) %}
+                        {% set _cache_hint = _cache_hint ~ " | Extended Thinking" %}
+                    {% endif %}
+                    {% set _ = ns.llm_notes.append(_cache_hint) %}
+                {% else %}
+                    {% set _tu = news_llm_meta.get("token_usage", {}) %}
+                    {% set _model_name = _tu.get("model", "") %}
+                    {% if _tu.get("total_tokens") %}
+                        {% set _token_parts = [] %}
+                        {% if _model_name %}{% set _ = _token_parts.append("模型：" ~ _model_name) %}{% endif %}
+                        {% set _ = _token_parts.append("Token 用量：输入 " ~ (_tu.get("input_tokens", 0) | thousands) ~ " / 输出 " ~ (_tu.get("output_tokens", 0) | thousands) ~ " = " ~ (_tu.get("total_tokens", 0) | thousands)) %}
+                        {% set _cost_est = news_llm_meta.get("cost_estimation", "-") %}
+                        {% if _cost_est and _cost_est != "-" %}
+                            {% set _ = _token_parts.append("估算费用：" ~ _cost_est) %}
+                        {% endif %}
+                        {% if news_llm_meta.get("thinking_enabled", false) %}
+                            {% set _ = _token_parts.append("Extended Thinking") %}
+                        {% endif %}
+                        {% set _ = ns.llm_notes.append(_token_parts | join(" | ")) %}
+                    {% endif %}
+                    {% set _ = ns.llm_notes.append("基于持仓名称和代码+LLM关联分析") %}
+                {% endif %}
+            {% else %}
+                {% set _ = ns.llm_notes.append("基于持仓名称和代码进行关键词匹配") %}
+                {% set _ = ns.llm_notes.append("本次未使用LLM服务能力增强支持，使用传统关键字匹配技术") %}
+            {% endif %}
+            {% for note in ns.llm_notes %}
+            <div>* {{ note }}</div>
+            {% endfor %}
+            {% set _active_src = (news_llm_meta or {}).get("active_sources", []) %}
+            {% if _active_src %}
+            <div>* 本次抓取财经资讯所使用的数据源：{{ _active_src | join("、") }}</div>
+            {% endif %}
+            {% set _ns_failed_all = (news_llm_meta or {}).get("source_status", {}).values() | selectattr("success", "equalto", false) | list %}
+            {% if _ns_failed_all %}
+            <div>* 以下新闻源不可用：{{ _ns_failed_all | map(attribute="label") | join("、") }}</div>
+            {% endif %}
+        </div>
+        {% else %}
+        {% set _ns_source_status = (news_llm_meta or {}).get("source_status", {}) %}
+        {% set _ns_failed = _ns_source_status.values() | selectattr("success", "equalto", false) | list %}
+        {% if _ns_source_status and _ns_failed | length == _ns_source_status | length %}
+        <div class="empty-section">📭 新闻数据暂不可用，请检查网络连接</div>
+        {% elif _ns_failed %}
+        <div class="empty-section">📭 暂无关联新闻。以下新闻源不可用：{{ _ns_failed | map(attribute="label") | join("、") }}</div>
+        {% else %}
+        <div class="empty-section">📭 暂无关联新闻</div>
+        {% endif %}
+        {% endif %}
+        </details>
+
+        {% include "partials/event_impact_section.html" with context %}
+
+        {{ render_back_to_top() }}
+    </div>

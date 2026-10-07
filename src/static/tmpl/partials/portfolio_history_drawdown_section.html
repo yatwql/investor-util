@@ -1,0 +1,332 @@
+    <div class="section" id="sec-portfolio_history_drawdown" style="order: {{ section_numbers['portfolio_history_drawdown'] }};">
+        <div class="section-title">
+            {{ section_numbers['portfolio_history_drawdown'] }}、{{ section_names['portfolio_history_drawdown'] }}
+            {% if history_data and history_data.status != "unavailable" %}
+            <span style="font-size:12px;font-weight:400;opacity:0.8;margin-left:8px;">⚠ as-if 模拟（历史净值 × 当前份额）</span>
+            {% endif %}
+        </div>
+        <details class="section-fold">
+            <summary class="section-fold-summary">
+                {% if history_data and history_data.status != "unavailable" %}
+                累计收益 {{ history_data.total_return_pct | change }} · 最大回撤 {{ history_data.max_drawdown_pct | abs | change }} · 年化波动 {{ history_data.annualized_volatility | change }} —— 点击展开/收起走势图表、指标卡、回撤矩阵与危机区间明细
+                {% else %}
+                组合历史走势与回撤 —— 点击展开明细
+                {% endif %}
+            </summary>
+        {% if history_data and history_data.status != "unavailable" %}
+        <div class="section-content">
+            {% set _crisis_ok = crisis_annotation_data and crisis_annotation_data.available %}
+            {% set _crisis_in_range = _crisis_ok and (crisis_annotation_data.intervals | selectattr("in_range") | list) %}
+            <!-- ── 一、走势表：净值趋势图 + 危机区间着色 ── -->
+            {% if enable_interactive_charts %}
+            <div class="chart-box" style="height:350px;">
+                <canvas id="chart_portfolio_line" width="800" height="350" style="width:100%;height:100%;" aria-label="净值趋势图（悬停查看精确值）" role="img">图表无法显示，数据见报告明细表格</canvas>
+            </div>
+            {% else %}
+            <canvas id="portfolioChart" width="800" height="350" style="width:100%;height:350px;"></canvas>
+            {% endif %}
+            {% if _crisis_in_range %}
+            <div class="chart-caption">组合净值走势（阴影区间为 2015/2018/2020/2022 主要危机时段）</div>
+            {% else %}
+            <div class="chart-caption">组合净值走势</div>
+            {% endif %}
+            <!-- 指标汇总（组合历史走势与回撤章唯一指标区：累计收益/最大回撤/波动率/起止日 + 回撤状态，不重复） -->
+            <div class="summary-grid" style="margin-top:16px;">
+                <div class="summary-card">
+                    <h3>累计收益</h3>
+                    <div class="value" style="color: {{ history_data.total_return_pct | profit_color }};">{{ history_data.total_return_pct | change }}</div>
+                    <div class="meta">
+                        {{ history_data.total_return | money }} ·
+                        {% if history_data.data_start %} {{ history_data.data_start }} ~ {{ history_data.data_end }} {% else %}全周期{% endif %}
+                    </div>
+                </div>
+                <div class="summary-card">
+                    <h3>最大回撤</h3>
+                    <div class="value" style="color: var(--profit);">{{ history_data.max_drawdown_pct | abs | change }}</div>
+                    <div class="meta">
+                        {{ history_data.max_drawdown | abs | money }}
+                        {% if history_data.drawdown_start %} · {{ history_data.drawdown_start }} → {{ history_data.drawdown_end or "至今" }}{% endif %}
+                    </div>
+                </div>
+                <div class="summary-card">
+                    <h3>年化波动率</h3>
+                    <div class="value">{{ history_data.annualized_volatility | change }}</div>
+                </div>
+                <div class="summary-card">
+                    <h3>当前回撤状态</h3>
+                    {% set _dd_last = (history_data.drawdown_events[-1] if history_data.drawdown_events else none) %}
+                    <div class="value" style="font-size:20px; {% if _dd_last and not _dd_last.recovered %}color:var(--profit);{% else %}color:var(--success);{% endif %}">
+                        {% if _dd_last and not _dd_last.recovered %}回撤中{% elif history_data.drawdown_events %}已恢复{% else %}无显著回撤{% endif %}
+                    </div>
+                    <div class="meta">
+                        {% if _dd_last and _dd_last.recovery_days %}最近一次恢复耗时 {{ _dd_last.recovery_days }} 天{% elif history_data.drawdown_events %}共 {{ history_data.drawdown_events | length }} 次显著回撤{% else %}窗口内未检测到 {{ history_data.get("min_depth_pct", 5) }}% 以上回撤{% endif %}
+                    </div>
+                </div>
+            </div>
+            <!-- 尾部风险统计（VaR95/99、最大单日跌幅、连续下跌、恢复天数；样本不足写占位，图下说明） -->
+            {% set _tail_ok = tail_risk_data and tail_risk_data.available %}
+            <div class="summary-grid" style="margin-top:16px;">
+                {% if _tail_ok %}
+                <div class="summary-card">
+                    <h3>VaR(95)</h3>
+                    <div class="value" style="color:var(--profit);">{{ tail_risk_data.var95 | change }}</div>
+                    <div class="meta">单日最大可能损失（95% 置信）</div>
+                </div>
+                <div class="summary-card">
+                    <h3>VaR(99)</h3>
+                    <div class="value" style="color:var(--profit);">{{ tail_risk_data.var99 | change }}</div>
+                    <div class="meta">单日最大可能损失（99% 置信）</div>
+                </div>
+                <div class="summary-card">
+                    <h3>最大单日跌幅</h3>
+                    <div class="value" style="color:var(--profit);">{{ tail_risk_data.max_single_day_drop | change }}</div>
+                    {% if tail_risk_data.max_single_day_drop_date %}
+                    <div class="meta">{{ tail_risk_data.max_single_day_drop_date }}</div>
+                    {% endif %}
+                </div>
+                <div class="summary-card">
+                    <h3>最长连续下跌</h3>
+                    <div class="value">{{ tail_risk_data.consecutive_down_days }} 天</div>
+                    {% if tail_risk_data.consecutive_down_start %}
+                    <div class="meta">{{ tail_risk_data.consecutive_down_start }} → {{ tail_risk_data.consecutive_down_end }}</div>
+                    {% endif %}
+                </div>
+                <div class="summary-card">
+                    <h3>最大跌幅后恢复</h3>
+                    {% if tail_risk_data.recovery_state == "unrecovered" %}
+                    <div class="value" style="color:var(--profit);">未恢复</div>
+                    <div class="meta">数据窗口内未回到跌幅前水平</div>
+                    {% elif tail_risk_data.recovery_state == "none" %}
+                    <div class="value">—</div>
+                    <div class="meta">窗口内无下跌日</div>
+                    {% else %}
+                    <div class="value">{{ tail_risk_data.recovery_days_after_drop }} 天</div>
+                    <div class="meta">自最大单日跌幅日收复</div>
+                    {% endif %}
+                </div>
+                {% else %}
+                <div class="summary-card">
+                    <h3>尾部风险统计</h3>
+                    <div class="value" style="font-size:16px;">样本不足</div>
+                    <div class="meta">有效交易日不足，尾部指标暂不可用</div>
+                </div>
+                {% endif %}
+            </div>
+            <div style="text-align:center;font-size:12px;color:var(--text-muted);margin-top:6px;">说明：尾部风险基于历史日收益序列（历史模拟法 VaR）；恢复天数指自最大单日跌幅日收复跌幅前水平所需交易日</div>
+            {% if enable_interactive_charts %}
+            {# 量化指标 Radar：3 张摘要卡片 + 雷达图增强（三级降级，同改造前） #}
+            <div class="chart-box" style="height:320px;margin-top:16px;">
+                {% if data_unavailable %}
+                <div class="chart-empty-note">持仓市值数据不可用，量化指标暂停计算</div>
+                {% elif chart_datasets and chart_datasets.get("radar", {}).get("labels") %}
+                <canvas id="chart_radar" width="480" height="320" style="width:100%;height:100%;" aria-label="量化指标雷达图（悬停查看指标值）" role="img">图表无法显示，数据见智囊团复盘页</canvas>
+                {% else %}
+                <div class="chart-empty-note">量化指标数据不足</div>
+                {% endif %}
+            </div>
+            {% if not data_unavailable and chart_datasets and chart_datasets.get("radar", {}).get("labels") %}
+            <div class="chart-caption">组合量化指标画像</div>
+            {% endif %}
+            {% if not data_unavailable and chart_datasets and chart_datasets.get("radar", {}).get("labels") and chart_datasets["radar"]["datasets"][0].get("note") %}
+            <div style="text-align:center;font-size:12px;color:var(--text-muted);margin-top:4px;">{{ chart_datasets["radar"]["datasets"][0]["note"] }}</div>
+            {% endif %}
+            {% endif %}
+            <!-- ── 二、回撤矩阵：回撤走势 + 回撤明细表 ── -->
+            {% if history_data.bars and history_data.get("drawdown_available") %}
+            {% if enable_interactive_charts %}
+            <div class="chart-box" style="height:250px;margin-top:16px;">
+                <canvas id="chart_drawdown" width="800" height="250" style="width:100%;height:100%;" aria-label="回撤分析图（悬停查看精确值）" role="img">图表无法显示，数据见报告明细表格</canvas>
+            </div>
+            {% else %}
+            <canvas id="drawdownChart" width="800" height="250" style="width:100%;height:250px;"></canvas>
+            {% endif %}
+            <div class="chart-caption">历史回撤走势</div>
+            {% if history_data.drawdown_events %}
+            <div style="font-weight: bold; font-size: 14px; margin-top: 20px; margin-bottom: 6px;">回撤明细（{{ history_data.drawdown_events | length }} 次显著回撤）</div>
+            <table>
+                <thead>
+                    <tr>
+                        <th>序号</th><th>起峰日</th><th>最深日</th><th>恢复日</th><th>最大回撤</th><th>持续天数</th><th>恢复耗时</th><th>是否已恢复</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for e in history_data.drawdown_events %}
+                    <tr>
+                        <td>{{ loop.index }}</td>
+                        <td>{{ e.peak_date }}</td>
+                        <td>{{ e.trough_date }}</td>
+                        <td>{{ e.recovery_date or "—" }}</td>
+                        <td style="color:var(--profit); font-weight:600;">{{ "%.2f"|format(e.drawdown_pct) }}%</td>
+                        <td>{{ e.duration_days }} 天</td>
+                        <td>{% if e.recovery_days is not none %}{{ e.recovery_days }} 天{% else %}—{% endif %}</td>
+                        <td>{% if e.recovered %}✅ 已恢复{% else %}⏳ 未恢复{% endif %}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+            {% endif %}
+            {% elif history_data.bars %}
+            <div class="empty-section" style="margin-top:16px;">📭 历史回撤数据不足（有效交易日不足 {{ drawdown_min_span }} 天），暂不计算回撤事件</div>
+            {% endif %}
+            <!-- ── 三、危机区间标注表（区间统计：区间回撤/恢复天数，图下说明） ── -->
+            {% if _crisis_ok %}
+            <div style="font-weight: bold; font-size: 14px; margin-top: 20px; margin-bottom: 6px;">危机区间标注（2015 股灾 / 2018 贸易摩擦 / 2020 疫情 / 2022 调整）</div>
+            {% if _crisis_in_range %}
+            <table>
+                <thead>
+                    <tr>
+                        <th>危机名称</th><th>区间</th><th>区间最大回撤</th><th>最深日</th><th>恢复耗时</th><th>状态</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for it in crisis_annotation_data.intervals if it.in_range %}
+                    <tr>
+                        <td>{{ it.name }}</td>
+                        <td>{{ it.start }} ~ {{ it.end }}</td>
+                        <td style="color:var(--profit); font-weight:600;">{% if it.interval_drawdown_pct is not none %}{{ "%.2f"|format(it.interval_drawdown_pct) }}%{% else %}—{% endif %}</td>
+                        <td>{{ it.trough_date or "—" }}</td>
+                        <td>{% if it.recovery_days is not none %}{{ it.recovery_days }} 天{% else %}—{% endif %}</td>
+                        <td>{% if it.recovered %}✅ 已恢复{% elif it.recovered is false %}⏳ 未恢复{% else %}—{% endif %}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+            {% else %}
+            <div class="empty-section">报告数据窗口内无历史危机区间（2015/2018/2020/2022）</div>
+            {% endif %}
+            <div class="chart-caption">说明：阴影/高亮区间为历史上 A 股主要危机时段；区间与报告数据窗口重叠时统计区间最大回撤与恢复耗时</div>
+            {% endif %}
+            <!-- 数据加载状态（组合历史走势与回撤章单一份） -->
+            {% if history_data.warnings or history_data.failed_holdings or history_data.successful_holdings %}
+            <div class="data-status" style="margin-top:12px;">
+                {% if history_data.warnings %}
+                <div class="data-status-title">数据加载状态</div>
+                {% for w in history_data.warnings %}
+                <div class="data-status-info">ℹ {{ w }}</div>
+                {% endfor %}
+                {% endif %}
+                {% if history_data.failed_holdings %}
+                <div style="margin-top:8px;font-size:13px;">
+                    <div style="font-weight:600;color:var(--text-tertiary);margin-bottom:4px;">⬇ 以下持仓无历史走势数据（不含/不支持/获取失败）：</div>
+                    {% for h in history_data.failed_holdings %}
+                    <div class="data-status-warn" style="border-left-color:#95a5a6;">✗ {{ h }}</div>
+                    {% endfor %}
+                </div>
+                {% endif %}
+                {% if history_data.successful_holdings %}
+                <div style="margin-top:8px;font-size:13px;">
+                    <div style="font-weight:600;color:var(--text-tertiary);margin-bottom:4px;">⬆ 以下持仓已纳入走势计算：</div>
+                    {% for h in history_data.successful_holdings %}
+                    <div class="data-status-ok">✓ {{ h }}</div>
+                    {% endfor %}
+                </div>
+                {% endif %}
+            </div>
+            {% endif %}
+        </div>
+        {% if not enable_interactive_charts %}
+        <script>
+        (function(){
+            var bars = {{ history_data.bars | tojson }};
+            if(!bars || !bars.length) return;
+            var values = bars.map(function(b){ return b.total_value; });
+            var labels = bars.map(function(b){ return b.date; });
+            /* 归一化组合至 100 基点，与基准指数同量纲比较 */
+            var firstVal = values[0];
+            var normValues = values.map(function(v){ return +(v / firstVal * 100).toFixed(2); });
+            var datasets = [{
+                label: '组合 (as-if)',
+                values: normValues,
+                color: '#2E75B6',
+                fillColor: 'rgba(46,117,182,0.1)',
+                width: 2
+            }];
+            /* 叠加基准指数（归一化至 100） */
+            var benchmarks = {{ (history_data.benchmarks or []) | tojson }};
+            var bmColors = ['#CC0000', '#E68A00', '#2E7D32'];
+            if (benchmarks && benchmarks.length) {
+                for (var bi = 0; bi < benchmarks.length; bi++) {
+                    var bm = benchmarks[bi];
+                    if (!bm.bars || !bm.bars.length) continue;
+                    datasets.push({
+                        label: bm.name,
+                        values: bm.bars.map(function(b){ return b.value; }),
+                        color: bmColors[bi % bmColors.length],
+                        width: 1.5,
+                        dash: [5, 3]
+                    });
+                }
+            }
+            /* 危机区间带：从 crisis_annotation_data 计算起止索引（无重叠为空 → 说明不出） */
+            var crisisBands = [];
+            var crisisAnnotation = {{ (crisis_annotation_data or {}) | tojson }};
+            if (crisisAnnotation && crisisAnnotation.intervals) {
+                for (var ci = 0; ci < crisisAnnotation.intervals.length; ci++) {
+                    var iv = crisisAnnotation.intervals[ci];
+                    if (!iv.in_range) continue;
+                    var si = -1, ei = -1;
+                    for (var k2 = 0; k2 < labels.length; k2++) {
+                        if (si === -1 && labels[k2] >= iv.start) si = k2;
+                        if (labels[k2] <= iv.end) ei = k2;
+                    }
+                    if (si !== -1 && ei !== -1 && si <= ei) {
+                        crisisBands.push({ startIndex: si, endIndex: ei, label: iv.name });
+                    }
+                }
+            }
+            window.drawSimpleChart('portfolioChart', datasets, { yFormat: 'index', labels: labels, crisisBands: crisisBands });
+
+            /* 回撤走势图（独立 canvas，透明红填充；无 canvas 时 drawSimpleChart 安全跳过） */
+            var drawdowns = bars.map(function(b){ return b.drawdown_pct; });
+            var ddDatasets = [{
+                label: '组合回撤',
+                values: drawdowns,
+                color: '#CC0000',
+                fillColor: 'rgba(204,0,0,0.15)',
+                width: 1.5
+            }];
+            if (benchmarks && benchmarks.length) {
+                var bmColors2 = ['#9CA3AF', '#B0BEC5', '#90A4AE'];
+                for (var di = 0; di < benchmarks.length; di++) {
+                    var bm2 = benchmarks[di];
+                    if (!bm2.bars || !bm2.bars.length) continue;
+                    var bmValues = bm2.bars.map(function(b){ return b.value; });
+                    var bmDrawdowns = [], bmPeak = bmValues[0];
+                    for (var vi = 0; vi < bmValues.length; vi++) {
+                        if (bmValues[vi] > bmPeak) bmPeak = bmValues[vi];
+                        bmDrawdowns.push(-(bmPeak - bmValues[vi]) / bmPeak * 100);
+                    }
+                    ddDatasets.push({
+                        label: bm2.name,
+                        values: bmDrawdowns,
+                        color: bmColors2[di % bmColors2.length],
+                        width: 1,
+                        dash: [4, 3],
+                        fill: false
+                    });
+                }
+            }
+            window.drawSimpleChart('drawdownChart', ddDatasets, { yFormat: 'percent', labels: labels });
+        })();
+        </script>
+        {% endif %}
+        {% else %}
+        <div class="section-content">
+            <div class="empty-note placeholder-note">
+                <p><strong>组合历史走势与回撤数据暂不可用</strong></p>
+                <p style="margin-top:8px;font-size:13px;color:var(--text-muted);">
+                    模块说明：基于当前持仓份额假设历史持仓不变（as-if 模拟），使用历史股价/净值
+                    回溯计算组合的模拟走势与回撤，包括累计收益率、最大回撤、年化波动率等关键指标，
+                    并标注 2015/2018/2020/2022 主要历史危机时段。
+                </p>
+                <p style="margin-top:12px;font-size:12px;color:#aaa;">
+                    功能入口：菜单 L（生成全系列完整版报告）将自动获取历史数据 |
+                    可在 config.json 的 history.fetch_mode 中设为 "auto" 自动获取
+                </p>
+            </div>
+        </div>
+        {% endif %}
+        </details>
+        {{ render_data_status(data_status_history) }}
+        {{ render_back_to_top() }}
+    </div>

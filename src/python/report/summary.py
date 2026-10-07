@@ -448,6 +448,7 @@ def write_summary_sheet(
     us_indices: dict[str, dict[str, Any]] | None = None,
     fund_flow_data: dict | None = None,
     market_temperature_data: dict | None = None,
+    section_nav: list[str] | None = None,
 ) -> None:
     """写入投资分析汇总。
 
@@ -465,8 +466,23 @@ def write_summary_sheet(
             None 时保持既有输出，功能开关 `cost_lots` 关闭）
         market_temperature_data: 市场温度数据契约（非 None 时在「市场指数」后
             追加「市场温度」刻度行；None 时保持既有输出，功能开关 `market_temperature` 关闭）
+        section_nav: 章节导航链接文本（可见页签标题 "N.章节名" 列表，
+            按可见章节序生成；None 时不渲染导航区，表头行位置与既有输出一致）
     """
     row = write_title_row(ws, 1, get_report_sheet_name("summary"), _NCOLS)
+    # ── 章节导航区（与 HTML 左侧目录对应：可见章节 → 各页签内部超链接） ──
+    if section_nav:
+        row = _write_section(ws, row, "【章节导航】")
+        _link_font = Font(color="0563C1", underline="single")
+        for _i, _title in enumerate(section_nav):
+            _cell = ws.cell(
+                row=row + _i // _NCOLS,
+                column=1 + _i % _NCOLS,
+                value=f'=HYPERLINK("#\'{_title}\'!A1","{_title}")',
+            )
+            _cell.font = _link_font
+        row += -(-len(section_nav) // _NCOLS)  # 向上取整占行
+    header_row = row
     row = write_header_row(ws, row, _HEADERS)
 
     row = _write_basic_info(ws, row)
@@ -488,7 +504,7 @@ def write_summary_sheet(
     # 指数数据源状态
     data_status = build_index_data_status(a_indices, us_indices)
     _write_data_status_foot(ws, data_status, start_row=row)
-    freeze_header(ws, 2)
+    freeze_header(ws, header_row)
     auto_width(ws)
     logger.info("投资分析汇总写入完成，共 %d 行", row)
 
