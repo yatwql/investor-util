@@ -92,9 +92,9 @@ ln -sf "$PWD/.pi/models.json" ~/.pi/agent/models.json
 
 | 门禁 | 触发点 | 命令 | 说明 |
 |:-----|:-------|:-----|:-----|
-| **P0** | 提交前 | `.venv/bin/python scripts/test-runner.py --mode dev-verify` + 9 个 check 脚本 | 阻塞提交，不得 commit |
+| **P0** | 提交前 | `.venv/bin/python scripts/test-runner.py --mode dev-verify` + 十守护（`--ci` 全套，钩子自动执行） | 阻塞提交，不得 commit |
 | **P1** | 合入 master 前 | `.venv/bin/python scripts/test-runner.py --mode verify` | 阻塞合入，不得 merge |
-| **P2** | 发布前 | `.venv/bin/python scripts/test-runner.py --mode verify,regression` + 9 个 check 脚本 | 阻塞发布，不得 release |
+| **P2** | 发布前 | `.venv/bin/python scripts/test-runner.py --mode regression` + 十守护（`--ci` 全套） | 阻塞发布，不得 release |
 
 **P0 提交前门禁**（全部通过才可 commit；手动项 = dev-verify，下列十守护由 pre-commit 钩子在 `git commit` 时自动执行、CI guards job 同源兜底，本地不手动重复——清单为五处同源引用）：
 
@@ -119,7 +119,7 @@ ln -sf "$PWD/.pi/models.json" ~/.pi/agent/models.json
 **P2 发布门禁**：
 
 ```bash
-.venv/bin/python scripts/test-runner.py --mode verify,regression   # 单元 + 场景验证
+.venv/bin/python scripts/test-runner.py --mode regression              # 场景回归（单元由 P1 合入门禁 + CI master 档覆盖）
 .venv/bin/python scripts/check-code-traces.py --ci
 .venv/bin/python scripts/check-doc-traces.py --ci
 .venv/bin/python scripts/check-task-numbering.py --ci
@@ -134,7 +134,7 @@ ln -sf "$PWD/.pi/models.json" ~/.pi/agent/models.json
 
 **辅助（非阻塞）**：`.venv/bin/ruff check`（lint 基线，选择项与刻意豁免均在 `pyproject.toml` 显式声明）+ `.venv/bin/ruff format --check`（代码格式一致性）——问题可经 `.venv/bin/ruff check --fix` / `.venv/bin/ruff format` 自动修复，不阻止合并/发布。当前两者均为零告警基线，新增代码应在提交前保持干净。
 
-**CI 同步执行（`.github/workflows/ci.yml`）**：三档测试按分支/标签分流——`dev` 推送跑 P0（`dev-verify`）、`master` 推送或 PR 跑 P1（`verify`）、打 `v*` tag 跑 P2（`verify,regression`），矩阵覆盖 Python 3.11/3.12/3.13；另有三个独立 job：`guards`（**阻塞**，10 个 `--ci` 守护脚本即上方 P0/P2 清单全量——job 内按 pre-commit 同款后台并行回放，任一守护非零退出折叠为 FAIL 分组并使 job 红；守护经 src.python 链依赖项目运行时包（如 check-doc-drift → httpx），故 editable 安装保留）、`portability`（**阻塞**，非 UTF-8 locale + 隐式编码双探针，见下方「编码/locale 自检」）与 `format`（非阻塞，`ruff format --check src/python/ scripts/` + `ruff check`）。
+**CI 同步执行（`.github/workflows/ci.yml`）**：三档测试按分支/标签分流——`dev` 推送跑 P0（`dev-verify`）、`master` 推送或 PR 跑 P1（`verify`）、打 `v*` tag 跑 P2（`regression`），矩阵覆盖 Python 3.11/3.12/3.13；另有三个独立 job：`guards`（**阻塞**，10 个 `--ci` 守护脚本即上方 P0/P2 清单全量——job 内按 pre-commit 同款后台并行回放，任一守护非零退出折叠为 FAIL 分组并使 job 红；守护经 src.python 链依赖项目运行时包（如 check-doc-drift → httpx），故 editable 安装保留）、`portability`（**阻塞**，非 UTF-8 locale + 隐式编码双探针，见下方「编码/locale 自检」）与 `format`（非阻塞，`ruff format --check src/python/ scripts/` + `ruff check`）。
 
 ### 编码/locale 自检（旧 pip 回退解码 / 隐式编码）
 
@@ -376,7 +376,7 @@ pip install pytest-cov coverage
 |:-----|:-----|:-------|:----------------|
 | **P0** | 阻塞提交 — 核心功能不可用 | 不得 commit | ① `dev-verify` |
 | **P1** | 阻塞合入 master | 不得 merge | ② `verify` |
-| **P2** | 阻塞发布 | 不得 release | ③ `verify,regression` |
+| **P2** | 阻塞发布 | 不得 release | ③ `regression` |
 | **P3** | 建议修复 | 不阻断 | — |
 
 P0 问题必须在 commit 前解决，否则代码不应进入版本控制。P1 问题允许提交但不允许合入主分支。P2 允许合入主分支但不应发布版本。P3 属于已知缺陷或待优化项，可带缺陷发布。
@@ -392,15 +392,15 @@ P0 问题必须在 commit 前解决，否则代码不应进入版本控制。P1 
 - **提交前门禁（`--mode dev-verify` / P0）** — commit 前必须执行。组合 6 个 unit 子模块（unit_core/unit_providers/unit_fetcher/unit_analysis/unit_scripts/unit_web，并行）+ 基础业务场景（`scenario_basic`），排除 edge/data 和极限场景。是编辑-验证循环中的正式屏障。
 - **全场景回归（`--mode regression`）** — commit 前可选的全场景补充验证。覆盖全部 `scenario` 业务场景测试（S0a/S0b/S0d + S1-S33 + T1-T21），确保端到端用户路径不被破坏。推荐在改动了跨模块路径或数据流后补充运行。
 - **合入验证（`--mode verify` / P1）** — 准备合并到 master 前必须执行。覆盖 `unit_core`（核心基础设施：缓存引擎、数据模型、注册表）、`unit_providers`（数据源 Provider：腾讯、东方财富、天天基金等）、`unit_fetcher`（数据获取调度：价格、指数、行业分类）、`unit_config`（配置管理）、`unit_news`（新闻聚合）、`unit_llm`（LLM 模块）、`unit_analysis`（分析计算：流动性/再平衡/汇率/债券收益率等）、`unit_scripts`（工程脚本：历史痕迹/版本一致性/任务编号检查）、`unit_web`（Web 入口：上传/运行/进度/产物）九个单元模块。确保数据从抓取→缓存→计算的整条管道通畅且正确。并行执行。场景测试已在 P0 dev-verify（基础场景）和 P2 verify,regression（全场景）中覆盖，P1 不重复。
-- **发布验证（`--mode verify,regression`）** — 发布版本（打 tag/release）前必须执行。组合单元测试 + 场景测试，覆盖全部核心通路。
-  > 注：若走常规 `dev → merge → tag master` 流程，P1 已保证 `verify` 通过，P2 的 `verify` 属冗余验证。保留冗余是为了覆盖**直接从 dev 打 tag 发布**（未过 P1 合入门禁）的场景。如确定流程中有严格 merge 屏障且不直接发布 dev，P2 可优化为仅 `--mode regression`。详见 [testplan.md](testplan.md) → §6.3 脚注。
+- **发布验证（`--mode regression`）** — 发布版本（打 tag/release）前必须执行。覆盖全部场景回归测试。
+  > 注：**简化口径已采纳（2026-10-07，详见 [testplan.md](testplan.md) → §6.3 脚注）**：本项目发布流程强制 `dev → merge → tag master`，P1 合入门禁（`--mode verify`）与 CI `master` 档（同提交 verify）已双重覆盖单元验证，tag 档 CI 同步只跑 `regression`；直接从 dev 打 tag（绕过 P1）属流程违规。若流程约束放宽（允许直接发布 dev），须恢复 `--mode verify,regression`。
 
 > `regression` 与 `scenario` 底层使用相同的标记表达式（`-m "scenario"`），前者是语义别名——强调"提交前快速回归"的用途定位；后者是分类名——强调"业务场景测试"的数据性质。两者可互相替代，但建议按使用场合选用对应名称以增强代码意图可读性。
 
 **推荐工作流：**
 
 ```
-编码 → --mode dev-verify → commit → 多次积累 → merge → P1 --mode verify → release前 → P2 --mode verify,regression
+编码 → --mode dev-verify → commit → 多次积累 → merge → P1 --mode verify → release前 → P2 --mode regression
           ↑                                    ↗
     改完代码随时跑                      若改跨模块调用
       提交前必过P0门禁                  先跑 --mode integration
@@ -413,7 +413,7 @@ P0 问题必须在 commit 前解决，否则代码不应进入版本控制。P1 
 4. 如果改了 Provider、缓存或数据获取逻辑，再跑 `--mode verify` 确认整条管道通畅
 5. 通过后 commit，积累多次提交后准备合并到 master
 6. 合并前 CI 自动跑 `--mode verify` 作为合入门禁
-7. 发布版本前 CI 自动跑 `--mode verify,regression` 全量验证
+7. 发布版本前 CI 自动跑 `--mode regression` 场景回归验证（单元由 P1 master 档覆盖）
 
 #### 模式与覆盖范围说明
 
