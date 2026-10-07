@@ -520,50 +520,66 @@ def update_evolution_table(text: str, stats: dict[str, int], with_release: bool,
         raise ReleaseError(f"演进对照表缺行：{missing_rows}")
     result = "\n".join(out_lines)
 
-    result, _ = re.subn(
+    result, n_date = re.subn(
         r"(当前开发版（[^）]*?· 本次重跑时的工作区 · )\d{4}-\d{2}-\d{2}",
         lambda m: m.group(1) + date,
         result,
         count=1,
     )
+    if n_date != 1:
+        raise ReleaseError("演进对照表「当前开发版」列头日期模式缺失（列头格式变化时先同步本工具）")
     return result
 
 
 def update_ratio_note(text: str, stats: dict[str, int], with_release: bool) -> str:
-    """测试/主程序行数比注释：`--release` 时最新发布点一并改写，否则只滚当前工作区。"""
+    """测试/主程序行数比注释：`--release` 时最新发布点一并改写，否则只滚当前工作区。
+
+    两种目标模式任一缺失即抛 `ReleaseError`——宁可硬失败也不产出半新半旧的注释。
+    """
     ratio = stats["test_lines"] / stats["main_lines"] if stats["main_lines"] else 0.0
     pair = f"{stats['test_lines']:,} / {stats['main_lines']:,}"
     if with_release:
-        text, _ = re.subn(
+        text, n_release = re.subn(
             r"升至 \*\*[\d.]+:\d\*\*（[\d,]+ / [\d,]+，最新发布点）",
             f"升至 **{ratio:.2f}:1**（{pair}，最新发布点）",
             text,
             count=1,
         )
-    text, _ = re.subn(
+        if n_release != 1:
+            raise ReleaseError("比值注释「最新发布点」模式缺失（注释格式变化时先同步本工具）")
+    text, n_ws = re.subn(
         r"当前工作区为 \*\*[\d.]+:\d\*\*（[\d,]+ / [\d,]+）",
         f"当前工作区为 **{ratio:.2f}:1**（{pair}）",
         text,
         count=1,
     )
+    if n_ws != 1:
+        raise ReleaseError("比值注释「当前工作区为」模式缺失（注释格式变化时先同步本工具）")
     return text
 
 
 def update_case_note(text: str, stats: dict[str, int]) -> str:
-    """用例口径注释中的 grep / 严格定义行数；pytest 收集口径留人工核对提示。"""
-    text, _ = re.subn(
-        r"^(最初 \d+ → 当前 )[\d,]+",
+    """用例口径注释中的 grep / 严格定义行数；pytest 收集口径留人工核对提示。
+
+    目标短语在真实文档中位于行中（非行首），不做行首锚定；模式缺失即抛
+    `ReleaseError`（历史上行首锚定导致静默不更新、旧计数滞留）。
+    """
+    text, n_grep = re.subn(
+        r"(最初 \d+ → 当前 )[\d,]+",
         lambda m: m.group(1) + f"{stats['def_test_lines']:,}",
         text,
         count=1,
-        flags=re.M,
     )
-    text, _ = re.subn(
+    if n_grep != 1:
+        raise ReleaseError("用例口径注释「最初 → 当前」模式缺失（注释格式变化时先同步本工具）")
+    text, n_strict = re.subn(
         r"口径为 [\d,]+；",
         f"口径为 {stats['def_test_strict']:,}；",
         text,
         count=1,
     )
+    if n_strict != 1:
+        raise ReleaseError("用例口径注释「口径为」模式缺失（注释格式变化时先同步本工具）")
     return text
 
 

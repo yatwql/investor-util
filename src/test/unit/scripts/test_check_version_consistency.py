@@ -8,6 +8,8 @@
   - 管理文档 CHECKS 注册为 header 校验，防止退回 contains
   - folders.md 版本演进对照「当前开发版」列头版本号 evolution_head 锚定校验
     （匹配/旧号/无列头拒绝 + --fix 自动同步 + 与 header 并存注册）
+  - 回归场景：--fix 头部改写保留版本头前空行（行首空白类只吃同行字符，
+    不得跨行吞换行）；头部校验不跨行误判（`>\n文档版本：…` 不算合法头）
 
 测试通过脚本 import 方式直接复用 _check_header / _check_contains /
 _auto_fix_header / _check_evolution_head / _auto_fix_evolution_head，
@@ -74,6 +76,11 @@ class TestHeaderCheck:
         text = "  > 文档版本：0.10.0\n"
         assert version_script._check_header(text, "0.10.0") is True
 
+    def test_check_header_not_crossing_newline(self, version_script):
+        # 行首空白类不得跨行：`>` 独占一行 + 下一行裸文本不构成版本头
+        text = "# 标题\n>\n文档版本：0.10.0\n"
+        assert version_script._check_header(text, "0.10.0") is False
+
 
 class TestAutoFixHeader:
     """--fix 自动修正头部版本行。"""
@@ -95,6 +102,13 @@ class TestAutoFixHeader:
         p.write_text("> 文档版本：0.9.13-dev\n", encoding="utf-8")
         assert version_script._auto_fix_header(p, "0.10.1-dev") is True
         assert p.read_text(encoding="utf-8") == "> 文档版本：0.10.1-dev\n"
+
+    def test_fix_preserves_blank_line_before_header(self, version_script, tmp_path):
+        # 行首空白类不得吞换行：H1 与版本头之间的空行改写后必须保留
+        p = tmp_path / "doc.md"
+        p.write_text("# 标题\n\n> 文档版本：0.9.13-dev\n\n## 章节\n", encoding="utf-8")
+        assert version_script._auto_fix_header(p, "0.10.0") is True
+        assert p.read_text(encoding="utf-8") == "# 标题\n\n> 文档版本：0.10.0\n\n## 章节\n"
 
 
 class TestDocHeaderRegistration:

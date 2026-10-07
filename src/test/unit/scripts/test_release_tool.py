@@ -304,6 +304,11 @@ _EVOLUTION_SAMPLE = (
     "| **测试用例数**（`def test_` 行数口径） | **491** | **8,833** | **8,833** | 18.0×\n"
     "| 仓库文件总数 | 56 | 1,126 | 1,126 | 20.1×\n"
     "| 仓库总行数（全部跟踪文件） | 15,600 | 322,464 | 322,464 | 20.7×\n"
+    '> - **测试用例数**采 `git grep -c "def test_"` 的**行数口径**（含注释/文档串中的 `def test_` 提及）：'
+    "最初 491 → 当前 8,833；按更严格的「以 `def test_` 开头的定义行（含类方法缩进）」口径为 8,792；"
+    "按 pytest 实际收集（含参数化展开）为 **9,259** 项（另 20 项 opt-in live 反选，全量 9,279）。\n"
+    "> - **测试 / 主程序行数比**由 0.84:1（6,108 / 7,258）升至 **1.58:1**（140,058 / 88,669，最新发布点），"
+    "当前工作区为 **1.58:1**（140,058 / 88,669）。\n"
 )
 
 
@@ -371,11 +376,29 @@ class TestEvolutionTable:
         assert "140,000 / 90,000" in out
 
     def test_case_note_updates_grep_and_strict(self, rel):
-        text = "最初 491 → 当前 8,833；按严格口径为 8,792；收集 9,259"
+        # 真实排版：短语位于行中（「…提及）：最初 491 → 当前 …」），不得依赖行首锚定
+        text = "行数口径（含 `def test_` 提及）：最初 491 → 当前 8,833；按严格口径为 8,792；收集 9,259"
         out = rel.update_case_note(text, _stats())
-        assert "最初 491 → 当前 8,900" in out
+        assert "提及）：最初 491 → 当前 8,900" in out
         assert "严格口径为 8,850" in out
         assert "9,259" in out  # pytest 收集口径不代写
+
+    def test_case_note_missing_pattern_raises(self, rel):
+        with pytest.raises(rel.ReleaseError, match="最初"):
+            rel.update_case_note("没有任何口径短语的文本", _stats())
+        with pytest.raises(rel.ReleaseError, match="口径为"):
+            rel.update_case_note("最初 1 → 当前 2，但缺第二个模式", _stats())
+
+    def test_ratio_note_missing_pattern_raises(self, rel):
+        with pytest.raises(rel.ReleaseError, match="当前工作区"):
+            rel.update_ratio_note("没有比值短语", _stats(), with_release=False)
+        with pytest.raises(rel.ReleaseError, match="最新发布点"):
+            rel.update_ratio_note("当前工作区为 **1.58:1**（140,058 / 88,669）", _stats(), with_release=True)
+
+    def test_evolution_table_missing_date_header_raises(self, rel):
+        mangled = _EVOLUTION_SAMPLE.replace("· 本次重跑时的工作区 · 2026-10-07", "· 滚动读数")
+        with pytest.raises(rel.ReleaseError, match="列头日期"):
+            rel.update_evolution_table(mangled, _stats(), False, "2026-10-09")
 
 
 # ─────────────────────────── 门禁 ───────────────────────────

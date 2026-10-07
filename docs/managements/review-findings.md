@@ -1,6 +1,6 @@
 # 投资复盘助手 - 自我审查问题记录
-> 文档版本：0.12.6-dev
-> **编号源**：`rf-next = 622`（新增问题取此编号，完成后更新为 +1；已用最大 rf-621，递增保证唯一，归档不回收。若与历史归档冲突，运行 `scripts/check-task-numbering.py` 校验）
+> 文档版本：0.12.6
+> **编号源**：`rf-next = 624`（新增问题取此编号，完成后更新为 +1；已用最大 rf-623，递增保证唯一，归档不回收。若与历史归档冲突，运行 `scripts/check-task-numbering.py` 校验）
 
 ---
 
@@ -47,8 +47,9 @@
 
 ## 已解决问题
 
-- rf-621 已修复（2026-10-07，流程优化复测发现、同日机制复核修正关闭）：初记「影子双算结构性无法毕业」经代码路径复核为**误判**——共享语境变化（代码+测试混合提交）只跑单次全量、既不付影子双算也不推进/归零计数（零加税；无有效比对证据不计数），毕业由共享语境稳定的测试变更同步逐次推进；新补 2 项行为锁定回归：混合提交「单次全量 + 计数保持 + 语境刷新」、毕业全生命周期（0 → 连续达标 → 测试变更零全量纯增量）端到端证可达；原拟修复方向（共享变化用旧计数做比对）会以不同命题的证据推进毕业、削弱质量门，按质量前提**不实施**
-
+> **本迭代已修复记录（rf-621 ~ rf-623 批次）已随发布迁移至** [`archived_review-findings.0.12.x.md`](../archive/v0.12.x/archived_review-findings.0.12.x.md)；主文件只留未修复项与迁移索引。
+>
+>
 
 > **本迭代已修复记录（rf-600 ~ rf-620 批次）已随发布迁移至** [`archived_review-findings.0.12.x.md`](../archive/v0.12.x/archived_review-findings.0.12.x.md)；主文件只留未修复项与迁移索引。
 >
@@ -70,7 +71,7 @@
 
 ### 归档档案
 
-- [`archived_review-findings.0.12.x.md`](../archive/v0.12.x/archived_review-findings.0.12.x.md) — v0.12.1 ~ v0.12.5 批次（2026-10-03 ~ 2026-10-07）
+- [`archived_review-findings.0.12.x.md`](../archive/v0.12.x/archived_review-findings.0.12.x.md) — v0.12.1 ~ v0.12.6 批次（2026-10-03 ~ 2026-10-07）
 - [`archived_review-findings.0.11.x.md`](../archive/v0.11.x/archived_review-findings.0.11.x.md) — v0.11.0 ~ v0.11.11  （2026-09-18 ~ 2026-10-02）
 - [`archived_review-findings.0.10.x.md`](../archive/v0.10.x/archived_review-findings.0.10.x.md) — v0.10.1 ~ v0.10.20（2026-08-04 ~ 2026-09-15）
 - [`archived_review-findings.0.9.x.md`](../archive/v0.9.x/archived_review-findings.0.9.x.md) — v0.9.0 ~ v0.9.12（2026-07-30 ~ 2026-08-03）
