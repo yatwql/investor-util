@@ -511,6 +511,62 @@ class TestSnapshotCountCache:
         assert env.startswith(str(tmp_path))
         assert "test_coverage_snapshot.json" in env
 
+    def test_shared_context_change_preserves_shadow_counter(self, drift_parts, monkeypatch):
+        """共享语境变化（代码+测试混合提交）→ 单次全量：影子计数原样保持，不推进也不归零。"""
+        mod = drift_parts._shared
+        files = self._pristine_files(mod)
+        self._seed(mod, files=files, shared="stale-shared-context", shadow_ok=2)
+        calls: list = []
+
+        def _fake(file_args):
+            calls.append(list(file_args))
+            return {"_总收集": len(files), "_marker集合": ["unit"]}, self._full_map(files)
+
+        monkeypatch.setattr(mod, "_run_collect", _fake)
+        snap = mod._collect_test_snapshot()
+        assert calls == [[]]  # 单次全量：无增量、无影子双算（混合提交零加税）
+        assert snap["_总收集"] == len(files)
+        state = self._read_state(mod)
+        assert state["shadow_ok"] == 2  # 计数保持：无有效比对证据既不推进也不重置
+        assert state["shared"] == mod._shared_signature()  # 语境已刷新
+
+    def test_shadow_lifecycle_graduates_to_pure_incremental(self, drift_parts, monkeypatch):
+        """毕业全生命周期：连续达标逐次推进，达标后测试变更只跑增量（零全量）。"""
+        mod = drift_parts._shared
+        files = self._pristine_files(mod)
+        self._seed(mod, files=files, shadow_ok=0)
+        rel = sorted(files)[0]
+        calls: list = []
+
+        def _fake(file_args):
+            calls.append(list(file_args))
+            if file_args:
+                return {"_总收集": 1, "_marker集合": ["unit"]}, {rel: 1}
+            return {"_总收集": len(files), "_marker集合": ["unit"]}, self._full_map(files)
+
+        monkeypatch.setattr(mod, "_run_collect", _fake)
+        path = mod._snapshot_cache_path()
+
+        # 毕业窗口内：每次测试文件变更都是影子双算，且计数逐次推进
+        for round_i in range(1, mod._SHADOW_MATCHES_NEEDED + 1):
+            state = self._read_state(mod)
+            state["files"][rel]["sig"] = f"stale-{round_i}"
+            path.write_text(json.dumps(state, ensure_ascii=False), encoding="utf-8")
+            calls.clear()
+            mod._collect_test_snapshot()
+            assert calls == [[rel], []], f"第 {round_i} 次应为影子双算（增量+全量）"
+            assert self._read_state(mod)["shadow_ok"] == round_i
+
+        # 达标毕业：再来的测试变更只跑增量，不再叠加全量（纯增量路径可达）
+        state = self._read_state(mod)
+        state["files"][rel]["sig"] = "stale-after-graduation"
+        path.write_text(json.dumps(state, ensure_ascii=False), encoding="utf-8")
+        calls.clear()
+        snap = mod._collect_test_snapshot()
+        assert calls == [[rel]]  # 毕业后纯增量：零全量
+        assert snap["_总收集"] == len(files)  # 未变文件复用 + 变更文件增量
+        assert self._read_state(mod)["shadow_ok"] == mod._SHADOW_MATCHES_NEEDED
+
 
 class TestGeneratedArtifacts:
     """构建/缓存产物不得触发目录树误报（CI 的 `pip install -e` 会在 src/ 下生成 *.egg-info）。"""
