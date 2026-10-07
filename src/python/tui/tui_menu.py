@@ -212,6 +212,7 @@ def _show_multi_chain_status(llm: dict) -> None:
     if llm.get("preferred"):
         print(f"    ▶ 模块偏好: {' / '.join(llm['preferred'])}")
 
+
 # ── 快捷键查找 ──────────────────────────────────────────────
 
 

@@ -45,6 +45,8 @@ def write_block_title(ws, row: int, title: str, ncols: int | None = None) -> int
     cell = ws.cell(row=row, column=1, value=title)
     cell.font = _FONT_SUB_BLOCK
     return row + 1
+
+
 _FONT_WARN = Font(color="CC0000")
 
 # 空子块占位（框架先行，后续轮次填充时被真实数据替换）

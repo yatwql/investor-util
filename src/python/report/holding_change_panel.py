@@ -364,7 +364,7 @@ def _intent_view(metrics: dict[str, Any]) -> tuple[list[list[str]], list[str]]:
 def write_holding_change_sheet(ws: Any, holding_change_data: dict[str, Any] | None) -> None:
     """写入「持仓变动复盘」页签（与 HTML partial 消费同一份 view 字符串）。"""
     from src.python.report.excel_writer import (
-    write_block_title,
+        write_block_title,
         _write_placeholder,
         auto_width,
         freeze_header,

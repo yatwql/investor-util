@@ -173,7 +173,11 @@ def extract_excel_block_titles(module_paths: Iterable[Path]) -> set[str]:
         tree = ast.parse(source, filename=str(path))
         consts: dict[str, str] = {}
         for node in ast.walk(tree):
-            if isinstance(node, ast.Assign) and isinstance(node.value, ast.Constant) and isinstance(node.value.value, str):
+            if (
+                isinstance(node, ast.Assign)
+                and isinstance(node.value, ast.Constant)
+                and isinstance(node.value.value, str)
+            ):
                 for target in node.targets:
                     if isinstance(target, ast.Name):
                         consts[target.id] = node.value.value

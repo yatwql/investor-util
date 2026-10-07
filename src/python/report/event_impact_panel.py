@@ -452,7 +452,7 @@ def write_event_impact_footer(ws: Any, event_impact_data: dict[str, Any] | None,
     （新闻内容之后留一空行）。区块标题与 partial 章内标题同为「事件窗量化对照」。
     """
     from src.python.report.excel_writer import (
-    write_block_title,
+        write_block_title,
         _write_placeholder,
         auto_width,
         write_data_row,

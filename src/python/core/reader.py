@@ -102,8 +102,7 @@ def require_holdings(holdings: list, filepath: str | None = None) -> None:
         return
     location = f": {filepath}" if filepath else ""
     raise ValueError(
-        f"持仓文件为空、无有效账户或格式异常{location}"
-        " —— 请确保持仓文件包含「名称, 代码, 持仓份额, 每份成本」四列"
+        f"持仓文件为空、无有效账户或格式异常{location} —— 请确保持仓文件包含「名称, 代码, 持仓份额, 每份成本」四列"
     )
 
 

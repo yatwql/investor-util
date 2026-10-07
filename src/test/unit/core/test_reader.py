@@ -1034,7 +1034,6 @@ class TestParseFlowSheets(unittest.TestCase):
         self.assertEqual(reader._normalize_action("BUY"), "buy")
 
 
-
 @pytest.mark.unit_core
 class TestRequireHoldings(unittest.TestCase):
     """require_holdings — 空持仓门（读取域不变量，三渠道共用单一入口）。"""
@@ -1059,6 +1058,7 @@ class TestRequireHoldings(unittest.TestCase):
         msg = str(ctx.exception)
         self.assertIn("持仓文件为空", msg)
         self.assertNotIn("/", msg)
+
 
 if __name__ == "__main__":
     unittest.main()

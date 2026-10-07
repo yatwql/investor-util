@@ -314,7 +314,6 @@ class TestFeatureGatedMenuItems:
         assert tm.MENU_ITEMS == first
 
 
-
 class TestLlmStatusRendering:
     """_show_llm_config_status — 消费 llm_status 单源的三态终端渲染。"""
 
@@ -344,6 +343,7 @@ class TestLlmStatusRendering:
             out = self._render()
         assert "多链服务 (1 provider)" in out
         assert "alpha" in out
+
 
 if __name__ == "__main__":
     unittest.main()

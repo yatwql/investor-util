@@ -19,7 +19,13 @@ import logging
 
 from openpyxl.styles import Font
 
-from src.python.report.excel_writer import auto_width, write_data_row, write_header_row, write_title_row, write_block_title
+from src.python.report.excel_writer import (
+    auto_width,
+    write_data_row,
+    write_header_row,
+    write_title_row,
+    write_block_title,
+)
 
 logger = logging.getLogger("invest")
 

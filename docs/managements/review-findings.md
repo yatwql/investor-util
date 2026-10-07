@@ -1,6 +1,6 @@
 # 投资复盘助手 - 自我审查问题记录
-> 文档版本：0.12.5-dev
-> **编号源**：`rf-next = 621`（新增问题取此编号，完成后更新为 +1；已用最大 rf-620，递增保证唯一，归档不回收。若与历史归档冲突，运行 `scripts/check-task-numbering.py` 校验）
+> 文档版本：0.12.5
+> **编号源**：`rf-next = 622`（新增问题取此编号，完成后更新为 +1；已用最大 rf-621，递增保证唯一，归档不回收。若与历史归档冲突，运行 `scripts/check-task-numbering.py` 校验）
 
 ---
 
@@ -45,36 +45,20 @@
 
 > **当前无挂账项**（贴线跟踪 rf-586 的拆分已完成并转入下方已解决区）。警告级全集（测试 >800 行 / >80 项）以 `scripts/check-file-length.py -v` 为派生源，不做人肉快照；逼近红线（1200 行 / 120 项）时按「被测函数 / 场景类型」拆分为同目录兄弟分片，并同步刷新 `test-coverage.md` / `folders.md` 用例计数。
 
-### P2E — 任务执行流程耗时优化（质量 × 时间平衡）（2026-10-07）
+### P2F — 执行流程耗时优化残留（影子双算毕业）（2026-10-07）
 
-> 触发：2026-10-07 用户反馈「每次运行任务比以前长很多」并怀疑冗余调用。实测基准（dragonball，12C16T，本轮采集）：十守护串行合计 **5.1s**（其中 `check-test-redundancy` AST 全量解析 446 个测试文件 **3.47s，占 68%**）；`check-doc-drift --sync` **4.0s**（内含 pytest 收集 9157 项 **3.4s**）；`collect-test-coverage` 单跑 3.4s；dev-verify preflight 3 守护 ≈3.9s + 测试本机 ~33s（test-coverage.md 环境耗时表）。变重时间线：pre-commit 在 2026-10-03 前仅条件触发 3 项守护，10-03 改为八守护全量（dfad7090）、10-03 增 doc-links、10-06 增 file-length，09-19 增 test-redundancy 与 dev-verify preflight——两周内多层叠加，与「比以前慢」的主观感受吻合。**优化总原则：本地降频不降级——CI guards job 恒全量兜底，任何本地分级/缓存都必须与 CI 全量成对设计**。
+> 触发：2026-10-07 流程优化批（rf-606 ~ rf-615）交付后复测——结论缓存/事实缓存/快照热路径/预检均实测达宣称值，唯影子毕业路径在混合提交节奏下不可达。
 
 | # | 问题 | 修复方向 |
 |---|------|----------|
+| **rf-621** | 测试收集快照**影子双算无法毕业**：`shadow_ok` 仅在「共享语境未变 + 仅测试文件变更」的运行 +1，而共享语境 = `src/` 全部非测试文件 + `pyproject.toml`（业务代码同批变更即走 `inc=None` 分支，只回写 `prev_ok` 不推进计数）；2026-10-07 全天 5 次代码+测试混合提交后计数实测仍为 0，测试变更提交每次都付全量双算 ~4.1s，宣称「变更文件纯增量 ~0.87s」结构性不可达 | 共享语境变化的运行保留**旧文件计数仅作比对用途**（权威仍以全量为准、指纹范围不缩、失效方向仍偏向真收集），使混合提交也能推进毕业计数；配回归：混合提交推进计数 / 比对不一致归零且告警 / 全量权威与失败不回写语义不变 |
 
 ## 已解决问题
 
-- rf-600 已修复（2026-10-07）：仓库 config `report_section_order` 与章节注册表失同步 —— config 移除废弃键 `event_impact`、补 `schedule_replay`=16（18 键与注册表 19 键减 `llm_usage` 双向一致、逐键出厂同序），`validate_config` 未知模块标识升级为计 1 问题 + 内存自动清理，契约测试 `TestRepoConfigSectionOrderContract` 绕过测试隔离直读仓库 config 兜底键集漂移 + `TestReportSectionOrderAutoClean` 锁定清理，并同步 how-to-config/faq/technical「本仓库配置 N 项」镜像表述
-- rf-601 已修复（2026-10-07）：导航分组三张 HTML 私有表收敛注册表单源 —— `_REPORT_SECTION_DEFAULT` 条目增 `nav_group`（六组）与 `llm_supported` 字段，`_SECTION_NAV_GROUP_MAP` 删除、`_NAV_GROUP_LABELS`/`_LLM_SUPPORTED_SECTIONS` 派生，计算注册表拆出 `core/computation_registry.py`（`registry.py` 顶部 re-export）控住行数红线，`TestNavGroupRegistry` 防漂移 + 三处散点断言收口迁移至注册表条目断言
-- rf-602 已修复（2026-10-07）：Excel 导航三件套落地 —— 页签 `tabColor` 六组六色（`nav_group` 派生，与 HTML 目录分组同源）、汇总页「章节导航」超链接区（每 8 列一行，表头/冻结行随导航动态化）、各页签标题行尾「↩ 返回汇总」链接（不挪动 20+ 写入器表头行），`test_excel_navigation.py` 覆盖分组配色双向键集、导航链接集 ↔ 可见页签集、返回链接与双端分组一致性
-- rf-603 已修复（2026-10-07）：章节显示名单源化 —— 模板 14 处 + partials 5 处硬编码标题改 `{{ section_names[key] }}`（env globals 从注册表一次性构造），`_REPORT_SHEET_NAMES` 降为派生视图（LLM 章差集 `_LLM_SHEET_NAME_KEYS` 显式声明）+ 派生关系测试 + 「模板与 partials 无硬编码标题」守卫用例
-- rf-604 已修复（2026-10-07）：模板按 TOC 六组章节级拆分 —— `report_template.html` 3131 → 1143 行、14 个章节 partial（`partials/*_section.html` + `with context` 约定沿用），渲染输出与拆分前按空白归一逐字一致；raw 读模板的 4 个测试改读「模板 + partials」拼接源，`_FOLD_KEYS` 补持仓变动/调仓回放两章折叠结构断言；可选项（`check-file-length` 增列 `.html` 观察名单）因拆分后主模板仅 1143 行、失去监控动机，不启用
-- rf-605 已修复（2026-10-07）：章节-区块矩阵双端契约基线 —— `technical.md` §4.22 固化 19 个章节的矩阵（HTML 序号标记重算口径 + Excel 子块清单存在性对账 + key 双向对注册表），`check-doc-drift` 第 17 项机检（计数重算/清单逐串/缺行多行）配 7 项回归用例；顺带修正组合历史「一章两区块」陈旧 docstring 为三区块、§4.21 折叠载体口径随模板拆分重写
-- rf-606 已修复（2026-10-07）：同一待提交树守护重复执行 —— dev-verify 预检精简为 <100ms 任务编号快检，pre-commit 为本地守护唯一执行点、CI guards 全量兜底；回归用例 `test_test_runner_modes.py` 3 项锁定预检内容
-- rf-607 已修复（2026-10-07）：P0 门禁文档三处口径矛盾 —— CLAUDE.md / developer-guide / testplan 统一为「dev-verify 手动 + 十守护由 pre-commit 钩子自动执行 + CI 恒全量兜底」，守护清单五处同源校验保持不变
-- rf-608 已修复（2026-10-07）：`check-doc-drift --sync` 无条件 pytest 收集 —— 测试树指纹磁盘缓存（`DOC_DRIFT_SNAPSHOT_CACHE` 测试隔离重定向），收集冷 4.1s → 命中 0.6s；回归用例 `test_check_doc_drift_crosscheck.py` 6 项（命中免收集 / 失效重算回写 / 损坏降级 / 树指纹敏感 / 同树确定性 / 隔离生效）
-- rf-609 已修复（2026-10-07）：pre-commit 十守护无条件串行 —— `check-doc-drift` 串行先行（--sync 回写）+ 其余九守护按暂存域后台并行回放，纯文档/纯代码提交不跑无关守护，CI 恒全量与同源清单校验不变
-- rf-610 已修复（2026-10-07）：`check-test-redundancy` 随测试规模线性变重 —— 按文件事实缓存（size:mtime 签名 + 逻辑版本键 + 跨文件重复/死用例比对仍全集归并），冷 3.5s → 1.8s、变更文件增量 0.07s、命中 0.06s，与旧实现输出对拍逐字一致；回归用例 `TestFactsCache` 5 项
-- rf-611 已修复（2026-10-07）：`check-doc-drift` 测试收集快照全树指纹重复全量 —— v2 按文件增量状态（逐文件计数账本 + 共享语境指纹变化整树全量兑底 + 影子双算连续 5 次一致才毕业进纯增量 + 失败/非零退出拒收不回写），实测 sync 快路径 0.63s、变更文件纯增量 0.87s（单文件收集 0.2s，旧全量 4.2s）、`--with-test-count` 热 0.52s（冷 3.5s 保守重算）；影子窗口内双算 ≈4.3s 与旧全量同级不回退；回归用例 `test_check_doc_drift_crosscheck.py` 重写 `TestSnapshotCountCache` 15 项 + `TestCollectTestSnapshot` 7 项
-- rf-615 已修复（2026-10-07，随 rf-611 同批自查发现）：`collect-test-coverage.py` 无视 `pytest.main()` 退出码 —— 收集期校验出错（exit=4：conftest 标记纪律校验中断钩子链使 `-m not live` 过滤未执行，实测 20 个 live 项混入、总数虚增）时输出未过滤错数，会被当真值缓存并写进文档统计（rf-608 上线路径与发布数据刷新同受影响）；改为传递退出码、消费方按 rc∈{0,5} 拒收且不回写状态；回归用例 `test_nonzero_exit_rejected` / `test_no_tests_collected_exit_accepted`
-- rf-612 已修复（2026-10-07）：dev-verify 双阶段重复的收集与 worker 启动 —— 两阶段合一为单轮并集 marker（布尔等价全组合枚举对拍 + 合并前后收集数 5752+155=5907 精确一致零重叠，timeout 预算 300s×2 不变，单轮报告 `report.html`，多阶段逐文件防覆盖机制保留），实测本机 37.6s → 30.1s；high 档实测无增益（31.2s、CPU×2），默认保持 medium、`--parallel high` 档可选；回归用例 `TestDevVerifySinglePhaseMerge` 3 项
-- rf-613 已修复（2026-10-07）：三守护暖路径全量重扫 + 钩子串行空等 —— ① 结论缓存（`_checklib.conclusion_cache_*`：逻辑版本键 + 输入面指纹 + 原子写失败静默 + 仅 --ci 加载），--ci 冷/热输出与退出码逐字一致实测 0.59→0.043s / 0.32→0.035s / 0.10→0.031s；② 钩子读写分层：不读 folders.md 的快集+py/test 域先行与 doc-drift 并行，读 folders.md 的 version-consistency+doc 域串行后置；回归用例 `test_check_conclusion_cache.py` 10 项（三守护冷热对拍 ×3 + 输入/逻辑/结构失配矩阵 + 通过与发现双缓存 + 隔离）
-- rf-614 已修复（2026-10-07）：CI guards 十守护串行 + 每 job pip 自升级 —— ① guards job 改单步后台并行回放（YAML 语法校验通过；本地原样提取块复演：成功 rc=0 十守护全回放，注入失败 rc=1 折叠 [FAIL] 分组且其余九守护照跑），暖测 0.80→0.43s、CI 冷预期 ~5.1s→~2s（test-redundancy 冷 ~1.8s 封顶，原目标 1.5s 略乐观、以实际下限为准）；② 4 处 `--upgrade pip` 移除；③ 依赖审计（十守护→仓内模块传递闭包 69 文件）确认守护经 src.python 链 import httpx 等运行时依赖 → 按 rf 规则保留 editable 安装；五处同源对拍 13 项绿
-- rf-616 已修复（2026-10-07）：章节区块级双端契约 —— 新建 `core/section_block_registry.py`（`SECTION_BLOCK_SPECS` 19 个章节条目：双端归一化区块清单 + 提取载体）与 `report/section_block_extraction.py`（HTML 三源规则 / Excel `write_block_title` 调用点含参数直通包装，两端归一化同口径），15 个写入器约 44 处区块标题换 API、组合演进 Excel 端题名对齐 HTML 端（5 对 5 对等），`check-doc-drift` 第 17 项改注册表三向对账（`recount_html_blocks` 序号重算口径退役）+ §4.22 矩阵数据行纠错（新闻章对照表 1→2、LLM 章幻影项「事实校验摘要」撤除）；新增契约测试 `test_section_block_contract.py` 与 `TestBlockMatrix` 注册表篡改/缺契约用例；顺带用户可见标题去配置键泄漏（候选基金比较标题改人话）
-- rf-617 已修复（2026-10-07，近 36 小时实现自查发现）：`scripts/_doc_drift/_tree.py` 矩阵解析 5 处 `# type: ignore[index]` 下标抑制 —— 表头列位经 `absent` 校验齐备后以 `cast(int, …)` 收窄为 `col` 映射再取用（行越界守卫同源改走 `col`），消除全部抑制注释；同轮自查其余维度全净（窗口内 199 个新增符号测试引用/行为级覆盖交叉、TODO/FIXME/债务标记、删除符号残留、文件行数派生源 vs 文档登记、待处理挂账相关性）
-- rf-618 已修复（2026-10-07，渠道一致性自审发现）：LLM 配置状态判定树在渠道复刻 —— `core/system_info` 拆出 `llm_status()` 单源（configured 判定 / 多链与 flat 分流 / credentials 凭据回填），TUI `tui_menu` 状态两函数与 CLI `_show_llm_config_status_cli` 改为消费该 dict 仅做终端/日志渲染，TUI 首次使用 LLM 提示同走 `configured` 判定；`build_system_info` 的 llm 段改由 `llm_status()` 直接嵌入（镜像组装消除）；回归：三渠道三态渲染 + `build.llm == llm_status()` 单源关系 + NO_COLOR 用例 patch 面改 `src.python.config.get_llm_config`
-- rf-619 已修复（2026-10-07，渠道一致性自审发现）：空持仓门在渠道多处复刻且文案四样 —— `core/reader.require_holdings()` 单一入口（ValueError 统一四列提示；`filepath` 可选，HTTP 端不传防服务端路径泄漏），CLI 读入 ×2 / TUI `prepare_holdings` 与清缓存前读入 / Web `_run_generation` / 上传 `_prevalidate` 全部改 catch→各自错误通道（日志+None / 打印+按键 / state.errors / UploadError）；接线回归覆盖 Web run 与 TUI 两处（CLI/上传由既有断言保持）
-- rf-620 已修复（2026-10-07，渠道一致性自审发现）：Web 产物清单在渠道层镜像 --type 规则 + 「个人投资分析报告」文件名多模块字面量重复 —— `orchestrator.artifacts_for_report_type()` 承载类型语义（`_build_artifacts` 改委托），`core/constants` 增 `REPORT_FILE_BASE`/`LATEST_XLSX_NAME`/`LATEST_HTML_NAME` 单源（excel_writer/html_save/web 同引，值不变故产物路径行为不变）
+
+> **本迭代已修复记录（rf-600 ~ rf-620 批次）已随发布迁移至** [`archived_review-findings.0.12.x.md`](../archive/v0.12.x/archived_review-findings.0.12.x.md)；主文件只留未修复项与迁移索引。
+>
+>
 
 > **本迭代已修复记录（rf-579 ~ rf-599 批次）已随发布迁移至** [`archived_review-findings.0.12.x.md`](../archive/v0.12.x/archived_review-findings.0.12.x.md)；主文件只留未修复项与迁移索引。
 >
@@ -92,7 +76,7 @@
 
 ### 归档档案
 
-- [`archived_review-findings.0.12.x.md`](../archive/v0.12.x/archived_review-findings.0.12.x.md) — v0.12.1 ~ v0.12.4 批次（2026-10-03 ~ 2026-10-07）
+- [`archived_review-findings.0.12.x.md`](../archive/v0.12.x/archived_review-findings.0.12.x.md) — v0.12.1 ~ v0.12.5 批次（2026-10-03 ~ 2026-10-07）
 - [`archived_review-findings.0.11.x.md`](../archive/v0.11.x/archived_review-findings.0.11.x.md) — v0.11.0 ~ v0.11.11  （2026-09-18 ~ 2026-10-02）
 - [`archived_review-findings.0.10.x.md`](../archive/v0.10.x/archived_review-findings.0.10.x.md) — v0.10.1 ~ v0.10.20（2026-08-04 ~ 2026-09-15）
 - [`archived_review-findings.0.9.x.md`](../archive/v0.9.x/archived_review-findings.0.9.x.md) — v0.9.0 ~ v0.9.12（2026-07-30 ~ 2026-08-03）

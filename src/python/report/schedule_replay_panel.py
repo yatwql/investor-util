@@ -345,7 +345,7 @@ def build_schedule_replay_view(panel: dict[str, Any] | None) -> dict[str, Any]:
 def write_schedule_replay_sheet(ws: Any, schedule_replay_data: dict[str, Any] | None) -> None:
     """写入「调仓纪律回放」页签（与 HTML partial 消费同一份 view 字符串）。"""
     from src.python.report.excel_writer import (
-    write_block_title,
+        write_block_title,
         _write_placeholder,
         auto_width,
         freeze_header,

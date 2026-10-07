@@ -52,6 +52,7 @@ def _show_llm_config_status_cli() -> None:
         )
     logger.info("─" * 40)
 
+
 def _cli_resolve_holdings_file(config: dict) -> str | None:
     """CLI 模式定位持仓文件路径——跳过文件选择交互，通过 config 配置定位。
 
