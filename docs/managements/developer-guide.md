@@ -884,6 +884,7 @@ A: 运行 `.venv/bin/python scripts/check-test-markers.py`，脚本会静态扫�
 | `collect-test-coverage.py` | 测试 | 测试覆盖计数收集（`--collect-only` 快照，供 test-coverage.md 更新） |
 | `smoke-web.py` | 测试 | Web 模式 HTTP 冒烟脚本（test_client 进程内全链路断言，可独立运行） |
 | `check-version-consistency.py` | 质量 | 版本号全局一致性检查（P0/P2 守护脚本 + 发布流程必跑） |
+| `release.py` | 发布 | 发布流程分步编排（check/prepare/refresh/evolution/gate/publish/devbump，每步独立可审阅、失败即停） |
 | `perf-report.py` | 诊断 | 端到端报告生成管线性能基准（独立脚本，mock 外部数据源） |
 | `perf-view.py` | 诊断 | 性能历史趋势查看（读取 perf_history.jsonl → 跨版本耗时对比） |
 | `probe.py` | 诊断 | 探测统一入口（按 target 分发到 `probes/` 子模块；新探针实现契约面登记即用） |
@@ -1229,6 +1230,24 @@ sh .githooks/install-hooks.sh --off   # 停用
 ```
 
 全部 `[OK]` 方可提交。如有 `[ERR]`，按提示逐个同步，然后重跑直到全部通过。版本切换工作流见下文「版本发布流程」章节。
+
+### 发布类
+
+**`release.py` — 发布流程分步编排**
+
+把「版本发布流程」固化为可执行子命令，每步独立可审阅、失败即停不连锁：
+
+```bash
+.venv/bin/python scripts/release.py check     # 预检：分支/工作树/版本形态/tag/版本一致性
+.venv/bin/python scripts/release.py prepare   # 版本全链 + changelog 发布段归档 + 一致性 --fix
+.venv/bin/python scripts/release.py refresh   # bench --update-docs + collect + doc-drift --sync
+.venv/bin/python scripts/release.py evolution --release   # 演进对照快照（默认只滚当前开发版列）
+.venv/bin/python scripts/release.py gate      # P2：regression + 十守护 --ci
+.venv/bin/python scripts/release.py publish --title "<发布主题>"   # release 提交 + P1 verify + --no-ff 合并 + tag
+.venv/bin/python scripts/release.py devbump    # 切下一开发版并提交
+```
+
+`publish` / `devbump` 默认不推送（只打印推送命令），`--push` 才执行；rf 归档迁移保留人工（需判断归档段语义）。
 
 ### 诊断类
 
@@ -1783,6 +1802,8 @@ registry 的测试在 `src/test/unit/core/test_registry.py`，验证 TTL 默认�
 ## 版本发布流程
 
 发布版本时，按以下五步顺序执行：
+
+> 可用 `scripts/release.py` 分步编排（五步的可执行封装，每步独立可审阅、失败即停）：`prepare`（版本全链与 changelog 归档）、`refresh` + `evolution --release`（数据刷新与演进快照）、`gate`（P2 门禁）、`publish --title`（release 提交 + P1 verify + `--no-ff` 合并 + tag）、`devbump`（切开发版），另有 `check` 预检；下列手动命令为底层口径，脚本失败时按手动步骤排查。
 
 **① 版本号一致**
 

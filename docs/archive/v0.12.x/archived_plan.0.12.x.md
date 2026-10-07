@@ -9,6 +9,7 @@
 > 追加归档：2026-10-06 plan-78 因子动物园目录评测（factor_zoo_catalog）先决门槛三指标评测判定转正立项（见文末章节）
 > 追加归档：2026-10-06 plan-79 事件窗量化对照（event_window_impact）先决门槛三段通过并四迭代完成（见文末章节）
 > 追加归档：2026-10-07 plan-80 调仓纪律回放（rebalance_schedule_replay）先决门槛三段通过并四迭代完成（见文末章节）
+> 追加归档：2026-10-07 plan-84 发布流程分步编排脚本（release.py 七子命令 + 49 项单测）完成（见文末章节）
 > 设计文档索引：plan-72 的设计文档 [`fund-purchase-limit-design.md`](fund-purchase-limit/fund-purchase-limit-design.md) **已随 plan-74 完成一并归档**（本目录 `fund-purchase-limit/`）；plan-73 的 LLM 上下文设计同在 `fund-purchase-limit/fund-purchase-limit-llm-context-design.md`（设计 + 已实施）；plan-76 的快照事件级设计在本目录 `holding-change-review/holding-change-review-design.md`（已实施，§15 实施与验收记录）；plan-77 的 What-if 成本与基准设计在本目录 `whatif-cost-benchmark/whatif-cost-benchmark-design.md`（已实施，§14 门槛与验收记录）；plan-78 的因子目录评测设计在本目录 `factor-zoo-catalog/factor-zoo-catalog-design.md`（已评测·判定转正立项，§13 判定记录）；plan-79 的事件窗设计在本目录 `event-window-impact/event-window-impact-design.md`（已实施，§14 判定记录）；plan-80 的调仓纪律回放设计在本目录 `rebalance-schedule-replay/rebalance-schedule-replay-design.md`（已实施，§14 实施与门槛判定记录）
 
 ---
@@ -152,3 +153,11 @@
 4. guard 类测试写死派生量全仓审计：「断言+关键词+数字」扫描命中 12 处逐一核验均为合成夹具/固定内容/结构不变量，无遗留。
 
 **结果**：门禁强度不变（十守护/测试门禁/pre-commit 一并保留），只收敛往返次数；触点清单见 `developer-guide.md`，纪律见 `CLAUDE.md`「执行效率（合并往返）」，变更记录见 `changelog.md` 同日条目。
+
+## plan-84 发布流程分步编排脚本（scripts/release.py）— ✅ 已完成（2026-10-07）
+
+**动机**：发布编排（版本全链 / changelog 段归档迁移 / 版本演进快照 / 数据刷新 / P2 门禁 / release 提交 + P1 验证 + 合并打 tag / 切开发版）全靠人按文档手工执行，v0.12.5 发布实测触点十余处、易漏项（演进列头、归档索引、README 版本行曾需多轮 `--fix` 才 15/15），步骤口径散落 CLAUDE / testplan / developer-guide 三处。
+
+**动作**：`scripts/release.py` 提供七个分步子命令（每步独立可审阅、失败即停不连锁）：`check`（分支/工作树/版本形态/tag 预检）→ `prepare`（版本全链 + changelog 段迁移与指针/归档索引 + `check-version-consistency --fix` 传播）→ `refresh`（`bench --update-docs` + collect + sync）→ `evolution`（版本演进对照按「git 清单 + 逐文件行数」口径快照 + 增长比 + 注释行数字提示）→ `gate`（P2 = `regression` + 十守护 `--ci`，与门禁清单同源）→ `publish`（release 提交 + P1 `verify` + `--no-ff` 合并 + tag，默认不推送、`--push` 可选）→ `devbump`（切 X.Y.(Z+1)-dev + 提交）。rf 归档迁移保留人工（需判断归档段语义）；测试载体 `src/test/unit/scripts/test_release_tool.py`。
+
+**结果**：七子命令落地（`scripts/release.py`，全部子进程显式 UTF-8 解码、路径注入可测试），`test_release_tool.py` 49 项单测全绿（版本纯函数 / changelog 归档迁移 / 预检条件 / 演进统计与表格渲染 / 门禁编排 / publish 序列与失败中止 / devbump，子进程经 `FakeRunner` 替身不触真实 git 网络）；实现期修正四处设计缺陷（publish 预检放行待提交改动、演进行数增长基准取行数而非文件数、归档索引区间保留起始版本号、devbump 按发布形态而非开发形态）；文档触点同源登记（CLAUDE 发布编排脚本 bullet、developer-guide「发布类」速查 + 一览行 + 版本发布流程编排提示、technical 约束外参照、folders 目录树、changelog 条目）。
