@@ -3,8 +3,8 @@
 #
 # 结构（设计意图与质量兜底见文末「分域原则」）：
 #   1) 无读写竞态守护先行后台启动——快集（code-traces / task-numbering /
-#      semantic-index / requirement-trace）+ py 域 file-length + 测试域
-#      test-redundancy，它们不读 folders.md，与第 2 步 doc-drift 串行段并行执行。
+#      semantic-index / requirement-trace）+ py 域（ruff 探针 + file-length）+
+#      测试域 test-redundancy，它们不读 folders.md，与第 2 步 doc-drift 串行段并行执行。
 #   2) check-doc-drift 串行段——唯一会写文件的守护（涉及 docs/managements/
 #      或 src/test/ 时 --sync 回写 folders.md 并 git add），必须先完成。
 #   3) 读 folders.md 的守护（version-consistency + doc 域 doc-traces/doc-links）
@@ -79,10 +79,18 @@ run_bg check-task-numbering scripts/check-task-numbering.py --ci
 run_bg check-semantic-index scripts/check-semantic-index.py --ci
 run_bg check-requirement-trace scripts/check-requirement-trace.py --ci
 
-# py 域：单文件行数红线（扫描面 = src/python + src/test 的 *.py，含自身脚本）
+# py 域：ruff 探针（E4/E7/E9/F 错误类阻塞 + format 非阻塞提示）+ 单文件行数红线
+# （扫描面 = src/python + src/test 的 *.py，含自身脚本）
 if in_changed '\.py$'; then
-    echo "[..] pre-commit: py 域（file-length，与 doc-drift 并行）"
+    echo "[..] pre-commit: py 域（ruff + file-length，与 doc-drift 并行）"
+    run_bg ruff_check -m ruff check .
     run_bg check-file-length scripts/check-file-length.py --ci
+    # format 探针：非阻塞（与 CI format job 同政策，仅提示不中止提交）
+    (
+        set +e
+        "$PY_CMD" -m ruff format --check . >"$GUARD_TMP/ruff_format.log" 2>&1
+        echo $? >"$GUARD_TMP/ruff_format.rc"
+    ) &
 fi
 
 # 测试域：测试冗余与无效（AST 只读 src/test + 自身 + _checklib；按文件事实缓存：
@@ -127,6 +135,13 @@ show_guard check-version-consistency
 show_guard check-doc-traces
 show_guard check-doc-links
 show_guard check-file-length
+show_guard ruff_check
+
+# ruff format 探针回放：非阻塞——存在待格式化文件只提示（政策与 CI format job 一致）
+if [ -f "$GUARD_TMP/ruff_format.rc" ] && [ "$(cat "$GUARD_TMP/ruff_format.rc")" != "0" ]; then
+    echo "[!] pre-commit: ruff format 有待格式化文件（不阻断提交，修复：.venv/bin/ruff format .）"
+    cat "$GUARD_TMP/ruff_format.log"
+fi
 show_guard check-test-redundancy
 
 if [ -n "$GUARD_FAILED" ]; then
