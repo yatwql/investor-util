@@ -1,6 +1,6 @@
 # 投资复盘助手 - 自我审查问题记录
-> 文档版本：0.12.5
-> **编号源**：`rf-next = 622`（新增问题取此编号，完成后更新为 +1；已用最大 rf-621，递增保证唯一，归档不回收。若与历史归档冲突，运行 `scripts/check-task-numbering.py` 校验）
+> 文档版本：0.12.6
+> **编号源**：`rf-next = 624`（新增问题取此编号，完成后更新为 +1；已用最大 rf-623，递增保证唯一，归档不回收。若与历史归档冲突，运行 `scripts/check-task-numbering.py` 校验）
 
 ---
 
@@ -45,16 +45,11 @@
 
 > **当前无挂账项**（贴线跟踪 rf-586 的拆分已完成并转入下方已解决区）。警告级全集（测试 >800 行 / >80 项）以 `scripts/check-file-length.py -v` 为派生源，不做人肉快照；逼近红线（1200 行 / 120 项）时按「被测函数 / 场景类型」拆分为同目录兄弟分片，并同步刷新 `test-coverage.md` / `folders.md` 用例计数。
 
-### P2F — 执行流程耗时优化残留（影子双算毕业）（2026-10-07）
-
-> 触发：2026-10-07 流程优化批（rf-606 ~ rf-615）交付后复测——结论缓存/事实缓存/快照热路径/预检均实测达宣称值，唯影子毕业路径在混合提交节奏下不可达。
-
-| # | 问题 | 修复方向 |
-|---|------|----------|
-| **rf-621** | 测试收集快照**影子双算无法毕业**：`shadow_ok` 仅在「共享语境未变 + 仅测试文件变更」的运行 +1，而共享语境 = `src/` 全部非测试文件 + `pyproject.toml`（业务代码同批变更即走 `inc=None` 分支，只回写 `prev_ok` 不推进计数）；2026-10-07 全天 5 次代码+测试混合提交后计数实测仍为 0，测试变更提交每次都付全量双算 ~4.1s，宣称「变更文件纯增量 ~0.87s」结构性不可达 | 共享语境变化的运行保留**旧文件计数仅作比对用途**（权威仍以全量为准、指纹范围不缩、失效方向仍偏向真收集），使混合提交也能推进毕业计数；配回归：混合提交推进计数 / 比对不一致归零且告警 / 全量权威与失败不回写语义不变 |
-
 ## 已解决问题
 
+> **本迭代已修复记录（rf-621 ~ rf-623 批次）已随发布迁移至** [`archived_review-findings.0.12.x.md`](../archive/v0.12.x/archived_review-findings.0.12.x.md)；主文件只留未修复项与迁移索引。
+>
+>
 
 > **本迭代已修复记录（rf-600 ~ rf-620 批次）已随发布迁移至** [`archived_review-findings.0.12.x.md`](../archive/v0.12.x/archived_review-findings.0.12.x.md)；主文件只留未修复项与迁移索引。
 >
@@ -76,7 +71,7 @@
 
 ### 归档档案
 
-- [`archived_review-findings.0.12.x.md`](../archive/v0.12.x/archived_review-findings.0.12.x.md) — v0.12.1 ~ v0.12.5 批次（2026-10-03 ~ 2026-10-07）
+- [`archived_review-findings.0.12.x.md`](../archive/v0.12.x/archived_review-findings.0.12.x.md) — v0.12.1 ~ v0.12.6 批次（2026-10-03 ~ 2026-10-07）
 - [`archived_review-findings.0.11.x.md`](../archive/v0.11.x/archived_review-findings.0.11.x.md) — v0.11.0 ~ v0.11.11  （2026-09-18 ~ 2026-10-02）
 - [`archived_review-findings.0.10.x.md`](../archive/v0.10.x/archived_review-findings.0.10.x.md) — v0.10.1 ~ v0.10.20（2026-08-04 ~ 2026-09-15）
 - [`archived_review-findings.0.9.x.md`](../archive/v0.9.x/archived_review-findings.0.9.x.md) — v0.9.0 ~ v0.9.12（2026-07-30 ~ 2026-08-03）

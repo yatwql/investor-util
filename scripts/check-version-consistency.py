@@ -118,15 +118,19 @@ def _check_header(text: str, version: str) -> bool:
     仅匹配整行 `> 文档版本：{version}`，避免正文偶然出现的版本号
     导致全文 contains 误判。
     """
-    pattern = rf"^\s*>\s*文档版本：{re.escape(version)}\s*$"
+    pattern = rf"^[ \t]*>[ \t]*文档版本：{re.escape(version)}[ \t]*$"
     return bool(re.search(pattern, text, re.MULTILINE))
 
 
 def _auto_fix_header(path: Path, version: str) -> bool:
-    """自动修正「文档版本：」头部版本行为目标版本。"""
+    """自动修正「文档版本：」头部版本行为目标版本。
+
+    行首空白类只用同行字符（`[ \t]`）——`\s` 含换行，原 `^\s*>` 在 MULTILINE 下
+    会把版本头前的空行一并吞掉（H1 与版本头之间有空行的文档会丢格式）。
+    """
     text = path.read_text(encoding="utf-8")
     new_text, count = re.subn(
-        r"^\s*>\s*文档版本：.*$",
+        r"^[ \t]*>[ \t]*文档版本：.*$",
         lambda m: f"> 文档版本：{version}",
         text,
         count=1,
