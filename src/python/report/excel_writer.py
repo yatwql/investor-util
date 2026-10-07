@@ -169,6 +169,25 @@ def write_title_row(ws, row: int, text: str, ncols: int) -> int:
     return row + 1
 
 
+def write_block_title(ws, row: int, text: str, ncols: int) -> int:
+    """写入章内区块标题行 — 区块契约载体（与 write_title_row 同样式）。
+
+    双端区块契约（`core/section_block_registry.py`）按本函数调用点提取实际
+    区块清单；非区块的小节标题（说明/配对明细/基准对照等）仍用
+    `write_title_row`，不进入契约。
+
+    Args:
+        ws: 工作表
+        row: 行号（1-based）
+        text: 区块标题文本（字面量或模块常量，契约要求静态可提取）
+        ncols: 跨列数
+
+    Returns:
+        下一行起始行号
+    """
+    return write_title_row(ws, row, text, ncols)
+
+
 def write_header_row(ws, row: int, headers: list[str]) -> int:
     """写入表头行。
 

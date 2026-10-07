@@ -64,6 +64,11 @@ def _write_section(ws, row: int, label: str) -> int:
     return row + 1
 
 
+def write_block_title(ws, row: int, label: str) -> int:
+    """区块标题行（区块契约载体：区块级标题一律经此写入，供双端区块契约提取）。"""
+    return _write_section(ws, row, label)
+
+
 def _write_kv_row(ws, row: int, key: str, value: Any) -> int:
     """写入一个指标=数值行（标准 2 列）。"""
     write_data_row(ws, row, [key, value])
@@ -133,7 +138,7 @@ def _write_holdings_overview(
     update_status: tuple[int, int, bool] | None,
 ) -> int:
     """写入持仓概况分类计数和价格更新状态。"""
-    row = _write_section(ws, row, "【持仓概况】")
+    row = write_block_title(ws, row, "【持仓概况】")
     total_count = 0
     if categories:
         for cat_label in ("场内股票", "场内ETF", "国内场外", "QDII"):
@@ -199,7 +204,7 @@ def _write_profit_summary(
 
     from src.python.report.styles import FMT_MONEY, FMT_PERCENT
 
-    row = _write_section(ws, row, "【盈亏汇总】")
+    row = write_block_title(ws, row, "【盈亏汇总】")
     summary_data: list[tuple[str, float, str]] = [
         ("总市值 (元)", total_mv, FMT_MONEY),
         ("总成本 (元)", total_cost, FMT_MONEY),
@@ -345,7 +350,7 @@ def _write_market_temperature(ws: Worksheet, row: int, temperature: dict | None)
     if not temperature or not temperature.get("available"):
         logger.info("[summary] 市场温度不可用，本行静默省略")
         return row
-    row = _write_section(ws, row, "【市场温度】")
+    row = write_block_title(ws, row, "【市场温度】")
     disclaimer = (
         temperature.get("disclaimer")
         or "市场温度为价格分位、均线偏离与波动率三因子合成的信号，仅供参考，不构成任何仓位建议"
@@ -491,7 +496,7 @@ def write_summary_sheet(
     row = _write_blanks(ws, row)
 
     # ── 市场指数 ──
-    row = _write_section(ws, row, "【市场指数】")
+    row = write_block_title(ws, row, "【市场指数】")
     row = _write_a_share_indices(ws, row, a_indices)
     row = _write_blanks(ws, row)
     row = _write_us_indices(ws, row, us_indices)

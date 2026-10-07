@@ -23,7 +23,7 @@
   14. Extended Thinking 支持矩阵  手册对比表/「仅」式枚举/默认开思考提示 ↔ `llm/api_base` 前缀名单
   15. Provider Chain 降级表  `fetcher/chain.py` `_DEFAULT_CHAINS` → manuals/datasource-reliability.md（逐链双向）
   16. 守护清单同源        developer-guide P0/P2 门禁块 + ci.yml guards steps + CLAUDE.md/testplan.md 清单 + .githooks/pre-commit（五处）`check-*.py --ci` 引用集合两两一致
-  17. 章节-区块矩阵      模板 partial 序号标记重算 + 页签写入器子块清单逐串存在 → managements/technical.md §4.22
+  17. 章节-区块矩阵      区块注册表三向对账（文档行 ↔ 注册表逐列 / 实现提取集合） → managements/technical.md §4.22
 
 按设计豁免的历史记录文档：`changelog.md` / `review-findings.md`（会如实引用旧数字作为变更记录）
 与 `docs/archive/**`（版本快照）不参与第 2/4/5 项扫描。
@@ -137,7 +137,6 @@ from _doc_drift import (  # noqa: E402,F401  # 原面 re-export（实现见 _doc
     sync_project_stats,
     _BLOCK_MATRIX_TITLE,
     parse_block_matrix,
-    recount_html_blocks,
     check_block_matrix,
     _RF_ID,
     _PLAN_ID,

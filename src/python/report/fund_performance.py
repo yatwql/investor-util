@@ -35,6 +35,7 @@ from src.python.report.data_status import (
 )
 from src.python.report.fund_candidate import build_candidate_compare_data
 from src.python.report.excel_writer import (
+    write_block_title,
     _write_data_status_foot,
     _write_placeholder,
     auto_width,
@@ -507,7 +508,7 @@ def _write_candidate_unavailable_block(ws, row: int, candidate_data: dict[str, A
     Returns:
         下一可用行号
     """
-    row = write_title_row(ws, row, "候选基金比较（候选来自 config.comparison_candidates）", _NCOLS)
+    row = write_block_title(ws, row, "候选基金比较（比较对象由配置指定）", _NCOLS)
     _invalid = candidate_data.get("invalid") or []
     _suffix = f"（无效候选代码已忽略：{'、'.join(_invalid)}）" if _invalid else ""
     row = _write_placeholder(
@@ -531,7 +532,7 @@ def _write_candidate_compare_block(ws, row: int, candidate_data: dict[str, Any])
     Returns:
         下一可用行号
     """
-    row = write_title_row(ws, row, "候选基金比较（候选来自 config.comparison_candidates）", _NCOLS)
+    row = write_block_title(ws, row, "候选基金比较（比较对象由配置指定）", _NCOLS)
     row = write_header_row(ws, row, _CANDIDATE_HEADERS)
     fmt = _candidate_num_formats()
     for c in candidate_data.get("rows", []):
@@ -687,7 +688,7 @@ def _manager_change_label(changed: bool, is_first: bool) -> str:
 
 def _write_manager_block(ws: Worksheet, row: int, manager_data: list[dict[str, Any]]) -> int:
     """写入「基金经理变更监控」块，返回下一可用行号。"""
-    row = write_title_row(ws, row, "三、基金经理变更监控", ncols=_MANAGER_NCOLS)
+    row = write_block_title(ws, row, "三、基金经理变更监控", ncols=_MANAGER_NCOLS)
     row = write_header_row(ws, row, _MANAGER_HEADERS)
 
     if not manager_data:

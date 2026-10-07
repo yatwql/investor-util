@@ -2924,12 +2924,12 @@ llm/skeleton.py                 # 教训区块注入专家复盘提示词（开�
 
 ### 4.22 章节-区块矩阵
 
-**用途**：双端一致性契约此前只覆盖「名称 + 顺序 + 集合」（章级），**章内区块级**清单只散落在文字描述里——某端增/删/漏区块（Excel 少写一节、HTML 多渲染一块）无机检。本节把全部报告章节的双端区块清单固化为矩阵表，`check-doc-drift` 第 17 项按同口径重算/对账，漂移在提交前暴露；后续再升级为代码级契约（注册表条目增 `blocks` 字段，清单以注册表为真值）。
+**用途**：在章级一致性（名称/顺序/集合）之上固化**区块级**双端契约。真值在 `src/python/core/section_block_registry.py` 的 `SECTION_BLOCK_SPECS`（每章 `html`/`excel` 归一化区块名清单 + `partials`/`modules` 提取载体），本矩阵是它的派生视图；`check-doc-drift` 第 17 项三向对账——文档行 ↔ 注册表逐列相等、注册表键集 ↔ 章节注册表双向、双端实现提取 ↔ 注册表集合相等，任一端增/删/改名区块在提交前暴露。两端标题共用归一化口径（去 HTML 标签与 span 副标题、去序号头 `一、`/`①`、去括号段与【】外框），契约名与展示文案解耦。
 
-**计数口径**（检查脚本与本节文字同源，改口径须同步两处）：
+**提取口径**（与 `report/section_block_extraction.py` 模块说明同源，改口径须同步两处）：
 
-- **HTML 区块数**——对章节 partial（`src/static/tmpl/partials/`，多文件用 ` + ` 分隔）按「序号标记去重重算」：三类序号取并集——block-title 标题首字符序号（`一、` / `①` 式）、`>` 后的加粗序号 div、结构注释 `<!-- ── 一、… ── -->`；有序号时计集合大小，无序号但存在 block-title 则计去重标题数，两者皆无记「—」（流式章，不计数）。
-- **Excel 区块清单**——各页签写入器的子块标题清单（多模块用 ` + ` 分隔、多区块用 ` / ` 分隔），检查逐串在载体模块内做存在性对账（防区块删除/改名后矩阵不失真）；「—」为单表章。
+- **HTML 端**——`class="block-title"` 元素（全部计为区块）+ 内联加粗 div 中**带序号头**者（不带序号的加粗行是块内小标签，不计）+ `<!-- ── 一、…` 框式结构注释兜底（其序号/标题已被可见区块占用时丢弃，可见优先）；归一化标题集合大小即矩阵「HTML 区块数」，无区块记「—」（流式章/单表章）。
+- **Excel 端**——`write_block_title` 调用点（含 `_write_sub_block` 类参数直通包装的调用位参）的静态字面量/模块常量，归一化集合即清单真值；非区块小节标题（说明/配对明细/基准对照等）仍走 `write_title_row`，不入契约；清单多模块用 ` + ` 分隔、多区块用 ` / ` 分隔，「—」为该端无子块。
 - **备注**记录条件（开关门控）区块与双端差异；矩阵首列序号无语义（仅行标），章节集合与顺序以注册表为准（缺行/多行由检查报出）。
 
 | # | 章节（key） | HTML 区块数 | HTML 载体（`src/static/tmpl/partials/`） | Excel 区块清单 | Excel 载体（`src/python/report/`） | 备注 |
@@ -2939,19 +2939,19 @@ llm/skeleton.py                 # 教训区块注入专家复盘提示词（开�
 | 3 | `penetration` | — | penetration_section.html | — | penetration_sheet.py | 单表章 |
 | 4 | `fund_performance` | 2 | fund_performance_section.html | 候选基金比较 / 基金经理变更监控 | fund_performance.py | 候选比较为开关门控区块（两态标题去重后计 1） |
 | 5 | `position_structure` | 3 | position_structure_section.html | 持仓重合度矩阵 / 持仓相关性矩阵 / 持仓集中度监控 | position_structure_sheet.py | 双端对等 |
-| 6 | `style_factor` | 4 | style_factor_section.html | 基金风格表 / 风格因子回归 / 行业 Beta / 因子目录 | style_factor_sheet.py | 行业 Beta 子表与因子目录默认关（条件区块，序号去重计 4） |
-| 7 | `action` | 7 | action_section.html | 再平衡信号 / 交易纪律 / 调仓建议清单 / 收益归因 / 历史决策复盘 / 景气度框架诊断 / 市场情绪 | action_sheet.py | ⑤⑥⑦ 门控（决策复盘/景气度/市场情绪，默认关） |
-| 8 | `news_correlation` | 1 | news_correlation_section.html + event_impact_section.html | 事件窗量化对照 | news_correlation.py + event_impact_panel.py | 事件窗对照为章内块级；新闻主表为章主体 |
-| 9 | `global_macro` | — | global_macro_section.html | 事实校验摘要 | llm_content.py | LLM 流式章；事实校验块 Excel 端条件写入 |
-| 10 | `expert_review` | — | expert_review_section.html | 事实校验摘要 | llm_content.py | 同上 |
-| 11 | `health_check` | — | health_check_section.html | 事实校验摘要 | llm_content.py | 同上 |
-| 12 | `penetration_deep` | — | penetration_deep_section.html | 事实校验摘要 | llm_content.py | 同上 |
+| 6 | `style_factor` | 4 | style_factor_section.html | 基金风格表 / 风格因子回归 / 行业 Beta / 因子目录 | style_factor_sheet.py | 行业 Beta 子表与因子目录默认关（条件区块，归一化去重计 4） |
+| 7 | `action` | 7 | action_section.html | 再平衡信号 / 交易纪律 / 调仓建议清单 / 收益归因 / 历史决策复盘 / 景气度框架诊断 / 市场情绪与持仓热点 | action_sheet.py | ⑤⑥⑦ 门控（决策复盘/景气度/市场情绪，默认关） |
+| 8 | `news_correlation` | 2 | news_correlation_section.html + event_impact_section.html | 事件窗量化对照 / 事件窗对照表 | news_correlation.py + event_impact_panel.py | 量化对照为章内块级、对照表为其折叠子块（双端同构）；新闻主表为章主体 |
+| 9 | `global_macro` | — | global_macro_section.html | — | llm_content.py | LLM 流式章；事实校验块为内容内嵌（无标题行，契约外） |
+| 10 | `expert_review` | — | expert_review_section.html | — | llm_content.py | 同上 |
+| 11 | `health_check` | — | health_check_section.html | — | llm_content.py | 同上 |
+| 12 | `penetration_deep` | — | penetration_deep_section.html | — | llm_content.py | 同上 |
 | 13 | `portfolio_history_drawdown` | 3 | portfolio_history_drawdown_section.html | 走势表 / 回撤矩阵 / 危机区间标注 | portfolio_history_drawdown_sheet.py | 双端对等 |
-| 14 | `portfolio_evolution` | 5 | evolution_section.html | 总市值趋势 / 自上次快照变化摘要 | evolution_sheet.py | HTML 端五序号 vs Excel 两子块（已知差异，后续对齐） |
+| 14 | `portfolio_evolution` | 5 | evolution_section.html | 自上次快照变化摘要 / 总市值与总盈亏趋势 / 持仓集中度趋势 / TOP 持仓占比变迁 / 账户配置流 | evolution_sheet.py | 双端对等（5 对 5；Excel 端标题已对齐 HTML 端） |
 | 15 | `holding_change` | 4 | holding_change_section.html | 变动事件清单 / 频率与结构演变 / 意图对账 / 变动动因 LLM 归因 | holding_change_panel.py | LLM 归因块条件写入，双端四对四 |
 | 16 | `schedule_replay` | 2 | schedule_replay_section.html | 纪律回放 vs 买入持有 / 规则 A 逐期调仓与成本 | schedule_replay_panel.py | 双端对等 |
 | 17 | `data_source_status` | — | data_source_status_section.html | 源健康 / 数据源说明 / 品种覆盖 / 可信度 | data_quality_sheet.py | HTML 端表格直排无序号标记；Excel 端四子块 |
-| 18 | `fundamental_snapshot` | 2 | fundamental_snapshot_section.html | 财务指标 / 财报摘要 | fundamental_snapshot_sheet.py | 两区块各由功能开关门控 |
+| 18 | `fundamental_snapshot` | 2 | fundamental_snapshot_section.html | 财务指标 / 持仓个股财报摘要 | fundamental_snapshot_sheet.py | 两区块各由功能开关门控 |
 | 19 | `llm_usage` | — | llm_usage_section.html | — | excel_llm_usage.py | 单表章 |
 
 ## 5. LLM 集成层（概要设计）

@@ -1,7 +1,7 @@
 """组合演进页签 Excel 呈现测试。
 
 覆盖：
-  - available=True → 汇总 + 总市值趋势表 + HHI 趋势表 + TOP 持仓占比变迁表 + 说明
+  - available=True → 汇总 + 总市值与总盈亏趋势表 + HHI 趋势表 + TOP 持仓占比变迁表 + 说明
   - 标题顺序：总市值 → HHI → TOP 变迁 → 说明
   - 多账户 → 账户配置流表
   - 单期无有效权重 → HHI 记 "-"
@@ -62,17 +62,17 @@ class TestExcelEvolutionSheet(unittest.TestCase):
         return [v for row in self._all_text(ws) for v in row]
 
     def test_full_rendering_when_available(self):
-        """available=True → 汇总 + 总市值趋势 + HHI 趋势 + TOP 变迁 + 说明齐全。"""
+        """available=True → 汇总 + 总市值与总盈亏趋势 + HHI 趋势 + TOP 变迁 + 说明齐全。"""
         ws = self._write(_evolution_data())
         titles = [r[0] for r in self._all_text(ws)]
         self.assertTrue(any("组合演进" in t for t in titles), f"应含组合演进标题，实际: {titles}")
-        self.assertTrue(any("总市值趋势" in t for t in titles))
+        self.assertTrue(any("总市值与总盈亏趋势" in t for t in titles))
         self.assertTrue(any("HHI" in t for t in titles))
         self.assertTrue(any("持仓占比变迁" in t for t in titles))
         self.assertTrue(any("账户配置流" in t for t in titles))
         self.assertTrue(any("说明" in t for t in titles))
         # 标题顺序：总市值 → HHI → TOP → 说明
-        mv_idx = next(i for i, t in enumerate(titles) if "总市值趋势" in t)
+        mv_idx = next(i for i, t in enumerate(titles) if "总市值与总盈亏趋势" in t)
         hhi_idx = next(i for i, t in enumerate(titles) if "HHI" in t)
         top_idx = next(i for i, t in enumerate(titles) if "持仓占比变迁" in t)
         notes_idx = next(i for i, t in enumerate(titles) if "说明" in t)

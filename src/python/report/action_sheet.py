@@ -33,6 +33,18 @@ logger = logging.getLogger("invest")
 
 _FONT_ACCENT = Font(size=12, bold=True, color="2E75B6")
 _FONT_SUB_BLOCK = Font(bold=True, color="404040")
+
+
+def write_block_title(ws, row: int, title: str, ncols: int | None = None) -> int:
+    """区块标题行（区块契约载体）：子块标题与同版式区块标题统一入口。
+
+    ``ncols`` 给定时走合并居中标题样式（情绪/景气块），否则保持子块直排加粗样式。
+    """
+    if ncols:
+        return write_title_row(ws, row, title, ncols)
+    cell = ws.cell(row=row, column=1, value=title)
+    cell.font = _FONT_SUB_BLOCK
+    return row + 1
 _FONT_WARN = Font(color="CC0000")
 
 # 空子块占位（框架先行，后续轮次填充时被真实数据替换）
@@ -66,8 +78,7 @@ def _write_sub_block(
         子块结束行号
     """
     row += 1
-    cell = ws.cell(row=row, column=1, value=title)
-    cell.font = _FONT_SUB_BLOCK
+    row = write_block_title(ws, row, title)
     row += 1
     if not items:
         row = write_data_row(ws, row, [placeholder] + [""] * (ncols - 1))
@@ -179,7 +190,7 @@ def write_action_sheet(
     # 子块 4：收益归因（TOP5 贡献占比，正负分列 + 净额合计）
     _attr = action_data.get("attribution")
     row += 1
-    ws.cell(row=row, column=1, value="收益归因（品种贡献占比）").font = _FONT_SUB_BLOCK
+    row = write_block_title(ws, row, "收益归因（品种贡献占比）")
     row += 1
     if not _attr or not _attr.get("available"):
         row = write_data_row(ws, row, ["待生成", "", "", "", ""])
@@ -227,7 +238,7 @@ def _write_review_block(
         review_data: `decision_review_data` 契约 dict（available=True 已保证）
     """
     row += 1
-    ws.cell(row=row, column=1, value="历史决策复盘（非回测，仅供反思参考）").font = _FONT_SUB_BLOCK
+    row = write_block_title(ws, row, "历史决策复盘（非回测，仅供反思参考）")
     row += 1
     disclaimer = (review_data.get("disclaimer") or "").strip()
     if disclaimer:
@@ -284,7 +295,7 @@ def _write_market_sentiment_block(ws, row: int, data: dict[str, Any], ncols: int
     只列**命中持仓/穿透标的代码**的当日事件：上榜龙虎榜（净买额/上榜原因）与
     进入连板梯队（板位/次日封板）；不可用时写降级原因，不阻断行动建议章其余内容。
     """
-    row = write_title_row(ws, row, "市场情绪与持仓热点", ncols=ncols)
+    row = write_block_title(ws, row, "市场情绪与持仓热点", ncols=ncols)
     if not data.get("available"):
         row = write_data_row(ws, row, [f"（{data.get('reason') or '暂无可用情绪数据'}）", "", "", "", ""])
         for f in data.get("failures") or []:
@@ -358,7 +369,7 @@ def _write_prosperity_block(ws, row: int, data: dict[str, Any], ncols: int) -> i
     含总分/评级、六维明细（依据行）、持仓视角与「需核实」清单；结尾固定免责句
     （契合度而非优劣判断，非投资建议）。
     """
-    row = write_title_row(ws, row, "景气度框架诊断（实验性）", ncols=ncols)
+    row = write_block_title(ws, row, "景气度框架诊断（实验性）", ncols=ncols)
     row = write_data_row(
         ws,
         row,

@@ -21,6 +21,7 @@ from openpyxl.worksheet.worksheet import Worksheet
 
 from src.python.core.registry import get_report_sheet_name
 from src.python.report.excel_writer import (
+    write_block_title,
     auto_width,
     freeze_header,
     write_data_row,
@@ -86,7 +87,7 @@ def _plain(value: Any, digits: int = 2) -> str:
 def _write_indicator_block(ws: Worksheet, row: int, indicator_data: dict[str, Any] | None) -> int:
     """写入区块①「财务指标」，返回下一可用行号。"""
     ncols = len(_INDICATOR_COLUMNS)
-    write_title_row(ws, row, _BLOCK_TITLE_INDICATOR, ncols=ncols)
+    write_block_title(ws, row, _BLOCK_TITLE_INDICATOR, ncols=ncols)
     body = row + 2  # 区块标题下一行留空（与原独立页签布局一致）
 
     if not indicator_data or not indicator_data.get("available"):
@@ -144,7 +145,7 @@ def _write_indicator_block(ws: Worksheet, row: int, indicator_data: dict[str, An
 def _write_digest_block(ws: Worksheet, row: int, digest_data: dict[str, Any] | None) -> int:
     """写入区块②「持仓个股财报摘要」，返回下一可用行号。"""
     ncols = len(_DIGEST_COLUMNS)
-    write_title_row(ws, row, _BLOCK_TITLE_DIGEST, ncols=ncols)
+    write_block_title(ws, row, _BLOCK_TITLE_DIGEST, ncols=ncols)
     body = row + 1
 
     if not digest_data or not digest_data.get("available"):

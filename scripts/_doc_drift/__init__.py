@@ -62,7 +62,6 @@ from _doc_drift._tree import (  # noqa: F401
     sync_project_stats,
     _BLOCK_MATRIX_TITLE,
     parse_block_matrix,
-    recount_html_blocks,
     check_block_matrix,
 )
 from _doc_drift._ledger import (  # noqa: F401
@@ -195,7 +194,6 @@ __all__ = [
     "sync_project_stats",
     "_BLOCK_MATRIX_TITLE",
     "parse_block_matrix",
-    "recount_html_blocks",
     "check_block_matrix",
     "_RF_ID",
     "_PLAN_ID",

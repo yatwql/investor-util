@@ -168,7 +168,7 @@
             {% elif history_data.bars %}
             <div class="empty-section" style="margin-top:16px;">📭 历史回撤数据不足（有效交易日不足 {{ drawdown_min_span }} 天），暂不计算回撤事件</div>
             {% endif %}
-            <!-- ── 三、危机区间标注表（区间统计：区间回撤/恢复天数，图下说明） ── -->
+            <!-- ── 三、危机区间标注（区间统计：区间回撤/恢复天数，图下说明） ── -->
             {% if _crisis_ok %}
             <div style="font-weight: bold; font-size: 14px; margin-top: 20px; margin-bottom: 6px;">危机区间标注（2015 股灾 / 2018 贸易摩擦 / 2020 疫情 / 2022 调整）</div>
             {% if _crisis_in_range %}

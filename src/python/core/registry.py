@@ -24,6 +24,11 @@ from src.python.core.computation_registry import (  # noqa: F401
     get_computation_module,
     get_computation_registry,
 )
+from src.python.core.section_block_registry import (  # noqa: F401
+    SECTION_BLOCK_SPECS,
+    SectionBlockSpec,
+    get_section_block_spec,
+)
 
 logger = logging.getLogger("invest")
 

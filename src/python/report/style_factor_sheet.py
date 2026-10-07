@@ -25,6 +25,7 @@ from openpyxl.worksheet.worksheet import Worksheet
 from src.python.core.registry import get_report_sheet_name
 from src.python.report.data_status import STATUS_MESSAGES
 from src.python.report.excel_writer import (
+    write_block_title,
     _write_placeholder,
     auto_width,
     freeze_header,
@@ -107,7 +108,7 @@ def _write_style_block(
     ncols: int,
 ) -> int:
     """写入一、基金风格表区块，返回下一行起始行号。"""
-    write_title_row(ws, row, "一、基金风格表", ncols=ncols)
+    write_block_title(ws, row, "一、基金风格表", ncols=ncols)
     row += 1
     row = write_header_row(ws, row, _STYLE_HEADERS)
     row += 1
@@ -152,7 +153,7 @@ def _write_factor_block(
     ncols: int,
 ) -> int:
     """写入二、风格因子回归区块，返回下一行起始行号。"""
-    write_title_row(ws, row, "二、风格因子回归", ncols=ncols)
+    write_block_title(ws, row, "二、风格因子回归", ncols=ncols)
     row += 1
 
     if not factor_exposure or not factor_exposure.get("available"):
@@ -252,7 +253,7 @@ def _write_industry_beta_block(
         logger.info("风格与因子分析·行业 Beta：开关关闭，区块不渲染")
         return row
 
-    write_title_row(ws, row, "三、行业 Beta（组合对各行业指数敏感性）", ncols=ncols)
+    write_block_title(ws, row, "三、行业 Beta（组合对各行业指数敏感性）", ncols=ncols)
     row += 1
 
     if not industry_beta.get("available"):
@@ -331,7 +332,7 @@ def _write_catalog_block(
     if factor_catalog_data is None:
         logger.info("风格与因子分析·因子目录：开关关闭，区块不渲染")
         return row
-    write_title_row(ws, row, "四、因子目录（25 因子五来源族横截面）", ncols=ncols)
+    write_block_title(ws, row, "四、因子目录（25 因子五来源族横截面）", ncols=ncols)
     row += 1
     if not factor_catalog_data.get("available"):
         reason = factor_catalog_data.get("reason") or "池内有效成分数不足"

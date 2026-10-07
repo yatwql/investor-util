@@ -19,6 +19,7 @@ from openpyxl.worksheet.worksheet import Worksheet
 
 from src.python.core.registry import get_report_sheet_name
 from src.python.report.excel_writer import (
+    write_block_title,
     _write_placeholder,
     auto_width,
     freeze_header,
@@ -68,7 +69,7 @@ def _write_trend_block(
     tail_risk: dict[str, Any] | None = None,
 ) -> int:
     """写入一、走势表区块（净值时间线 + 指标汇总 + 尾部风险），返回下一行起始行号。"""
-    write_title_row(ws, row, "一、走势表", ncols=ncols)
+    write_block_title(ws, row, "一、走势表", ncols=ncols)
     row += 1
 
     bars = history_data.get("bars", [])
@@ -180,7 +181,7 @@ def _write_drawdown_block(
     ncols: int,
 ) -> int:
     """写入二、回撤矩阵区块（独立回撤事件明细），返回下一行起始行号。"""
-    write_title_row(ws, row, "二、回撤矩阵", ncols=ncols)
+    write_block_title(ws, row, "二、回撤矩阵", ncols=ncols)
     row += 1
 
     dd_events = history_data.get("drawdown_events") or []
@@ -221,7 +222,7 @@ def _write_crisis_block(
     ncols: int,
 ) -> int:
     """写入三、危机区间标注区块（静态日期表 + 区间统计），返回下一行起始行号。"""
-    write_title_row(ws, row, "三、危机区间标注", ncols=ncols)
+    write_block_title(ws, row, "三、危机区间标注", ncols=ncols)
     row += 1
 
     intervals = (crisis_annotation or {}).get("intervals", []) if crisis_annotation else []

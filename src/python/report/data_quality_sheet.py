@@ -19,7 +19,7 @@ import logging
 
 from openpyxl.styles import Font
 
-from src.python.report.excel_writer import auto_width, write_data_row, write_header_row, write_title_row
+from src.python.report.excel_writer import auto_width, write_data_row, write_header_row, write_title_row, write_block_title
 
 logger = logging.getLogger("invest")
 
@@ -100,7 +100,7 @@ def _write_source_health_block(ws, row: int, matrix: list[dict]) -> int:
     from src.python.report.data_source_matrix import MATRIX_HEADERS
 
     ncols = len(MATRIX_HEADERS)
-    row = write_title_row(ws, row, "源健康（数据源可用性）", ncols)
+    row = write_block_title(ws, row, "源健康（数据源可用性）", ncols)
     row = write_header_row(ws, row, list(MATRIX_HEADERS))
     for m in matrix:
         if m["status"] == "ok":
@@ -164,7 +164,7 @@ def write_source_catalog_block(ws, row: int, catalog: list[dict] | None = None) 
         return row
     ncols = 6
     row += 1
-    row = write_title_row(ws, row, "数据源说明（实际使用清单）", ncols)
+    row = write_block_title(ws, row, "数据源说明（实际使用清单）", ncols)
     row = write_header_row(ws, row, ["数据类别", "实际数据源（链路）", "用途", "计费", "凭据/就绪", "本次使用"])
     for item in catalog:
         provider = item.get("provider", "")
@@ -195,7 +195,7 @@ def _write_coverage_block(ws, row: int, position_status: dict | None, ncols: int
         区块结束行号
     """
     row += 1
-    row = write_title_row(ws, row, "品种覆盖（逐品种数据状态）", ncols)
+    row = write_block_title(ws, row, "品种覆盖（逐品种数据状态）", ncols)
     block = build_coverage_block(position_status)
     if not block["has_data"]:
         row = write_data_row(ws, row, [_COVERAGE_PLACEHOLDER, "", "", "", ""])
@@ -228,7 +228,7 @@ def _write_freshness_block(ws, row: int, data_freshness: dict | None, ncols: int
         区块结束行号
     """
     row += 1
-    row = write_title_row(ws, row, "可信度（数据新鲜度 + 单日跳变）", ncols)
+    row = write_block_title(ws, row, "可信度（数据新鲜度 + 单日跳变）", ncols)
     if not data_freshness or not data_freshness.get("available"):
         row = write_data_row(ws, row, [_FRESHNESS_PLACEHOLDER, "", "", "", ""])
         return row

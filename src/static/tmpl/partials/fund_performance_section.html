@@ -33,7 +33,7 @@
         {% endif %}
         {% if candidate_data %}
         {% if candidate_data.get("available") %}
-        <div class="block-title">候选基金比较（候选来自 config.comparison_candidates）</div>
+        <div class="block-title">候选基金比较（比较对象由配置指定）</div>
         <div class="section-content" style="padding: 0;">
             <table>
                 <thead>
@@ -89,7 +89,7 @@
         {% endif %}
         {% else %}
         <!-- 候选基金比较开关已开启但无有效候选（config.comparison_candidates 未配置或代码非法） -->
-        <div class="block-title">候选基金比较（候选来自 config.comparison_candidates）</div>
+        <div class="block-title">候选基金比较（比较对象由配置指定）</div>
         <div class="empty-section">📭 未配置候选基金（config.comparison_candidates 为空），无法输出候选基金比较。请在 config.json 中配置 comparison_candidates 后重新生成报告。{% if candidate_data.get("invalid") %}（无效候选代码已忽略：{{ candidate_data["invalid"] | join('、') }}）{% endif %}</div>
         {% endif %}
         {% endif %}

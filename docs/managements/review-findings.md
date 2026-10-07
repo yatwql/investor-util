@@ -1,6 +1,6 @@
 # 投资复盘助手 - 自我审查问题记录
 > 文档版本：0.12.5-dev
-> **编号源**：`rf-next = 617`（新增问题取此编号，完成后更新为 +1；已用最大 rf-616，递增保证唯一，归档不回收。若与历史归档冲突，运行 `scripts/check-task-numbering.py` 校验）
+> **编号源**：`rf-next = 618`（新增问题取此编号，完成后更新为 +1；已用最大 rf-617，递增保证唯一，归档不回收。若与历史归档冲突，运行 `scripts/check-task-numbering.py` 校验）
 
 ---
 
@@ -45,14 +45,6 @@
 
 > **当前无挂账项**（贴线跟踪 rf-586 的拆分已完成并转入下方已解决区）。警告级全集（测试 >800 行 / >80 项）以 `scripts/check-file-length.py -v` 为派生源，不做人肉快照；逼近红线（1200 行 / 120 项）时按「被测函数 / 场景类型」拆分为同目录兄弟分片，并同步刷新 `test-coverage.md` / `folders.md` 用例计数。
 
-### P2D — 报告结构与组织优化（Excel × HTML 双端同步）（2026-10-07）
-
-> 触发：2026-10-07 报告结构专项自审（章节注册表单源 / 导航分组 / 双端一致性契约 / 模板组织四路核查）。均为未修复项；凡涉及结构与组织的改动，修复时须 Excel 与 HTML 两端同步考虑，不得单端落地。
-
-| # | 问题 | 修复方向 |
-|---|------|----------|
-| **rf-616** | 章节-区块矩阵首版即暴露的双端章内区块清单不对等：「组合演进」HTML 端五个序号区块（①~⑤）vs Excel 端两子块（总市值趋势 / 自上次快照变化摘要）；矩阵已记为「已知差异」，但无机检强制收敛，单端增删仍可能静默发生 | 升级区块级代码契约（注册表条目增 `blocks` 字段，Excel 写入区块 ↔ HTML 渲染区块集合双向断言）时对齐组合演进两端区块划分，并把矩阵计数改为由注册表派生 |
-
 ### P2E — 任务执行流程耗时优化（质量 × 时间平衡）（2026-10-07）
 
 > 触发：2026-10-07 用户反馈「每次运行任务比以前长很多」并怀疑冗余调用。实测基准（dragonball，12C16T，本轮采集）：十守护串行合计 **5.1s**（其中 `check-test-redundancy` AST 全量解析 446 个测试文件 **3.47s，占 68%**）；`check-doc-drift --sync` **4.0s**（内含 pytest 收集 9157 项 **3.4s**）；`collect-test-coverage` 单跑 3.4s；dev-verify preflight 3 守护 ≈3.9s + 测试本机 ~33s（test-coverage.md 环境耗时表）。变重时间线：pre-commit 在 2026-10-03 前仅条件触发 3 项守护，10-03 改为八守护全量（dfad7090）、10-03 增 doc-links、10-06 增 file-length，09-19 增 test-redundancy 与 dev-verify preflight——两周内多层叠加，与「比以前慢」的主观感受吻合。**优化总原则：本地降频不降级——CI guards job 恒全量兜底，任何本地分级/缓存都必须与 CI 全量成对设计**。
@@ -78,6 +70,8 @@
 - rf-612 已修复（2026-10-07）：dev-verify 双阶段重复的收集与 worker 启动 —— 两阶段合一为单轮并集 marker（布尔等价全组合枚举对拍 + 合并前后收集数 5752+155=5907 精确一致零重叠，timeout 预算 300s×2 不变，单轮报告 `report.html`，多阶段逐文件防覆盖机制保留），实测本机 37.6s → 30.1s；high 档实测无增益（31.2s、CPU×2），默认保持 medium、`--parallel high` 档可选；回归用例 `TestDevVerifySinglePhaseMerge` 3 项
 - rf-613 已修复（2026-10-07）：三守护暖路径全量重扫 + 钩子串行空等 —— ① 结论缓存（`_checklib.conclusion_cache_*`：逻辑版本键 + 输入面指纹 + 原子写失败静默 + 仅 --ci 加载），--ci 冷/热输出与退出码逐字一致实测 0.59→0.043s / 0.32→0.035s / 0.10→0.031s；② 钩子读写分层：不读 folders.md 的快集+py/test 域先行与 doc-drift 并行，读 folders.md 的 version-consistency+doc 域串行后置；回归用例 `test_check_conclusion_cache.py` 10 项（三守护冷热对拍 ×3 + 输入/逻辑/结构失配矩阵 + 通过与发现双缓存 + 隔离）
 - rf-614 已修复（2026-10-07）：CI guards 十守护串行 + 每 job pip 自升级 —— ① guards job 改单步后台并行回放（YAML 语法校验通过；本地原样提取块复演：成功 rc=0 十守护全回放，注入失败 rc=1 折叠 [FAIL] 分组且其余九守护照跑），暖测 0.80→0.43s、CI 冷预期 ~5.1s→~2s（test-redundancy 冷 ~1.8s 封顶，原目标 1.5s 略乐观、以实际下限为准）；② 4 处 `--upgrade pip` 移除；③ 依赖审计（十守护→仓内模块传递闭包 69 文件）确认守护经 src.python 链 import httpx 等运行时依赖 → 按 rf 规则保留 editable 安装；五处同源对拍 13 项绿
+- rf-616 已修复（2026-10-07）：章节区块级双端契约 —— 新建 `core/section_block_registry.py`（`SECTION_BLOCK_SPECS` 19 个章节条目：双端归一化区块清单 + 提取载体）与 `report/section_block_extraction.py`（HTML 三源规则 / Excel `write_block_title` 调用点含参数直通包装，两端归一化同口径），15 个写入器约 44 处区块标题换 API、组合演进 Excel 端题名对齐 HTML 端（5 对 5 对等），`check-doc-drift` 第 17 项改注册表三向对账（`recount_html_blocks` 序号重算口径退役）+ §4.22 矩阵数据行纠错（新闻章对照表 1→2、LLM 章幻影项「事实校验摘要」撤除）；新增契约测试 `test_section_block_contract.py` 与 `TestBlockMatrix` 注册表篡改/缺契约用例；顺带用户可见标题去配置键泄漏（候选基金比较标题改人话）
+- rf-617 已修复（2026-10-07，近 36 小时实现自查发现）：`scripts/_doc_drift/_tree.py` 矩阵解析 5 处 `# type: ignore[index]` 下标抑制 —— 表头列位经 `absent` 校验齐备后以 `cast(int, …)` 收窄为 `col` 映射再取用（行越界守卫同源改走 `col`），消除全部抑制注释；同轮自查其余维度全净（窗口内 199 个新增符号测试引用/行为级覆盖交叉、TODO/FIXME/债务标记、删除符号残留、文件行数派生源 vs 文档登记、待处理挂账相关性）
 
 > **本迭代已修复记录（rf-579 ~ rf-599 批次）已随发布迁移至** [`archived_review-findings.0.12.x.md`](../archive/v0.12.x/archived_review-findings.0.12.x.md)；主文件只留未修复项与迁移索引。
 >
