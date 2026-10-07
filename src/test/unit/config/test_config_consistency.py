@@ -384,3 +384,36 @@ class TestLlmSettingsTemplateConsistency:
         assert _DEFAULT_LLM_SETTINGS["enabled_llm"].keys() <= titles.keys(), (
             f"以下模块在模板中缺少配置区块: {sorted(_DEFAULT_LLM_SETTINGS['enabled_llm'].keys() - titles.keys())}"
         )
+
+
+class TestRepoConfigSectionOrderContract:
+    """仓库自带 config 的 report_section_order 与章节注册表契约。
+
+    测试隔离会把 config 重定向到临时目录，仓库出厂 config 的键集合漂移
+    因此不会被日常用例发现——本类直接读仓库文件兜底。
+    """
+
+    def test_repo_config_keys_match_registry(self):
+        """键集合双向一致（不收 llm_usage、无未知键），且各键序号与出厂序同序。"""
+        from src.python.core.registry import get_report_section_keys, get_report_section_number
+
+        path = os.path.join(PROJECT_ROOT, "data", "config", "config.json")
+        with open(path, encoding="utf-8") as f:
+            data = json.loads(_comments._strip_json_comments(f.read()))
+        order = data.get("report_section_order") or {}
+        assert set(order) == get_report_section_keys() - {"llm_usage"}
+        for key, num in order.items():
+            expected = get_report_section_number(key)
+            assert num == expected, f"{key}={num} 偏离出厂序 {expected}（config 与注册表须同序）"
+
+
+class TestReportSectionOrderAutoClean:
+    """report_section_order 未知模块标识的校验期自动清理。"""
+
+    def test_unknown_key_counted_and_removed(self):
+        """未知模块标识：计 1 问题并从内存配置剔除（防残留键造成排序错位预期）。"""
+        config = {"report_section_order": {"summary": 1, "nonexistent_module": 2}}
+        n = cfg.validate_config(config)
+        assert n == 1
+        assert "nonexistent_module" not in config["report_section_order"]
+        assert "summary" in config["report_section_order"]
