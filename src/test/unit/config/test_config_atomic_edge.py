@@ -400,7 +400,7 @@ class TestConfigEnvEdge(unittest.TestCase):
         with (
             patch("sys.stdout.isatty", return_value=False),
             patch.dict(os.environ, {"NO_COLOR": "1"}),
-            patch("src.python.tui.tui_menu.get_llm_config", return_value={"api_key": "sk-test", "provider": "claude"}),
+            patch("src.python.config.get_llm_config", return_value={"api_key": "sk-test", "provider": "claude"}),
         ):
             with patch("sys.stdout", new_callable=MagicMock) as mock_stdout:
                 tui._show_llm_config_status()
@@ -415,7 +415,7 @@ class TestConfigEnvEdge(unittest.TestCase):
         with (
             patch("sys.stdout.isatty", return_value=False),
             patch.dict(os.environ, {"NO_COLOR": "1"}),
-            patch("src.python.tui.tui_menu.get_llm_config", return_value=None),
+            patch("src.python.config.get_llm_config", return_value=None),
         ):
             with patch("sys.stdout", new_callable=MagicMock) as mock_stdout:
                 tui._show_llm_config_status()

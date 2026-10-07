@@ -664,3 +664,25 @@ class TestPrintCacheRefreshReportExtended(unittest.TestCase):
         output = self._call(result)
         self.assertNotIn("新闻获取失败", output)
         self.assertNotIn("基金经理获取失败", output)
+
+
+@pytest.mark.unit_core
+class TestReadHoldingsGate(unittest.TestCase):
+    """_read_holdings_and_clear_cache — 空持仓门（读取域单源 require_holdings）。"""
+
+    @patch("src.python.cache.clear_by_group")
+    @patch("src.python.tui.handlers_cache.press_any_key")
+    @patch("src.python.tui.handlers_cache.read_holdings", return_value=[])
+    @patch("src.python.tui.handlers_cache.select_holdings_file", return_value="/tmp/holdings.xlsx")
+    @patch("src.python.tui.handlers_cache.refresh_config")
+    def test_empty_holdings_blocks_cleanup(self, mock_refresh, mock_select, mock_read, mock_press, mock_clear):
+        from src.python.tui.handlers_cache import _read_holdings_and_clear_cache
+
+        buf = io.StringIO()
+        with patch("sys.stdout", buf):
+            result = _read_holdings_and_clear_cache("利润预测")
+        self.assertIsNone(result)
+        out = buf.getvalue()
+        self.assertIn("持仓文件为空", out)
+        self.assertIn("四列", out)
+        mock_clear.assert_not_called()

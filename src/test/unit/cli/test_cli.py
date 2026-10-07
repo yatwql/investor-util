@@ -1036,3 +1036,34 @@ class TestModuleEntryPoint:
         )
 
         assert proc.returncode == 7, f"退出码未传递（stdout={proc.stdout!r} stderr={proc.stderr!r})"
+
+
+class TestLlmStatusLogging:
+    """_show_llm_config_status_cli — 消费 llm_status 单源的日志渲染。"""
+
+    @staticmethod
+    def _records(caplog) -> str:
+        from src.python.cli._handlers import _show_llm_config_status_cli
+
+        with caplog.at_level("INFO", logger="invest"):
+            _show_llm_config_status_cli()
+        return "\n".join(r.getMessage() for r in caplog.records)
+
+    def test_unconfigured(self, caplog, monkeypatch):
+        monkeypatch.setattr("src.python.config.get_llm_config", lambda: None)
+        assert "状态: 未配置" in self._records(caplog)
+
+    def test_flat_configured(self, caplog, monkeypatch):
+        monkeypatch.setattr("src.python.config.get_llm_config", lambda: {"api_key": "k", "provider": "claude"})
+        text = self._records(caplog)
+        assert "状态: 已配置" in text
+        assert "provider=claude" in text
+
+    def test_multi_chain(self, caplog, monkeypatch):
+        monkeypatch.setattr(
+            "src.python.config.get_llm_config",
+            lambda: {"_provider_list": [{"name": "alpha", "provider": "claude"}]},
+        )
+        text = self._records(caplog)
+        assert "多链服务: 1 provider" in text
+        assert "alpha" in text

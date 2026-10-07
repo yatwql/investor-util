@@ -262,6 +262,23 @@ class TestRunGeneration:
         assert code == 2
         assert state.errors == ["上传文件已过期，请重新上传"]
 
+    def test_empty_holdings_gate_returns_severe(self, monkeypatch):
+        """空持仓门（读取域单源）：run 读到空持仓 → 严重退出 + 统一四列提示，且不泄漏服务端路径。"""
+        from types import SimpleNamespace
+
+        result = upload.save_upload(BytesIO(_make_holdings_xlsx()), "持仓.xlsx")
+        file_id = result["file_id"]
+        params = {"file_id": file_id, "report_type": "basic"}
+        monkeypatch.setattr(
+            "src.python.core.reader.read_holdings_with_flows",
+            lambda _p: SimpleNamespace(holdings=[], transactions=[], dividends=[]),
+        )
+        state = RunState("r-empty", params)
+        code = _run_generation(state, params)
+        assert code == 2
+        assert state.errors and "持仓文件为空" in state.errors[0] and "四列" in state.errors[0]
+        assert "/" not in state.errors[0]
+
 
 class TestIndexConfigBackfill:
     """索引页按 get_config() 回填表单默认（历史走势/强制 LLM 复选框）。"""

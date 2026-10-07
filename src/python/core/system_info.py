@@ -3,6 +3,7 @@
 - ``build_system_info()``：版本 / 机器 IP / 持仓与输出摘要 / 匿名化与隐私 /
   自检开关 / LLM 配置状态（flat 单 provider 与 credentials_ref 多链两种模式）。
   渠道层只做渲染，不自行组装状态数据。
+- ``llm_status()``：LLM 配置状态单源（三渠道状态展示共用判定树，渠道不复刻分支）。
 - 展示原语（``simplify_endpoint`` / ``circuit_display`` / ``strategy_label`` /
   ``priority_display`` / ``anon_mode_label`` / ``resolve_provider_credentials`` /
   ``model_route_labels``）：熔断规则、主机名简化、策略标签、凭据回填等
@@ -109,11 +110,10 @@ def build_system_info() -> dict:
     Returns:
         dict，含 app_version / machine_ip / holdings 摘要字段 / llm（结构化状态）。
     """
-    from src.python.config import get_config, get_default, get_llm_config, get_local_flag, resolve_holdings_path
+    from src.python.config import get_config, get_default, get_local_flag, resolve_holdings_path
     from src.python.config.anonymizer import get_anonymization_mode
     from src.python.core.constants import APP_VERSION
     from src.python.core.logger import get_machine_ip
-    from src.python.core.registry import get_llm_module_names
 
     info = {
         "app_version": APP_VERSION,
@@ -165,13 +165,32 @@ def build_system_info() -> dict:
         logger.warning("读取功能开关失败，系统自检卡片按隐藏处理", exc_info=True)
         info["doctor_enabled"] = False
 
+    info["llm"] = llm_status()
+    return info
+
+
+def llm_status() -> dict:
+    """LLM 配置状态（三渠道状态展示共用的单一分支事实来源）。
+
+    configured 判定 / 多链与 flat 分流 / credentials 凭据回填 / 优先级与熔断
+    展示一律经本函数：TUI、CLI、Web 的 LLM 状态行消费同一份结果，渠道层
+    只做传输渲染（print/logger/JSON），不得复刻判定树。
+
+    Returns:
+        dict：未配置 ``{"configured": False}``；多链含 ``mode="multi"`` /
+        strategy / providers / preferred；flat 含 ``mode="flat"`` / provider /
+        model / endpoint / endpoint_display / circuit / route。
+    """
+    from src.python.config import get_llm_config
+    from src.python.core.registry import get_llm_module_names
+
     try:
         llm_config = get_llm_config()
     except Exception:
         logger.warning("读取 LLM 配置失败，按未配置展示", exc_info=True)
         llm_config = None
     if llm_config is None:
-        return info
+        return {"configured": False}
 
     provider_list = llm_config.get("_provider_list") or []
 
@@ -196,22 +215,21 @@ def build_system_info() -> dict:
             f"{get_llm_module_names().get(mk, mk)} → {pname}"
             for mk, pname in (llm_config.get("_preferred_providers", {}) or {}).items()
         ]
-        info["llm"] = {
+        return {
             "configured": True,
             "mode": "multi",
             "strategy": strategy_label(llm_config.get("_strategy", "priority")),
             "providers": providers,
             "preferred": preferred,
         }
-        return info
 
     # ── 传统 flat 模式：单 provider ──
     if not llm_config.get("api_key") or not llm_config.get("provider"):
-        return info
+        return {"configured": False}
 
     model = llm_config.get("model") or "默认"
     endpoint = llm_config.get("endpoint") or "默认"
-    info["llm"] = {
+    return {
         "configured": True,
         "mode": "flat",
         "provider": llm_config["provider"],
@@ -221,4 +239,3 @@ def build_system_info() -> dict:
         "circuit": circuit_display(endpoint, default_as_none=True),
         "route": model_route_labels(llm_config),
     }
-    return info

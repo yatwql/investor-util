@@ -975,3 +975,23 @@ class TestFetchHistoryData:
             [("SH600001", "测试", 100)],
             days=90,
         )
+
+
+class TestArtifactsForReportType:
+    """artifacts_for_report_type — 报告类型 → 产物 kind 单源（Web 产物清单消费）。"""
+
+    def test_basic_yields_excel_only(self):
+        from src.python.report.orchestrator import artifacts_for_report_type
+
+        assert artifacts_for_report_type("basic") == ("xlsx",)
+
+    def test_both_and_full_include_html(self):
+        from src.python.report.orchestrator import artifacts_for_report_type
+
+        for report_type in ("both", "full"):
+            assert artifacts_for_report_type(report_type) == ("html", "xlsx")
+
+    def test_unknown_type_defaults_to_excel(self):
+        from src.python.report.orchestrator import artifacts_for_report_type
+
+        assert artifacts_for_report_type("nonsense") == ("xlsx",)

@@ -17,7 +17,7 @@ from collections.abc import Callable
 
 from src.python.core.ansi_colors import GREEN, RED, RESET, YELLOW
 from src.python.core.registry import LLM_HIDDEN_KEYS
-from src.python.config import get_config, get_llm_config
+from src.python.config import get_config
 
 # 每个菜单项：(快捷键, 显示标签, 回调函数, 是否退出项)
 MenuItem = tuple[str, str, Callable[[], None] | None, bool]
@@ -110,8 +110,9 @@ def print_header() -> None:
     _first_run_hints = []
     if not os.path.exists(holdings):
         _first_run_hints.append("• 请先通过菜单 [D] 配置持仓目录/文件名，或放置文件到默认目录")
-    llm_conf = get_llm_config()
-    if llm_conf is None or not (llm_conf.get("api_key") or llm_conf.get("_provider_list")):
+    from src.python.core.system_info import llm_status
+
+    if not llm_status()["configured"]:
         _first_run_hints.append(
             "• 如需 LLM 分析，请配置 data/config/llm_key.json 或 llm_providers.json（菜单 [S] 查看状态）"
         )
@@ -172,88 +173,44 @@ def _show_privacy_and_security_status() -> None:
 
 
 def _show_llm_config_status() -> None:
-    """显示 LLM 配置状态（绿色已配置 / 红色未配置），含多链详细信息。"""
-    from src.python.core.system_info import circuit_display, model_route_labels, simplify_endpoint
+    """显示 LLM 配置状态（绿色已配置 / 红色未配置）。
 
-    llm_config = get_llm_config()
-    if llm_config is None:
+    数据来自 ``core.system_info.llm_status`` 单源（三渠道共用判定树），
+    本函数只做终端渲染，不自行组装状态。
+    """
+    from src.python.core.system_info import llm_status
+
+    llm = llm_status()
+    if not llm.get("configured"):
         print(f"  LLM: {RED}未配置{RESET}（配置 data/config/llm_key.json 或 llm_providers.json 后重启生效）")
         return
-
-    provider_list = llm_config.get("_provider_list") or []
-
-    # ── credentials_ref 多链模式 ──
-    if provider_list and not llm_config.get("api_key"):
-        _show_multi_chain_status(llm_config, provider_list)
+    if llm.get("mode") == "multi":
+        _show_multi_chain_status(llm)
         return
-
-    # ── 传统 flat 模式：单 provider ──
-    if not llm_config.get("api_key") or not llm_config.get("provider"):
-        print(f"  LLM: {RED}未配置{RESET}（配置 data/config/llm_key.json 或 llm_providers.json 后重启生效）")
-        return
-
-    provider = llm_config["provider"]
-    model = llm_config.get("model") or "默认"
-    endpoint = llm_config.get("endpoint") or "默认"
-    ep_display = simplify_endpoint(endpoint)
-
-    # 单 provider 熔断状态
-    cb_status = circuit_display(endpoint, default_as_none=True)
-    cb_display = f" |  熔断: {cb_status}" if cb_status != "—" else ""
-
-    print(f"  LLM: {GREEN}已配置{RESET}  provider={provider}  model={model}  endpoint={ep_display}{cb_display}")
-    print(f"         模型路由: {' / '.join(model_route_labels(llm_config))}")
+    cb_display = f" |  熔断: {llm['circuit']}" if llm["circuit"] != "—" else ""
+    print(
+        f"  LLM: {GREEN}已配置{RESET}  provider={llm['provider']}  model={llm['model']}"
+        f"  endpoint={llm['endpoint_display']}{cb_display}"
+    )
+    print(f"         模型路由: {' / '.join(llm['route'])}")
 
 
-def _show_multi_chain_status(llm_config: dict, provider_list: list[dict]) -> None:
-    """显示多 Provider 链式服务的详细信息。
+def _show_multi_chain_status(llm: dict) -> None:
+    """显示多 Provider 链式服务的详细信息（消费 llm_status 单源结果）。
 
-    展示策略、各 Provider 的后端/模型/优先级/熔断状态。
+    展示策略、各 Provider 的后端/模型/优先级/熔断状态与模块偏好；
     单独提取为函数以保持 _show_llm_config_status 清晰。
     """
-    from src.python.core.registry import get_llm_module_names
-    from src.python.core.system_info import (
-        circuit_display,
-        priority_display,
-        resolve_provider_credentials,
-        strategy_label,
-    )
-
-    strategy_display = strategy_label(llm_config.get("_strategy", "priority"))
-
     print(f"  LLM: {GREEN}已配置{RESET}")
-    print(f"  策略: {strategy_display}  |  多链服务 ({len(provider_list)} provider)")
-
-    # 每个 provider 一行列表显示（含后端类型、模型、优先级、熔断状态）
-    for i, entry in enumerate(provider_list, 1):
-        name = entry.get("name", "?")
-        backend = entry.get("provider", "?")
-
-        # 解析模型和 endpoint（优先 entry 内联，再查 _llm_credentials，凭据回填单源）
-        model, endpoint = resolve_provider_credentials(entry, llm_config.get("_llm_credentials", {}) or {})
-
-        model_display = model or "默认"
-
-        # 优先级显示
-        priority = priority_display(entry.get("priority"))
-
-        # 熔断状态
-        cb_status = circuit_display(endpoint)
+    print(f"  策略: {llm['strategy']}  |  多链服务 ({len(llm['providers'])} provider)")
+    for i, p in enumerate(llm["providers"], 1):
+        cb_status = p["circuit"]
         cb_icon = f"{GREEN}✓{RESET}" if cb_status == "正常" else f"{RED}⚠{RESET}"
-
-        print(f"    [{i}] {name}  ({backend})")
-        print(f"         模型: {model_display}")
-        print(f"         优先级: {priority}    熔断: {cb_icon} {cb_status}")
-
-    # 模块级 provider 偏好（如有）
-    preferred = llm_config.get("_preferred_providers", {})
-    if preferred:
-        parts = []
-        for mk, pname in preferred.items():
-            display_name = get_llm_module_names().get(mk, mk)
-            parts.append(f"{display_name} → {pname}")
-        print(f"    ▶ 模块偏好: {' / '.join(parts)}")
-
+        print(f"    [{i}] {p['name']}  ({p['backend']})")
+        print(f"         模型: {p['model']}")
+        print(f"         优先级: {p['priority']}    熔断: {cb_icon} {cb_status}")
+    if llm.get("preferred"):
+        print(f"    ▶ 模块偏好: {' / '.join(llm['preferred'])}")
 
 # ── 快捷键查找 ──────────────────────────────────────────────
 

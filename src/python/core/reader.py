@@ -84,6 +84,29 @@ def get_xlsx_info(filepath: str) -> dict:
         return {"error": str(e)}
 
 
+def require_holdings(holdings: list, filepath: str | None = None) -> None:
+    """空持仓门（读取域不变量）：生成/缓存/上传前置的三渠道共用单一入口。
+
+    空或无有效记录 → ValueError（统一含四列格式提示）；各渠道捕获后映射到
+    自身错误通道（CLI 日志 / TUI 打印 / Web state.errors / 上传 UploadError）。
+
+    Args:
+        holdings: 已解析的持仓列表。
+        filepath: 本地控制台渠道展示用来源路径；HTTP 端传 None（不向浏览器
+            泄漏服务端路径）。
+
+    Raises:
+        ValueError: 持仓为空或无有效账户。
+    """
+    if holdings:
+        return
+    location = f": {filepath}" if filepath else ""
+    raise ValueError(
+        f"持仓文件为空、无有效账户或格式异常{location}"
+        " —— 请确保持仓文件包含「名称, 代码, 持仓份额, 每份成本」四列"
+    )
+
+
 def read_holdings(filepath: str) -> list[Holding]:
     """读取持仓 Excel 文件，返回持仓记录列表。
 

@@ -1,6 +1,6 @@
 # 投资复盘助手 - 自我审查问题记录
 > 文档版本：0.12.5-dev
-> **编号源**：`rf-next = 618`（新增问题取此编号，完成后更新为 +1；已用最大 rf-617，递增保证唯一，归档不回收。若与历史归档冲突，运行 `scripts/check-task-numbering.py` 校验）
+> **编号源**：`rf-next = 621`（新增问题取此编号，完成后更新为 +1；已用最大 rf-620，递增保证唯一，归档不回收。若与历史归档冲突，运行 `scripts/check-task-numbering.py` 校验）
 
 ---
 
@@ -72,6 +72,9 @@
 - rf-614 已修复（2026-10-07）：CI guards 十守护串行 + 每 job pip 自升级 —— ① guards job 改单步后台并行回放（YAML 语法校验通过；本地原样提取块复演：成功 rc=0 十守护全回放，注入失败 rc=1 折叠 [FAIL] 分组且其余九守护照跑），暖测 0.80→0.43s、CI 冷预期 ~5.1s→~2s（test-redundancy 冷 ~1.8s 封顶，原目标 1.5s 略乐观、以实际下限为准）；② 4 处 `--upgrade pip` 移除；③ 依赖审计（十守护→仓内模块传递闭包 69 文件）确认守护经 src.python 链 import httpx 等运行时依赖 → 按 rf 规则保留 editable 安装；五处同源对拍 13 项绿
 - rf-616 已修复（2026-10-07）：章节区块级双端契约 —— 新建 `core/section_block_registry.py`（`SECTION_BLOCK_SPECS` 19 个章节条目：双端归一化区块清单 + 提取载体）与 `report/section_block_extraction.py`（HTML 三源规则 / Excel `write_block_title` 调用点含参数直通包装，两端归一化同口径），15 个写入器约 44 处区块标题换 API、组合演进 Excel 端题名对齐 HTML 端（5 对 5 对等），`check-doc-drift` 第 17 项改注册表三向对账（`recount_html_blocks` 序号重算口径退役）+ §4.22 矩阵数据行纠错（新闻章对照表 1→2、LLM 章幻影项「事实校验摘要」撤除）；新增契约测试 `test_section_block_contract.py` 与 `TestBlockMatrix` 注册表篡改/缺契约用例；顺带用户可见标题去配置键泄漏（候选基金比较标题改人话）
 - rf-617 已修复（2026-10-07，近 36 小时实现自查发现）：`scripts/_doc_drift/_tree.py` 矩阵解析 5 处 `# type: ignore[index]` 下标抑制 —— 表头列位经 `absent` 校验齐备后以 `cast(int, …)` 收窄为 `col` 映射再取用（行越界守卫同源改走 `col`），消除全部抑制注释；同轮自查其余维度全净（窗口内 199 个新增符号测试引用/行为级覆盖交叉、TODO/FIXME/债务标记、删除符号残留、文件行数派生源 vs 文档登记、待处理挂账相关性）
+- rf-618 已修复（2026-10-07，渠道一致性自审发现）：LLM 配置状态判定树在渠道复刻 —— `core/system_info` 拆出 `llm_status()` 单源（configured 判定 / 多链与 flat 分流 / credentials 凭据回填），TUI `tui_menu` 状态两函数与 CLI `_show_llm_config_status_cli` 改为消费该 dict 仅做终端/日志渲染，TUI 首次使用 LLM 提示同走 `configured` 判定；`build_system_info` 的 llm 段改由 `llm_status()` 直接嵌入（镜像组装消除）；回归：三渠道三态渲染 + `build.llm == llm_status()` 单源关系 + NO_COLOR 用例 patch 面改 `src.python.config.get_llm_config`
+- rf-619 已修复（2026-10-07，渠道一致性自审发现）：空持仓门在渠道多处复刻且文案四样 —— `core/reader.require_holdings()` 单一入口（ValueError 统一四列提示；`filepath` 可选，HTTP 端不传防服务端路径泄漏），CLI 读入 ×2 / TUI `prepare_holdings` 与清缓存前读入 / Web `_run_generation` / 上传 `_prevalidate` 全部改 catch→各自错误通道（日志+None / 打印+按键 / state.errors / UploadError）；接线回归覆盖 Web run 与 TUI 两处（CLI/上传由既有断言保持）
+- rf-620 已修复（2026-10-07，渠道一致性自审发现）：Web 产物清单在渠道层镜像 --type 规则 + 「个人投资分析报告」文件名多模块字面量重复 —— `orchestrator.artifacts_for_report_type()` 承载类型语义（`_build_artifacts` 改委托），`core/constants` 增 `REPORT_FILE_BASE`/`LATEST_XLSX_NAME`/`LATEST_HTML_NAME` 单源（excel_writer/html_save/web 同引，值不变故产物路径行为不变）
 
 > **本迭代已修复记录（rf-579 ~ rf-599 批次）已随发布迁移至** [`archived_review-findings.0.12.x.md`](../archive/v0.12.x/archived_review-findings.0.12.x.md)；主文件只留未修复项与迁移索引。
 >

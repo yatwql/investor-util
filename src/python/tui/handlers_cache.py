@@ -14,7 +14,7 @@ from __future__ import annotations
 import os
 
 from src.python.core.logger import setup_logger
-from src.python.core.reader import read_holdings
+from src.python.core.reader import read_holdings, require_holdings
 from src.python.tui.tui_handlers import print_error_with_hint, select_holdings_file
 from src.python.tui.tui_menu import GREEN, RED, RESET, YELLOW, press_any_key, refresh_config
 
@@ -42,10 +42,10 @@ def _read_holdings_and_clear_cache(group_name: str) -> list | None:
 
     try:
         holdings = read_holdings(filepath)
-        if not holdings:
-            print(f"  {RED}[ERR]{RESET} 未读取到有效的持仓数据")
-            print("     请检查持仓文件中是否有数据，列名是否正确")
-            print("     需要的列名：名称、代码、持仓份额、每份成本")
+        try:
+            require_holdings(holdings, filepath)
+        except ValueError as e:
+            print(f"  {RED}[ERR]{RESET} {e}")
             press_any_key()
             return None
         print(f"  {GREEN}[OK]{RESET} 共 {len(holdings)} 条持仓记录")

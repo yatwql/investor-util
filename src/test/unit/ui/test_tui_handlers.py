@@ -611,3 +611,26 @@ class TestSelectHoldingsFile(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+@pytest.mark.unit_ui
+class TestPrepareHoldingsGate(unittest.TestCase):
+    """prepare_holdings — 空持仓门（读取域单源 require_holdings）。"""
+
+    @patch("src.python.tui.tui_handlers.press_any_key")
+    @patch("src.python.tui.tui_handlers.read_holdings_with_flows")
+    @patch("src.python.tui.tui_handlers.select_holdings_file", return_value="/tmp/holdings.xlsx")
+    @patch("src.python.tui.tui_handlers.refresh_config")
+    def test_empty_holdings_returns_none(self, mock_refresh, mock_select, mock_read, mock_press):
+        from types import SimpleNamespace
+
+        from src.python.tui.tui_handlers import prepare_holdings
+
+        mock_read.return_value = SimpleNamespace(holdings=[], transactions=[], dividends=[])
+        buf = io.StringIO()
+        with patch("sys.stdout", buf):
+            result = prepare_holdings()
+        self.assertIsNone(result)
+        out = buf.getvalue()
+        self.assertIn("持仓文件为空", out)
+        mock_press.assert_called_once()

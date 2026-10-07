@@ -355,7 +355,7 @@ section_visible = board_enabled(section.type) AND data_available(section.data_fl
 
 三渠道遵循同一「**薄入口 + 共享管线 + 进度抽象 + 配置快照**」模式：
 
-- **薄入口**：渠道层只保留交互外壳（菜单 / argparse / HTTP 路由），不承载业务逻辑。TUI 的 `tui/handlers_*`、CLI 的 argparse 直调、Web 的 API 路由均委托共享层（`report/orchestrator.py` + `cache/operations.py`）。
+- **薄入口**：渠道层只保留交互外壳（菜单 / argparse / HTTP 路由），不承载业务逻辑。TUI 的 `tui/handlers_*`、CLI 的 argparse 直调、Web 的 API 路由均委托共享层（`report/orchestrator.py` + `cache/operations.py`）。展示与校验类共性规则同样单源：LLM 配置状态经 `core/system_info.llm_status()` 组装（三渠道状态行只渲染不判定），空持仓门经 `core/reader.require_holdings()`（各渠道捕获后映射自身错误通道）。
 - **共享管线**：`generate_report()`（报告编排器，§4.2）为同步函数，通过可注入的 `ProgressReporter` 接口输出阶段消息，与终端/浏览器完全解耦——三渠道注入各自的 reporter 子类即可，**管线代码零改动**。
 - **进度抽象**：`report/progress.py` 定义 `ProgressReporter` 基类（info/ok/warn/error/add_error/timer），三渠道各实现子类：`TuiProgressReporter`（菜单区刷新）、`CliProgressReporter`（logging + verbose stderr）、`WebProgressReporter`（事件缓冲 → 浏览器轮询）。
 - **配置快照**：生成任务执行时取一次 `get_config()` 快照，run 期间不受外部配置修改影响（Web 侧在任务**出队时**取快照，见 §1.8.5）。
@@ -451,7 +451,7 @@ while True:
 | | `[T]` | 系统自检（环境/配置/目录/数据源一键体检，`handlers_log.py::_cmd_run_doctor`）；**受开关 `doctor_check` 约束（默认开）**——开关关闭时该菜单项由 `tui_menu._apply_feature_gates()` 就地裁剪，不出现在菜单中 |
 | 退出 | `[X]` | 退出程序 |
 
-菜单渲染层与状态面板：`print_header`（标题 + 首次运行指引：缺持仓文件/缺 LLM 配置提示）、`show_config`（持仓路径、输出目录、新闻抓取上限、文件就绪状态 `[OK]`/`[!!]`、匿名化状态、隐私声明、LLM 配置状态单链/多链两视图）。LLM 状态面板支持多 Provider 链式模式（策略、各 provider 后端/模型/优先级/熔断状态、模块级偏好）。
+菜单渲染层与状态面板：`print_header`（标题 + 首次运行指引：缺持仓文件/缺 LLM 配置提示）、`show_config`（持仓路径、输出目录、新闻抓取上限、文件就绪状态 `[OK]`/`[!!]`、匿名化状态、隐私声明、LLM 配置状态单链/多链两视图）。LLM 状态面板支持多 Provider 链式模式（策略、各 provider 后端/模型/优先级/熔断状态、模块级偏好）；面板数据消费 `core/system_info.llm_status()` 单源（configured 判定与多链/flat 分支唯一在共享层，渠道只做终端渲染）。
 
 #### 1.6.4 报告生成流程
 
@@ -522,7 +522,7 @@ CLI 渠道是**命令行参数**形态，面向脚本化与自动化场景：定
 #### 1.7.4 子命令处理器（`cli/_handlers.py`）
 
 - **`_handle_report`**：`CliProgressReporter(verbose)` 注入 `generate_report`（§4.2）；`--output` 覆盖 `output_dir`，`--history` 为 None 时回退配置层解析；返回 `result.exit_code`。
-- **`_handle_cache`**：三分支——`--clean` 委托 `cleanup_cache`；`--stats` 委托 `get_cache_stats` + 打印 LLM 配置状态；`--update` 委托 `update_basic_cache`/`update_position_cache`（§3.6），`--update all` 委托 `update_all_cache` **最大努力模式**（basic 失败仍继续 position，退出码取两者 max）。
+- **`_handle_cache`**：三分支——`--clean` 委托 `cleanup_cache`；`--stats` 委托 `get_cache_stats` + 打印 LLM 配置状态（消费 `core/system_info.llm_status()` 单源，仅日志渲染）；`--update` 委托 `update_basic_cache`/`update_position_cache`（§3.6），`--update all` 委托 `update_all_cache` **最大努力模式**（basic 失败仍继续 position，退出码取两者 max）。
 - **`_handle_whatif`**：解析 `--base`/`--candidate` 两份持仓 → `run_whatif_simulation()`（§4.13）→ 结果 `ok` 判定，失败返回 2；`--effective-date` 触发时序回测扩展。
 - **`_handle_cassettes`**：无参数时经 `core/cassette.py::list_cassettes()` 列出已录制响应（来源/录制时间/交互数/大小）；`--verify` 时经 `fetcher/cassette_checks.py::CASSETTE_CHECKS` + `verify_cassettes()` 离线回放，有解析失败返回 `_EXIT_SEVERE`。纯只读展示层，不联网、不碰用户配置。
 - **`_handle_check_sources`**：`run_check_sources()`（内部 `sys.exit`）。
@@ -551,7 +551,7 @@ Web 渠道是第三种交互入口：**浏览器内完成「上传持仓 Excel �
 |:-----|:-----|:---------|
 | `web/server.py` | 启动入口 | sys.path 注入、参数解析、端口检测、output_dir 写锁检测、init_config、app.run |
 | `web/app.py` | Flask 应用工厂 | 统一 JSON 错误处理、request_id 访问日志、注入 run_manager |
-| `web/handlers.py` | API 路由 | 页面/上传/生成/轮询/预览/下载/历史/健康/日志/配置编辑；`_run_generation` 复刻 CLI 报告流程；`_build_system_info` 委托 `core/system_info.build_system_info` 单源组装状态区系统信息（版本/本机 IP/持仓输出摘要/LLM 含多链/自检卡片可见性，与 TUI 同组展示原语）；`_handle_logs`/`_handle_health_history` 薄展示（委托 `core/log_reader.py` + `core/perf.py`，无解析逻辑）；`_handle_doctor` 薄展示（委托 `core/doctor.py`）；`_handle_config_edit` 同源守卫（`_is_same_origin`） |
+| `web/handlers.py` | API 路由 | 页面/上传/生成/轮询/预览/下载/历史/健康/日志/配置编辑；`_run_generation` 复刻 CLI 报告流程；`_build_system_info` 委托 `core/system_info.build_system_info` 单源组装状态区系统信息（版本/本机 IP/持仓输出摘要/LLM 含多链/自检卡片可见性，与 TUI 同组展示原语）；`_handle_logs`/`_handle_health_history` 薄展示（委托 `core/log_reader.py` + `core/perf.py`，无解析逻辑）；`_handle_doctor` 薄展示（委托 `core/doctor.py`）；`_handle_config_edit` 同源守卫（`_is_same_origin`）；`_build_artifacts` 委托 `orchestrator.artifacts_for_report_type` 类型语义与 `core/constants` 最新产物名（不镜像 CLI --type 规则与文件名字面量）；空持仓门经 `core/reader.require_holdings` 单源（HTTP 端不带服务端路径） |
 | `web/upload.py` | 上传安全 | 服务端 uuid 重命名、扩展名白名单、大小上限、PK 魔数、原子落盘、TTL 清理 |
 | `web/config_edit.py` | 配置编辑 | 薄外观：再导出共享层 `config/edit_ops.py` 符号（`apply_config_edit`/`config_edit_whitelist`/`config_backup_file`）+ `get_config_edit_surface` 组装呈现面；规则与写入单源在共享层，与 TUI 同一函数 |
 | `web/runs.py` | 运行管理 | RunManager 单 worker 串行队列 + run 状态/事件注册表（Lock 保护） |

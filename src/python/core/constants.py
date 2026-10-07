@@ -39,6 +39,12 @@ APP_NAME = "投资复盘助手"
 
 APP_VERSION = "0.12.5-dev"
 
+# ── 报告产物文件名（单一来源：Excel/HTML 写入器与 Web 预览下载统一引用） ──
+# 报告产物文件基名（归档名 = 基名 + 时间戳后缀）
+REPORT_FILE_BASE = "个人投资分析报告"
+LATEST_XLSX_NAME = f"{REPORT_FILE_BASE}.xlsx"
+LATEST_HTML_NAME = f"{REPORT_FILE_BASE}.html"
+
 # ── 缓存频率常量（秒，用作代码内默认值） ──────────────────
 
 CACHE_DAILY = 86400  # 每日（24h）

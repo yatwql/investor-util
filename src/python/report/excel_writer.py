@@ -13,6 +13,7 @@ from openpyxl import Workbook
 from openpyxl.styles import Alignment, Font, PatternFill
 from openpyxl.utils import get_column_letter
 
+from src.python.core.constants import LATEST_XLSX_NAME, REPORT_FILE_BASE
 from src.python.report.styles import (
     BOLD_FONT,
     CENTER_ALIGN,
@@ -56,7 +57,7 @@ def _ensure_reports_dir(output_dir: str) -> None:
 
 def _latest_path(output_dir: str) -> str:
     """最新 Excel 报告路径。"""
-    return os.path.join(output_dir, "个人投资分析报告.xlsx")
+    return os.path.join(output_dir, LATEST_XLSX_NAME)
 
 
 def _archive_path(output_dir: str) -> str:
@@ -64,7 +65,7 @@ def _archive_path(output_dir: str) -> str:
     now = datetime.now()
     date_str = now.strftime("%Y%m%d")
     time_str = now.strftime("%H%M%S")
-    fname = f"个人投资分析报告-{date_str}-{time_str}.xlsx"
+    fname = f"{REPORT_FILE_BASE}-{date_str}-{time_str}.xlsx"
     return os.path.join(output_dir, date_str, fname)
 
 

@@ -131,3 +131,52 @@ class TestBuildSystemInfo:
         assert llm["endpoint_display"] == "api.x"
         assert llm["circuit"] == "正常"
         assert isinstance(llm["route"], list)
+
+
+class TestLlmStatusSingleSource:
+    """llm_status — LLM 配置状态单源（三渠道状态展示共用判定树）。"""
+
+    def test_none_config_reports_unconfigured(self, monkeypatch):
+        monkeypatch.setattr("src.python.config.get_llm_config", lambda: None)
+        from src.python.core.system_info import llm_status
+
+        assert llm_status() == {"configured": False}
+
+    def test_incomplete_flat_reports_unconfigured(self, monkeypatch):
+        """有 api_key 但缺 provider（flat 不完整）→ 未配置。"""
+        monkeypatch.setattr("src.python.config.get_llm_config", lambda: {"api_key": "sk-x"})
+        from src.python.core.system_info import llm_status
+
+        assert llm_status()["configured"] is False
+
+    def test_flat_configured_contract_keys(self, monkeypatch):
+        monkeypatch.setattr(
+            "src.python.config.get_llm_config",
+            lambda: {"api_key": "sk-x", "provider": "claude", "model": "m", "endpoint": "https://api.x/v1"},
+        )
+        from src.python.core.system_info import llm_status
+
+        llm = llm_status()
+        assert llm["configured"] is True
+        assert llm["mode"] == "flat"
+        assert {"provider", "model", "endpoint", "endpoint_display", "circuit", "route"} <= set(llm)
+
+    def test_multi_chain_contract(self, monkeypatch):
+        monkeypatch.setattr(
+            "src.python.config.get_llm_config",
+            lambda: {"_provider_list": [{"name": "a", "provider": "claude", "priority": 10}], "_strategy": "priority"},
+        )
+        from src.python.core.system_info import llm_status
+
+        llm = llm_status()
+        assert llm["configured"] is True
+        assert llm["mode"] == "multi"
+        assert len(llm["providers"]) == 1
+        assert {"strategy", "providers", "preferred"} <= set(llm)
+
+    def test_build_embeds_same_status(self, monkeypatch):
+        """build_system_info 的 llm 段与 llm_status() 逐字相等（单源关系，非镜像组装）。"""
+        monkeypatch.setattr("src.python.config.get_llm_config", lambda: {"api_key": "sk-x", "provider": "claude"})
+        from src.python.core.system_info import build_system_info, llm_status
+
+        assert build_system_info()["llm"] == llm_status()

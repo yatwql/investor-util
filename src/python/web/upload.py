@@ -181,6 +181,7 @@ def _prevalidate(
     *,
     get_xlsx_info: Callable | None = None,
     read_holdings: Callable | None = None,
+    require_holdings: Callable | None = None,
 ) -> dict:
     """内容预检：行数上限 + 空持仓/无有效账户校验。
 
@@ -189,9 +190,11 @@ def _prevalidate(
     """
     from src.python.core.reader import get_xlsx_info as _real_get_info
     from src.python.core.reader import read_holdings as _real_read
+    from src.python.core.reader import require_holdings as _real_require
 
     get_xlsx_info = get_xlsx_info or _real_get_info
     read_holdings = read_holdings or _real_read
+    require_holdings = require_holdings or _real_require
 
     try:
         info = get_xlsx_info(path)
@@ -211,8 +214,10 @@ def _prevalidate(
     except Exception as e:
         logger.warning("[web-upload] 持仓预检解析失败: %s", e)
         raise UploadError(UPLOAD_BAD_FILE, "持仓文件解析失败，请确认为标准四列格式") from e
-    if not holdings:
-        raise UploadError(UPLOAD_EMPTY, "持仓文件为空或无有效账户，请检查文件内容")
+    try:
+        require_holdings(holdings)  # 读取域空持仓门（HTTP 端不带服务端路径）
+    except ValueError as e:
+        raise UploadError(UPLOAD_EMPTY, "持仓文件为空或无有效账户，请检查文件内容") from e
 
     return {"sheets": sheets, "rows": rows, "count": len(holdings)}
 
