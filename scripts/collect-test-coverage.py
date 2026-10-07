@@ -42,13 +42,49 @@ def _sel(markers: set[str], *names: str) -> bool:
     return any(n in markers for n in names)
 
 
-def _collect() -> None:
-    """运行 pytest --collect-only，填充 collected（抑制 collect 输出）。"""
+def _collect(targets: list[str]) -> int:
+    """运行 pytest --collect-only，填充 collected（抑制 collect输出），返回 pytest 退出码。
+
+    ``targets`` 为空目录/文件列表：默认 ``["src/test/"]`` 整树；增量快照路径
+    传变更文件列表（`_doc_drift/_shared.py::_run_collect`），收集语义同源。
+    **退出码必须传递**：收集期校验报错（exit=4，如 conftest 标记纪律校验中断钩子链
+    导致 ``-m not live`` 过滤未执行）时输出是未过滤的错数，消费方按非零拒收、
+    不得当真值缓存或回写文档。
+    """
     with redirect_stdout(io.StringIO()):
-        pytest.main(
-            ["src/test/", "--collect-only", "-q", "--disable-warnings"],
+        code = pytest.main(
+            [*targets, "--collect-only", "-q", "--disable-warnings"],
             plugins=[CollectPlugin()],
         )
+    return int(code)
+
+
+def _target_files(targets: list[str]) -> list[str]:
+    """targets（文件或目录）展开为测试文件路径（补零计数用；live 除外）。
+
+    形式与传入目标同形（目录参数 rglob 结果自带前缀、文件参数原样），保证与
+    nodeid 前缀一致可归并；live 套件被 `pytest.ini` `-m "not live"` 恒不收集。
+    """
+    live = (REPO_ROOT / "src" / "test" / "live").resolve()
+    out: set[str] = set()
+    for t in targets:
+        p = Path(t)
+        if p.is_file():
+            out.add(t)
+            continue
+        if not p.is_dir():
+            continue
+        for pat in ("test_*.py", "*_test.py"):
+            for f in p.rglob(pat):
+                if "__pycache__" in f.parts:
+                    continue
+                try:
+                    if live in f.resolve().parents:
+                        continue
+                except OSError:
+                    continue
+                out.add(f.as_posix())
+    return sorted(out)
 
 
 def main() -> None:
@@ -56,7 +92,8 @@ def main() -> None:
     # 而消费方（`_doc_drift/_shared.py::_collect_test_snapshot`）按 UTF-8 解码
     # → UnicodeDecodeError（与仓库「文本 I/O 显式 encoding」纪律一致）。
     sys.stdout.reconfigure(encoding="utf-8")
-    _collect()
+    targets = sys.argv[1:] or ["src/test/"]
+    exit_code = _collect(targets)
 
     total = len(collected)
     print(f"\n总收集: {total} 项\n")
@@ -202,6 +239,21 @@ def main() -> None:
             by_file[file_part.replace("src/test/", "")] += 1
     for f, c in sorted(by_file.items()):
         print(f"{c:>4}  {f}")
+
+    # ── 逐文件收集计数（tab 分隔；含 0 计数文件，供 --sync 增量快照按文件复用/比对）──
+    print("\n### 逐文件收集计数")
+    per_file: Counter[str] = Counter()
+    for nodeid, _m in collected:
+        per_file[nodeid.split("::")[0]] += 1
+    for f in _target_files(targets):
+        per_file.setdefault(f, 0)
+    for f in sorted(per_file):
+        print(f"{f}\t{per_file[f]}")
+
+    # 收集出错（如标记纪律校验中断钩子链 → live 过滤未执行）→ 非零退出，
+    # 消费方（_doc_drift/_shared.py::_run_collect）按退出码拒收，不回写错数
+    if exit_code not in (0, 5):  # 5 = NO_TESTS_COLLECTED（合法空收集）
+        sys.exit(exit_code)
 
 
 if __name__ == "__main__":

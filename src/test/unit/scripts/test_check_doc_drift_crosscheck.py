@@ -3,7 +3,7 @@
 覆盖：
   - 数据源链路表 §4.2（Provider Chain 降级表 ↔ `_DEFAULT_CHAINS` 逐链双向一致）
   - Extended Thinking 支持矩阵（手册对比表/「仅」式措辞 ↔ 代码前缀名单）
-  - 测试收集快照解析与编码降级（`_collect_test_snapshot` cp936 回归）
+  - 测试收集快照解析/退出码拒收/按文件增量状态与影子双算（cp936 回归 + 错数拒收回归）
   - 生成产物列表（*.egg-info 等构建/缓存产物不触发目录树误报）
   - 真实仓库冒烟（`run_checks()` 为空）与项目统计表回写同步（`sync_project_stats`）
   - 守护清单同源（五处权威源 + pre-commit 钩子执行体两两一致）
@@ -14,6 +14,8 @@
 
 from __future__ import annotations
 
+import json
+import os
 from pathlib import Path
 
 import pytest
@@ -163,58 +165,351 @@ class TestThinkingSupportMatrix:
 
 
 class TestCollectTestSnapshot:
-    """`_collect_test_snapshot` 子进程快照解析与编码降级（回归：Windows cp936 下快照崩溃）。
+    """`_collect_test_snapshot` 快照解析、退出码拒收与编码降级（回归：Windows cp936 下快照崩溃）。
 
     背景：`collect-test-coverage.py` 曾在中文 Windows 上按 GBK 写出中文分组名，
     消费方按 UTF-8 解码 → reader 线程 `UnicodeDecodeError` → `proc.stdout` 为 None
     → `re.search(..., None)` 抛 `TypeError`，`check-doc-drift.py --sync` 直接堆栈退出。
+    另回归：收集期校验出错（exit=4）时 stdout 是未过滤的错数（conftest 标记纪律校验
+    中断钩子链会使 `-m not live` 过滤未执行、live 项漏入），消费方必须按退出码拒收、
+    不回写状态——错误输出不得当真值缓存或写进文档统计。
     """
+
+    @staticmethod
+    def _proc(stdout, returncode: int = 0):
+        class _Proc:
+            pass
+
+        _Proc.stdout = stdout
+        _Proc.returncode = returncode
+        return _Proc
 
     def test_parses_counts(self, drift_parts, monkeypatch):
         """正常 UTF-8 输出 → 解析出总收集与各分组计数。"""
-
-        class _Proc:
-            stdout = "\n总收集: 8167 项\n\n### 模式对应测试量\nunit: 7846\nedge: 949\n"
-
-        monkeypatch.setattr(drift_parts._shared.subprocess, "run", lambda *a, **k: _Proc())
-        snap = drift_parts._shared._collect_test_snapshot()
+        mod = drift_parts._shared
+        monkeypatch.setattr(
+            mod.subprocess,
+            "run",
+            lambda *a, **k: self._proc("\n总收集: 8167 项\n\n### 模式对应测试量\nunit: 7846\nedge: 949\n"),
+        )
+        snap = mod._collect_test_snapshot()
         assert snap["_总收集"] == 8167
         assert snap["unit"] == 7846
         assert snap["edge"] == 949
 
+    def test_parse_per_file_block(self, drift_parts):
+        """逐文件 tab 块 → 按仓库相对路径解析出每个文件的收集数（增量账本数据源）。"""
+        mod = drift_parts._shared
+        snap, per = mod._parse_collect_stdout(
+            "总收集: 3 项\n### 逐文件收集计数\nsrc/test/a.py\t2\nsrc/test/unit/b.py\t1\n"
+        )
+        assert snap["_总收集"] == 3
+        assert per == {"src/test/a.py": 2, "src/test/unit/b.py": 1}
+
     def test_none_stdout_degrades_without_crash(self, drift_parts, monkeypatch):
-        """stdout 为 None（reader 线程解码异常兑底）→ 返回空快照，不得抛 TypeError。"""
-
-        class _Proc:
-            stdout = None
-
-        monkeypatch.setattr(drift_parts._shared.subprocess, "run", lambda *a, **k: _Proc())
-        assert drift_parts._shared._collect_test_snapshot() == {}
+        """stdout 为 None（reader 线程解码异常兜底）→ 返回空快照，不得抛 TypeError。"""
+        mod = drift_parts._shared
+        monkeypatch.setattr(mod.subprocess, "run", lambda *a, **k: self._proc(None))
+        assert mod._collect_test_snapshot() == {}
 
     def test_empty_stdout_degrades_without_crash(self, drift_parts, monkeypatch):
         """stdout 为空字符串 → 返回空快照。"""
-
-        class _Proc:
-            stdout = "   \n"
-
-        monkeypatch.setattr(drift_parts._shared.subprocess, "run", lambda *a, **k: _Proc())
-        assert drift_parts._shared._collect_test_snapshot() == {}
+        mod = drift_parts._shared
+        monkeypatch.setattr(mod.subprocess, "run", lambda *a, **k: self._proc("   \n"))
+        assert mod._collect_test_snapshot() == {}
 
     def test_subprocess_run_uses_error_tolerant_encoding(self, drift_parts, monkeypatch):
         """回归：调用 subprocess.run 必须带 errors="replace"（不因个别非法字节在 reader 线程崩）。"""
         captured: dict = {}
-
-        class _Proc:
-            stdout = "总收集: 1 项\n"
+        mod = drift_parts._shared
 
         def _fake_run(*args, **kwargs):
             captured.update(kwargs)
-            return _Proc()
+            return self._proc("总收集: 1 项\n")
 
-        monkeypatch.setattr(drift_parts._shared.subprocess, "run", _fake_run)
-        drift_parts._shared._collect_test_snapshot()
+        monkeypatch.setattr(mod.subprocess, "run", _fake_run)
+        mod._collect_test_snapshot()
         assert captured.get("encoding") == "utf-8"
         assert captured.get("errors") == "replace"
+
+    def test_nonzero_exit_rejected(self, drift_parts, monkeypatch):
+        """收集出错退出码（如 exit=4 的未过滤错数）→ 整体拒收，不得解析入账。"""
+        mod = drift_parts._shared
+        monkeypatch.setattr(
+            mod.subprocess, "run", lambda *a, **k: self._proc("总收集: 9 项\nsrc/test/x.py\t9\n", returncode=4)
+        )
+        assert mod._run_collect([]) is None
+
+    def test_no_tests_collected_exit_accepted(self, drift_parts, monkeypatch):
+        """退出码 5（无用例收集，合法空收集）→ 正常解析，不当失败。"""
+        mod = drift_parts._shared
+        monkeypatch.setattr(mod.subprocess, "run", lambda *a, **k: self._proc("总收集: 123 项\n", returncode=5))
+        snapshot, _per = mod._run_collect([])
+        assert snapshot["_总收集"] == 123
+
+
+class TestSnapshotCountCache:
+    """测试收集快照 v2 按文件增量状态——零子进程快路径 + 变更文件增量 + 影子全量守门。
+
+    质量前提（失效方向永远偏向真收集，宁可多跑不陈旧）：
+      - 仅当共享语境指纹（src/ 非测试文件含 conftest、pytest 配置、解释器大版本）与
+        全部受收集测试文件指纹均未变 → 按文件计数直接求和，零子进程；
+      - 仅测试文件内容变更 → 只对变更文件重收集，其余复用缓存计数；
+      - 共享语境变化 / 状态缺失损坏 / 逐文件输出缺文件 / 影子未毕业 → 整树全量；
+      - 影子双算：增量与全量同时跑、以全量为准比对，连续一致达标才停用；
+        不一致立即告警并归零继续守门；
+      - 收集失败（非零退出/空输出/None stdout）→ 返回空且不回写状态（错误输出
+        不得当真值），下次仍真收集。
+    """
+
+    @staticmethod
+    def _pristine_files(mod) -> dict[str, dict]:
+        return {rel: {"sig": mod._file_signature(p), "total": 1} for rel, p in mod._current_test_files().items()}
+
+    @classmethod
+    def _seed(cls, mod, *, files=None, shared=None, full=None, shadow_ok=None) -> None:
+        path = mod._snapshot_cache_path()
+        path.parent.mkdir(parents=True, exist_ok=True)
+        state = {
+            "format": mod._SNAPSHOT_FORMAT,
+            "logic": mod._logic_key(),
+            "shared": mod._shared_signature() if shared is None else shared,
+            "files": cls._pristine_files(mod) if files is None else files,
+            "full": full
+            if full is not None
+            else {"signature": mod._snapshot_signature(), "snapshot": {"_总收集": 4242, "unit": 10}},
+            "shadow_ok": mod._SHADOW_MATCHES_NEEDED if shadow_ok is None else shadow_ok,
+        }
+        path.write_text(json.dumps(state, ensure_ascii=False), encoding="utf-8")
+
+    @staticmethod
+    def _read_state(mod) -> dict:
+        return json.loads(mod._snapshot_cache_path().read_text(encoding="utf-8"))
+
+    @staticmethod
+    def _full_map(files) -> dict[str, int]:
+        return {rel: 1 for rel in files}
+
+    def test_clean_state_fast_path_skips_subprocess(self, drift_parts, monkeypatch):
+        """全部文件指纹未变 → 求和直出，不得触发收集子进程。"""
+        mod = drift_parts._shared
+        files = self._pristine_files(mod)
+        files[sorted(files)[0]]["total"] = 7
+        self._seed(mod, files=files)
+
+        def _boom(file_args):
+            pytest.fail("全部文件指纹未变仍触发收集子进程（快路径失效）")
+
+        monkeypatch.setattr(mod, "_run_collect", _boom)
+        snap = mod._collect_test_snapshot()
+        assert snap["_总收集"] == sum(v["total"] for v in files.values())
+
+    def test_extra_store_entry_pruned_on_fast_path(self, drift_parts, monkeypatch):
+        """状态里残留已删除文件 → 快路径剔除多余条目，总收集只按现存文件求和。"""
+        mod = drift_parts._shared
+        files = self._pristine_files(mod)
+        files["src/test/unit/gone_test.py"] = {"sig": "x", "total": 99}
+        self._seed(mod, files=files)
+
+        def _boom(file_args):
+            pytest.fail("仅状态残留多余条目时不应触发收集")
+
+        monkeypatch.setattr(mod, "_run_collect", _boom)
+        snap = mod._collect_test_snapshot()
+        current = self._pristine_files(mod)
+        assert snap["_总收集"] == sum(v["total"] for v in current.values())
+        assert set(self._read_state(mod)["files"]) == set(current)
+
+    def test_changed_file_collects_only_that_file(self, drift_parts, monkeypatch):
+        """仅一个测试文件变更 → 子进程只收集该文件，未变文件复用缓存计数。"""
+        mod = drift_parts._shared
+        files = self._pristine_files(mod)
+        rel = sorted(files)[0]
+        files[rel]["sig"] = "stale-signature"
+        self._seed(mod, files=files)
+        calls: list = []
+
+        def _fake(file_args):
+            calls.append(list(file_args))
+            return {"_总收集": 1, "_marker集合": ["unit"]}, {rel: 1}
+
+        monkeypatch.setattr(mod, "_run_collect", _fake)
+        snap = mod._collect_test_snapshot()
+        assert calls == [[rel]]
+        assert snap["_总收集"] == sum(v["total"] for v in self._pristine_files(mod).values())
+        state = self._read_state(mod)
+        assert state["files"][rel]["sig"] == mod._file_signature(mod._current_test_files()[rel])
+        assert state["shadow_ok"] == mod._SHADOW_MATCHES_NEEDED
+
+    def test_shared_context_change_forces_full_run(self, drift_parts, monkeypatch):
+        """共享语境（conftest/配置/业务代码）变化 → 整树全量，绝不按文件增量。"""
+        mod = drift_parts._shared
+        files = self._pristine_files(mod)
+        self._seed(mod, files=files, shared="stale-shared-context")
+        calls: list = []
+
+        def _fake(file_args):
+            calls.append(list(file_args))
+            return {"_总收集": 77, "_marker集合": ["unit"]}, self._full_map(files)
+
+        monkeypatch.setattr(mod, "_run_collect", _fake)
+        snap = mod._collect_test_snapshot()
+        assert calls == [[]]
+        assert snap["_总收集"] == 77
+        assert self._read_state(mod)["shared"] == mod._shared_signature()
+
+    def test_missing_state_runs_full(self, drift_parts, monkeypatch):
+        """状态缺失 → 全量重建，不得报错。"""
+        mod = drift_parts._shared
+        calls: list = []
+        monkeypatch.setattr(mod, "_run_collect", lambda a: calls.append(list(a)) or ({"_总收集": 5}, {}))
+        snap = mod._collect_test_snapshot()
+        assert calls == [[]]
+        assert snap["_总收集"] == 5
+
+    def test_corrupt_state_treated_as_full(self, drift_parts, monkeypatch):
+        """状态文件损坏 → 按未命中处理（全量），不得抛异常。"""
+        mod = drift_parts._shared
+        path = mod._snapshot_cache_path()
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text("{not-json", encoding="utf-8")
+        monkeypatch.setattr(mod, "_run_collect", lambda a: ({"_总收集": 9}, {}))
+        assert mod._collect_test_snapshot()["_总收集"] == 9
+
+    def test_collect_failure_returns_empty_and_keeps_stale(self, drift_parts, monkeypatch):
+        """收集失败（子进程 None）→ 返回空且不回写：变更文件指纹保留，下次仍重收集。"""
+        mod = drift_parts._shared
+        files = self._pristine_files(mod)
+        rel = sorted(files)[0]
+        files[rel]["sig"] = "stale-signature"
+        self._seed(mod, files=files)
+        monkeypatch.setattr(mod, "_run_collect", lambda a: None)
+        assert mod._collect_test_snapshot() == {}
+        state = self._read_state(mod)
+        assert state["files"][rel]["sig"] == "stale-signature"
+
+    def test_shadow_match_increments_counter(self, drift_parts, monkeypatch):
+        """影子比对一致 → 连续一致计数 +1，状态以权威结果回写。"""
+        mod = drift_parts._shared
+        files = self._pristine_files(mod)
+        rel = sorted(files)[0]
+        files[rel]["sig"] = "stale-signature"
+        self._seed(mod, files=files, shadow_ok=0)
+        monkeypatch.setattr(
+            mod,
+            "_run_collect",
+            lambda a: ({"_总收集": 1}, {rel: 1}) if a else ({"_总收集": len(files)}, self._full_map(files)),
+        )
+        snap = mod._collect_test_snapshot()
+        assert snap["_总收集"] == len(files)
+        assert self._read_state(mod)["shadow_ok"] == 1
+
+    def test_shadow_mismatch_warns_resets_and_uses_full(self, drift_parts, monkeypatch, capsys):
+        """影子比对不一致 → stderr 告警、计数归零、以全量为准回写（增量被否决）。"""
+        mod = drift_parts._shared
+        files = self._pristine_files(mod)
+        rel = sorted(files)[0]
+        files[rel]["sig"] = "stale-signature"
+        self._seed(mod, files=files, shadow_ok=0)
+
+        def _fake(file_args):
+            if file_args:
+                return {"_总收集": 1}, {rel: 1}
+            full_map = self._full_map(files)
+            full_map[rel] = 42
+            return {"_总收集": 999}, full_map
+
+        monkeypatch.setattr(mod, "_run_collect", _fake)
+        snap = mod._collect_test_snapshot()
+        assert snap["_总收集"] == 999
+        state = self._read_state(mod)
+        assert state["shadow_ok"] == 0
+        assert state["files"][rel]["total"] == 42
+        assert "比对不一致" in capsys.readouterr().err
+
+    def test_shadow_env_disabled_uses_incremental(self, drift_parts, monkeypatch):
+        """影子强制关闭（DOC_DRIFT_SNAPSHOT_SHADOW=0）→ 只跑增量，不叠加全量。"""
+        mod = drift_parts._shared
+        files = self._pristine_files(mod)
+        rel = sorted(files)[0]
+        files[rel]["sig"] = "stale-signature"
+        self._seed(mod, files=files, shadow_ok=0)
+        monkeypatch.setenv("DOC_DRIFT_SNAPSHOT_SHADOW", "0")
+        calls: list = []
+
+        def _fake(file_args):
+            calls.append(list(file_args))
+            return {"_总收集": 1}, {rel: 1}
+
+        monkeypatch.setattr(mod, "_run_collect", _fake)
+        snap = mod._collect_test_snapshot()
+        assert calls == [[rel]]
+        assert snap["_总收集"] == len(files)
+
+    def test_full_buckets_reuses_valid_full(self, drift_parts, monkeypatch):
+        """full_buckets=True 且 full 块指纹有效 → 直接复用完整分组快照，免收集。"""
+        mod = drift_parts._shared
+        self._seed(mod)
+
+        def _boom(file_args):
+            pytest.fail("full 块有效仍触发收集")
+
+        monkeypatch.setattr(mod, "_run_collect", _boom)
+        snap = mod._collect_test_snapshot(full_buckets=True)
+        assert snap["_总收集"] == 4242
+        assert snap["unit"] == 10
+
+    def test_full_buckets_invalid_full_collects(self, drift_parts, monkeypatch):
+        """full_buckets=True 但 full 块指纹失效 → 真全量重取分组桶。"""
+        mod = drift_parts._shared
+        files = self._pristine_files(mod)
+        self._seed(mod, full={"signature": "stale-full-signature", "snapshot": {"_总收集": 1}})
+        calls: list = []
+
+        def _fake(file_args):
+            calls.append(list(file_args))
+            return {"_总收集": 66, "scenario": 6}, self._full_map(files)
+
+        monkeypatch.setattr(mod, "_run_collect", _fake)
+        snap = mod._collect_test_snapshot(full_buckets=True)
+        assert calls == [[]]
+        assert snap["_总收集"] == 66
+        assert snap["scenario"] == 6
+
+    def test_full_buckets_failure_returns_empty(self, drift_parts, monkeypatch):
+        """full_buckets=True 且收集失败 → 返回空（调用方跳过计数核对，不给残缺桶）。"""
+        mod = drift_parts._shared
+        self._seed(mod, full={"signature": "stale-full-signature", "snapshot": {"_总收集": 1}})
+        monkeypatch.setattr(mod, "_run_collect", lambda a: None)
+        assert mod._collect_test_snapshot(full_buckets=True) == {}
+
+    def test_file_signature_changes_when_file_changes(self, drift_parts, tmp_path):
+        """单文件指纹：内容/时间戳变化 → 必变（增量失效方向偏向真收集）。"""
+        mod = drift_parts._shared
+        f = tmp_path / "test_a.py"
+        f.write_text("def test_x(): pass\n", encoding="utf-8")
+        sig1 = mod._file_signature(f)
+        f.write_text("def test_x():\n    assert True\n", encoding="utf-8")
+        os.utime(f, ns=(1, 1))
+        assert mod._file_signature(f) != sig1
+
+    def test_file_signature_deterministic(self, drift_parts, tmp_path):
+        """同一文件连续两次取指纹必须一致（否则状态永远命不中、永远全量）。"""
+        mod = drift_parts._shared
+        f = tmp_path / "test_b.py"
+        f.write_text("def test_x(): pass\n", encoding="utf-8")
+        assert mod._file_signature(f) == mod._file_signature(f)
+
+    def test_snapshot_signature_deterministic(self, drift_parts):
+        """全树指纹同一棵树连续两次必须一致（快路径与 full 块有效性的判定基准）。"""
+        mod = drift_parts._shared
+        assert mod._snapshot_signature() == mod._snapshot_signature()
+
+    def test_isolation_fixture_redirects_cache_path(self, tmp_path):
+        """测试隔离：快照状态必须被 autouse 夹具重定向到 tmp_path（不碰真实 data/cache）。"""
+        env = os.environ.get("DOC_DRIFT_SNAPSHOT_CACHE", "")
+        assert env.startswith(str(tmp_path))
+        assert "test_coverage_snapshot.json" in env
 
 
 class TestGeneratedArtifacts:

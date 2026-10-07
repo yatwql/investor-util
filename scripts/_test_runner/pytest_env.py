@@ -107,9 +107,10 @@ def _calc_parallel_workers(level: str | bool) -> str:
 def _phase_report_path(mode_key: str, phase_tag: str = "") -> str:
     """该模式的 pytest-html 报告路径。
 
-    分阶段模式（dev-verify = Phase A 核心单元 + Phase B 基础场景）**每阶段一个文件**：
-    两阶段共用 ``report.html`` 会让后跑的阶段覆盖前者，详细报告只剩最后一阶段
-    （实测只剩 152 个场景用例、Phase A 的 2700+ 用例全丢），排查时看不到真正的失败面。
+    多阶段模式**每阶段一个文件**（``report_phase_<tag>.html``）：多阶段共用
+    ``report.html`` 会让后跑的阶段覆盖前者，详细报告只剩最后一阶段（实测只剩
+    152 个场景用例、首阶段的 2700+ 用例全丢），排查时看不到真正的失败面。
+    单阶段（合一后的 dev-verify）与非分阶段模式用 ``report.html``。
     """
     name = f"report_phase_{phase_tag}.html" if phase_tag else "report.html"
     return os.path.join(_LATEST_DIR, mode_key, name)

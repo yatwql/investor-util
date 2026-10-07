@@ -164,9 +164,12 @@ def _run_phased(
     """分阶段运行测试，前序失败则跳过后续阶段。
 
     每个阶段调用一次 subprocess.run，支持不同 marker/parallel/timeout。
+    单阶段（如 dev-verify 双阶段合一）不带 Phase 标签：报告直接写 ``report.html``、
+    摘要无阶段后缀；多阶段保持每阶段一报告文件（避免后阶段覆盖前阶段报告）。
     """
     mode_cfg = MODES.get(mode_key, {})
     html_available = _check_pytest_html()
+    single = len(phases) == 1
 
     combined: dict = {
         "mode": mode_key,
@@ -201,8 +204,12 @@ def _run_phased(
             return combined
 
     for i, phase in enumerate(phases):
-        tag = chr(65 + i)  # A, B, C, …
-        print(f"\n    ── [Phase {tag}]: {phase.get('desc', '')} ──")
+        tag = "" if single else chr(65 + i)  # 多阶段 A, B, …；单阶段无标签
+        ph_label = mode_key if single else f"Phase {tag}"
+        if single:
+            print(f"\n    ── {phase.get('desc', '')} ──")
+        else:
+            print(f"\n    ── [{ph_label}]: {phase.get('desc', '')} ──")
 
         phase_cfg = {
             "marker": phase["marker"],
@@ -231,7 +238,7 @@ def _run_phased(
                 env=_env,
             )
         except subprocess.TimeoutExpired:
-            print(f"    [ERR] [Phase {tag}] 测试超时（{timeout}s）")
+            print(f"    [ERR] [{ph_label}] 测试超时（{timeout}s）")
             combined["exit_code"] = -1
             combined["timed_out"] = True
             combined["duration"] += timeout or 0
@@ -272,11 +279,12 @@ def _run_phased(
 
         # 阶段失败时保存完整输到调试文件（可在 CI artifact 中查看）
         if proc.returncode != 0:
-            debug_path = os.path.join(_LATEST_DIR, mode_key, f"phase_{tag}_debug.log")
+            debug_name = f"phase_{tag}_debug.log" if tag else f"{mode_key}_debug.log"
+            debug_path = os.path.join(_LATEST_DIR, mode_key, debug_name)
             try:
                 with open(debug_path, "w", encoding="utf-8") as df:
                     df.write(output)
-                print(f"      [Phase {tag}] 详细日志已保存: {debug_path}")
+                print(f"      [{ph_label}] 详细日志已保存: {debug_path}")
             except Exception:
                 pass
 
@@ -285,12 +293,13 @@ def _run_phased(
         parts = [f"{stats['passed']} passed", f"{stats['failed']} failed"]
         if stats["skipped"]:
             parts.append(f"{stats['skipped']} skipped")
-        print(f"    [{tag2}] [Phase {tag}] {', '.join(parts)}  ({elapsed:.1f}s)")
+        print(f"    [{tag2}] [{ph_label}] {', '.join(parts)}  ({elapsed:.1f}s)")
 
         if not ok:
             combined["exit_code"] = proc.returncode
             # 打印完整 pytest 短摘要（自动包含末尾）
-            print(f"    [!] [Phase {tag}] 未通过（exit={proc.returncode}），跳过后续阶段")
+            skip_note = "" if single else "，跳过后续阶段"
+            print(f"    [!] [{ph_label}] 未通过（exit={proc.returncode}）{skip_note}")
             break
 
     # 汇总一行
@@ -299,6 +308,7 @@ def _run_phased(
     parts = [f"{combined['passed']} passed", f"{combined['failed']} failed"]
     if combined["skipped"]:
         parts.append(f"{combined['skipped']} skipped")
-    print(f"\n  [{tag2}] {mode_key}（分阶段）: {', '.join(parts)}  ({combined['duration']:.1f}s)")
+    style = "" if single else "（分阶段）"
+    print(f"\n  [{tag2}] {mode_key}{style}: {', '.join(parts)}  ({combined['duration']:.1f}s)")
 
     return combined

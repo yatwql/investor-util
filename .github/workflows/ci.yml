@@ -38,7 +38,7 @@ jobs:
         run: |
           # akshare 在 Linux 上的依赖 py-mini-racer / jsonpath 只有 sdist（需源码构建 V8/纯 Python），
           # 下载/编译偶发失败会让整个 job 挂掉（实测 3.12 曾单独失败）——加下载重试与更长超时
-          python -m pip install --upgrade pip --retries 5 --timeout 60
+          # 不再自升级 pip（setup-python 自带版本足够新；冷自升级纯耗时且无缓存收益）
           pip install --retries 5 --timeout 60 -e ".[test]"
 
       - name: P0 — 快速验证（dev 提交门禁）
@@ -80,7 +80,7 @@ jobs:
         run: |
           # akshare 在 Linux 上的依赖 py-mini-racer / jsonpath 只有 sdist（需源码构建 V8/纯 Python），
           # 下载/编译偶发失败会让整个 job 挂掉（实测 3.12 曾单独失败）——加下载重试与更长超时
-          python -m pip install --upgrade pip --retries 5 --timeout 60
+          # 不再自升级 pip（setup-python 自带版本足够新；冷自升级纯耗时且无缓存收益）
           pip install --retries 5 --timeout 60 -e ".[test]"
 
       - name: Ruff 格式检查
@@ -108,36 +108,49 @@ jobs:
         run: |
           # akshare 在 Linux 上的依赖 py-mini-racer / jsonpath 只有 sdist（需源码构建 V8/纯 Python），
           # 下载/编译偶发失败会让整个 job 挂掉（实测 3.12 曾单独失败）——加下载重试与更长超时
-          python -m pip install --upgrade pip --retries 5 --timeout 60
+          # 不再自升级 pip（setup-python 自带版本足够新；冷自升级纯耗时且无缓存收益）
           pip install --retries 5 --timeout 60 -e ".[test]"
 
-      - name: 代码历史痕迹 + 任务编号标识符（check-code-traces）
-        run: python scripts/check-code-traces.py --ci
-
-      - name: 文档历史痕迹（check-doc-traces）
-        run: python scripts/check-doc-traces.py --ci
-
-      - name: 任务编号全局一致性（check-task-numbering）
-        run: python scripts/check-task-numbering.py --ci
-
-      - name: 语义命名索引正反向（check-semantic-index）
-        run: python scripts/check-semantic-index.py --ci
-
-      - name: 文档与实现一致性（check-doc-drift）
-        run: python scripts/check-doc-drift.py --ci
-
-      - name: 测试用例冗余与无效（check-test-redundancy）
-        run: python scripts/check-test-redundancy.py --ci
-
-      - name: 需求 ID 追溯（check-requirement-trace）
-        run: python scripts/check-requirement-trace.py --ci
-
-      - name: 版本号一致性（check-version-consistency）
-        run: python scripts/check-version-consistency.py --ci
-      - name: 文档链接与结构一致性（check-doc-links）
-        run: python scripts/check-doc-links.py --ci
-      - name: 单文件行数红线（check-file-length）
-        run: python scripts/check-file-length.py --ci
+      # 十守护后台并行回放（与 pre-commit 钩子执行体同款并发调度）：
+      #   - 清单与 P0/P2 门禁五处同源（check-doc-drift 守护清单校验断言集合一致），
+      #     CI 恒全量十守护、不按域条件化——本地降频不降级，CI 是全量兜底；
+      #   - 任一守护非零退出 → 该守护输出折叠为 FAIL 分组并使 job 红；
+      #   - editable 安装保留：守护经 src.python 链 import 项目运行时依赖
+      #     （如 check-doc-drift → registry/tui_menu → httpx），无安装则无法运行。
+      - name: 十守护并行（清单与 P0/P2 门禁同源，恒全量）
+        run: |
+          set +e
+          GDIR="$RUNNER_TEMP/guards"
+          mkdir -p "$GDIR"
+          run_guard() {
+            _n="$1"; shift
+            ( python "$@" >"$GDIR/$_n.log" 2>&1; echo $? >"$GDIR/$_n.rc" ) &
+          }
+          run_guard code-traces scripts/check-code-traces.py --ci
+          run_guard doc-traces scripts/check-doc-traces.py --ci
+          run_guard task-numbering scripts/check-task-numbering.py --ci
+          run_guard semantic-index scripts/check-semantic-index.py --ci
+          run_guard doc-drift scripts/check-doc-drift.py --ci
+          run_guard test-redundancy scripts/check-test-redundancy.py --ci
+          run_guard requirement-trace scripts/check-requirement-trace.py --ci
+          run_guard version-consistency scripts/check-version-consistency.py --ci
+          run_guard doc-links scripts/check-doc-links.py --ci
+          run_guard file-length scripts/check-file-length.py --ci
+          wait
+          fail=0
+          for n in code-traces doc-traces task-numbering semantic-index doc-drift \
+                   test-redundancy requirement-trace version-consistency doc-links file-length; do
+            rc="$(cat "$GDIR/$n.rc" 2>/dev/null || echo 1)"
+            if [ "$rc" = "0" ]; then
+              cat "$GDIR/$n.log"
+            else
+              echo "::group::[FAIL] $n (exit $rc)"
+              cat "$GDIR/$n.log"
+              echo "::endgroup::"
+              fail=1
+            fi
+          done
+          exit $fail
 
   portability:
     # 非 UTF-8 locale / 隐式编码门禁（阻塞）。test / format / guards 三个 job 全在 UTF-8 locale
@@ -162,7 +175,7 @@ jobs:
         run: |
           # akshare 在 Linux 上的依赖 py-mini-racer / jsonpath 只有 sdist（需源码构建 V8/纯 Python），
           # 下载/编译偶发失败会让整个 job 挂掉（实测 3.12 曾单独失败）——加下载重试与更长超时
-          python -m pip install --upgrade pip --retries 5 --timeout 60
+          # 不再自升级 pip（setup-python 自带版本足够新；冷自升级纯耗时且无缓存收益）
           pip install --retries 5 --timeout 60 -e ".[test]"
 
       # ① PEP 597 隐式编码严格档：任何未显式 encoding= 的文本 I/O 立即失败（豁免项在 pytest.ini 声明）。

@@ -6,6 +6,8 @@
   - 无断言：assert / assertEqual 等 assert* / pytest.raises / mock 断言 / 经同类辅助方法断言
   - 完全重复：同体同参数同装饰器成组；字面量不同不成组；无法解析的 self 间接调用跳过比对
   - 自证用例：patch 被测函数 + 设 return_value + 断言回该字面量；断言别的字面量不算
+  - 增量事实缓存：命中免解析免检查、变更文件仅增量重算、删除文件陈旧条目剔除、
+    缓存逻辑版本（脚本/_checklib/解释器）失效全量重算
   - 真实仓库冒烟：当前测试集无死用例 / 无断言 / 完全重复 / 自证用例
 
 测试通过脚本 import 方式直接复用分析函数，不运行真实 CLI。
@@ -15,6 +17,7 @@ from __future__ import annotations
 
 import ast
 import importlib.util
+import json
 import sys
 from pathlib import Path
 
@@ -277,3 +280,91 @@ class TestRealRepoSmoke:
         findings, stats = redundancy.run_checks()
         assert findings == []
         assert stats["cases"] > 6000 and stats["files"] > 300
+
+
+# ═══ 增量事实缓存 ═══
+
+
+class TestFactsCache:
+    """按文件事实缓存：签名未变免解析免检查，变更/删除/版本失效必重算（只提速不改判定）。"""
+
+    @staticmethod
+    def _write(root: Path, name: str, body: str) -> Path:
+        path = root / "unit" / name
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(body, encoding="utf-8")
+        return path
+
+    @staticmethod
+    def _track_parses(monkeypatch, redundancy) -> list:
+        """拦截 ast.parse 计数，用于断言「哪些文件被（重新）解析」。"""
+        calls: list = []
+        original = redundancy.ast.parse
+
+        def _tracking_parse(*args, **kwargs):
+            calls.append(args[0] if args else "")
+            return original(*args, **kwargs)
+
+        monkeypatch.setattr(redundancy.ast, "parse", _tracking_parse)
+        return calls
+
+    @pytest.fixture()
+    def tmp_tree(self, redundancy, tmp_path, monkeypatch):
+        root = tmp_path / "src" / "test"
+        (root / "unit").mkdir(parents=True, exist_ok=True)
+        monkeypatch.setattr(redundancy, "_TEST_ROOT", root)
+        monkeypatch.setattr(redundancy, "_LIVE_DIR", root / "live")
+        monkeypatch.setenv("TEST_REDUNDANCY_CACHE", str(tmp_path / "data/cache/facts.json"))
+        return root
+
+    def test_warm_run_skips_parse_and_matches_cold(self, redundancy, tmp_tree, monkeypatch):
+        """缓存命中 → 不再调用 ast.parse，findings/stats 与冷路径完全一致。"""
+        self._write(
+            tmp_tree, "test_a.py", "def test_x():\n    assert f(1) == 2\n\ndef test_y():\n    assert f(1) == 2\n"
+        )
+        cold = redundancy.run_checks()
+        assert any("完全重复" in f for f in cold[0])
+        assert redundancy._facts_cache_path().is_file(), "冷路径应回写缓存"
+        calls = self._track_parses(monkeypatch, redundancy)
+        warm = redundancy.run_checks()
+        assert calls == [], "缓存命中仍触发解析（缓存未生效）"
+        assert warm == cold
+
+    def test_changed_file_reparsed_incrementally(self, redundancy, tmp_tree, monkeypatch):
+        """仅变更文件重算：新增的无断言用例被检出，未变文件不重解析。"""
+        self._write(tmp_tree, "test_a.py", "def test_x():\n    assert 1\n")
+        self._write(tmp_tree, "test_b.py", "def test_y():\n    assert 2\n")
+        redundancy.run_checks()
+        self._write(tmp_tree, "test_a.py", "def test_x():\n    assert 1\n\ndef test_new():\n    do_work()\n")
+        calls = self._track_parses(monkeypatch, redundancy)
+        findings, _ = redundancy.run_checks()
+        assert len(calls) == 1, "应只重解析变更文件"
+        assert any("test_new" in f and "无任何断言" in f for f in findings)
+
+    def test_deleted_file_prunes_stale_facts(self, redundancy, tmp_tree):
+        """删除文件后其缓存条目随写回剔除，旧 finding 不再复现。"""
+        self._write(tmp_tree, "test_a.py", "def test_x():\n    pass\n")
+        findings_before, _ = redundancy.run_checks()
+        assert any("test_x" in f for f in findings_before)
+        (tmp_tree / "unit" / "test_a.py").unlink()
+        findings_after, _ = redundancy.run_checks()
+        assert findings_after == []
+
+    def test_stale_logic_version_forces_full_reparse(self, redundancy, tmp_tree, monkeypatch):
+        """缓存逻辑版本不符（脚本/_checklib/解释器变化）→ 全部文件重解析。"""
+        self._write(tmp_tree, "test_a.py", "def test_x():\n    assert 1\n")
+        self._write(tmp_tree, "test_b.py", "def test_y():\n    assert 2\n")
+        redundancy.run_checks()
+        cache_file = redundancy._facts_cache_path()
+        data = json.loads(cache_file.read_text(encoding="utf-8"))
+        data["version"] = "stale-version"
+        cache_file.write_text(json.dumps(data, ensure_ascii=False), encoding="utf-8")
+        calls = self._track_parses(monkeypatch, redundancy)
+        redundancy.run_checks()
+        n_files = len(list(tmp_tree.rglob("test_*.py")))
+        assert len(calls) == n_files, "逻辑版本失效应全量重解析"
+
+    def test_cache_path_isolated_from_real_repo(self, redundancy, tmp_tree):
+        """隔离：缓存路径必须被 TEST_REDUNDANCY_CACHE 重定向到 tmp_path（不碰真实 data/cache）。"""
+        cache_path = redundancy._facts_cache_path()
+        assert str(cache_path).startswith(str(tmp_tree.parents[1]))

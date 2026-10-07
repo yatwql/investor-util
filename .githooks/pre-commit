@@ -1,20 +1,21 @@
 #!/bin/sh
-# git pre-commit hook — 提交门禁自动化
+# git pre-commit hook — 提交门禁自动化（分域并行）
 #
-# 1) 十守护全量（与 P0/P2 门禁清单、CI guards job 同源；check-doc-drift 第 16 项
-#    「守护清单同源」把本文件与 developer-guide / ci.yml / CLAUDE.md / testplan.md
-#    五处的 `scripts/check-*.py --ci` 引用集合两两比对，漏改任一处即报）
-#    - check-code-traces / check-doc-traces：代码与文档历史痕迹
-#    - check-task-numbering：任务编号（plan-/rf-）全局一致性
-#    - check-semantic-index：语义命名索引正反向校验
-#    - check-doc-drift：文档与实现一致性（统计快照自动回写 folders.md 并 git add）
-#    - check-test-redundancy：测试冗余与无效用例
-#    - check-requirement-trace：需求 ID ↔ 验证载体追溯
-#    - check-version-consistency：版本号 13 处一致
-#    - check-file-length：单文件行数红线（主程序 >800 / 测试 >1200，豁免与 review-findings 挂账同步）
-#    约 4~5 秒；任一 finding 即中止提交。此前本钩子仅条件触发其中 3 项，
-#    曾致 README 痕迹与 folders 行数漂移在本地放行、到 CI 才红。
-#    dev-verify（P0 单测）不入钩子，仍为提交前手动纪律 + CI 兜底。
+# 结构（设计意图与质量兜底见文末「分域原则」）：
+#   1) 无读写竞态守护先行后台启动——快集（code-traces / task-numbering /
+#      semantic-index / requirement-trace）+ py 域 file-length + 测试域
+#      test-redundancy，它们不读 folders.md，与第 2 步 doc-drift 串行段并行执行。
+#   2) check-doc-drift 串行段——唯一会写文件的守护（涉及 docs/managements/
+#      或 src/test/ 时 --sync 回写 folders.md 并 git add），必须先完成。
+#   3) 读 folders.md 的守护（version-consistency + doc 域 doc-traces/doc-links）
+#      在 doc-drift 完成后启动，避免 --sync 写读竞态；随后统一 wait。
+#   任一 finding 即中止提交。
+#
+# 分域原则（质量 × 时间平衡）：本地分域只省「结果不可能变化」的重复触发；CI guards
+#   job 对同一清单恒全量十守护兜底，且守护清单同源检查（check-doc-drift 第 16 项）
+#   保证本执行体与 CLAUDE.md / testplan / developer-guide / ci.yml 五处引用集合一致。
+#   历史教训：本钩子曾仅条件触发 3 项守护，致 README 痕迹与 folders 行数漂移本地放行、
+#   到 CI 才红——故分域必须与 CI 全量成对设计，不得单端条件化。
 #
 # 依赖 Python 在 PATH 或项目 .venv 中。需启用 core.hooksPath（install-hooks.sh）。
 
@@ -38,37 +39,101 @@ fi
 CHANGED=$(git diff --cached --name-only 2>/dev/null || true)
 GUARD_FAILED=""
 
-# ── 1) 统计快照同步 + 文档漂移（涉及 managements/ 或 src/test/ 时 --sync 回写
-#      并由脚本自行 git add；其余提交纯 --ci 校验，README/手册漂移同样拦截）
-if echo "$CHANGED" | grep -qE '^docs/managements/|^src/test/'; then
+GUARD_TMP=$(mktemp -d)
+trap 'rm -rf "$GUARD_TMP"' EXIT
+
+# 暂存文件是否命中某域（正则对多行清单做匹配）
+in_changed() {
+    printf '%s\n' "$CHANGED" | grep -qE "$1"
+}
+
+# 后台执行守护：输出与退出码分别落盘（set +e 兜住失败——否则守护报错会先于
+# 写 rc 文件终止子 shell，失败被静默吞掉）
+run_bg() {
+    _gname="$1"
+    shift
+    (
+        set +e
+        "$PY_CMD" "$@" >"$GUARD_TMP/$_gname.log" 2>&1
+        echo $? >"$GUARD_TMP/$_gname.rc"
+    ) &
+}
+
+# 回放单个后台守护的结果（成功打印其 [OK] 输出，失败打印全文并记入失败清单）
+show_guard() {
+    _gname="$1"
+    [ -f "$GUARD_TMP/$_gname.rc" ] || return 0
+    if [ "$(cat "$GUARD_TMP/$_gname.rc")" = "0" ]; then
+        cat "$GUARD_TMP/$_gname.log"
+    else
+        echo "[..] pre-commit: $_gname 未通过，输出如下："
+        cat "$GUARD_TMP/$_gname.log"
+        GUARD_FAILED="$GUARD_FAILED $_gname"
+    fi
+}
+
+# ── 1) 无读写竞态守护先行后台启动（不读 folders.md，与 doc-drift 串行段并行）──
+echo "[..] pre-commit: 快集守护（与 doc-drift 并行）"
+run_bg check-code-traces scripts/check-code-traces.py --ci
+run_bg check-task-numbering scripts/check-task-numbering.py --ci
+run_bg check-semantic-index scripts/check-semantic-index.py --ci
+run_bg check-requirement-trace scripts/check-requirement-trace.py --ci
+
+# py 域：单文件行数红线（扫描面 = src/python + src/test 的 *.py，含自身脚本）
+if in_changed '\.py$'; then
+    echo "[..] pre-commit: py 域（file-length，与 doc-drift 并行）"
+    run_bg check-file-length scripts/check-file-length.py --ci
+fi
+
+# 测试域：测试冗余与无效（AST 只读 src/test + 自身 + _checklib；按文件事实缓存：
+# 冷 ~1.8s / 变更文件增量 ~0.1s；仅测试变更触发）
+if in_changed '^src/test/|scripts/check-test-redundancy\.py|scripts/_checklib\.py'; then
+    echo "[..] pre-commit: 测试域（test-redundancy，与 doc-drift 并行）"
+    run_bg check-test-redundancy scripts/check-test-redundancy.py --ci
+fi
+
+# ── 2) 统计快照同步 + 文档漂移（串行先行：涉及 managements/ 或 src/test/ 时
+#      --sync 回写并由脚本自行 git add；其余提交纯 --ci 校验，README/手册漂移同样拦截）
+if printf '%s\n' "$CHANGED" | grep -qE '^docs/managements/|^src/test/'; then
     echo "[..] pre-commit: 统计快照同步 + 文档漂移（check-doc-drift --sync）"
     if ! "$PY_CMD" scripts/check-doc-drift.py --sync --ci; then
         GUARD_FAILED="$GUARD_FAILED check-doc-drift"
     fi
 else
-    echo "[..] pre-commit: scripts/check-doc-drift.py --ci"
+    echo "[..] pre-commit: 文档与实现一致性（check-doc-drift）"
     if ! "$PY_CMD" scripts/check-doc-drift.py --ci; then
         GUARD_FAILED="$GUARD_FAILED check-doc-drift"
     fi
 fi
 
-# ── 2) 其余八个守护（无条件全量，与 CI guards job 逐步同源）
-echo "[..] pre-commit: 十守护全量校验"
-if ! "$PY_CMD" scripts/check-code-traces.py --ci; then GUARD_FAILED="$GUARD_FAILED check-code-traces"; fi
-if ! "$PY_CMD" scripts/check-doc-traces.py --ci; then GUARD_FAILED="$GUARD_FAILED check-doc-traces"; fi
-if ! "$PY_CMD" scripts/check-task-numbering.py --ci; then GUARD_FAILED="$GUARD_FAILED check-task-numbering"; fi
-if ! "$PY_CMD" scripts/check-semantic-index.py --ci; then GUARD_FAILED="$GUARD_FAILED check-semantic-index"; fi
-if ! "$PY_CMD" scripts/check-test-redundancy.py --ci; then GUARD_FAILED="$GUARD_FAILED check-test-redundancy"; fi
-if ! "$PY_CMD" scripts/check-requirement-trace.py --ci; then GUARD_FAILED="$GUARD_FAILED check-requirement-trace"; fi
-if ! "$PY_CMD" scripts/check-version-consistency.py --ci; then GUARD_FAILED="$GUARD_FAILED check-version-consistency"; fi
-if ! "$PY_CMD" scripts/check-doc-links.py --ci; then GUARD_FAILED="$GUARD_FAILED check-doc-links"; fi
-if ! "$PY_CMD" scripts/check-file-length.py --ci; then GUARD_FAILED="$GUARD_FAILED check-file-length"; fi
+# ── 3) 读 folders.md 的守护：doc-drift 完成后启动（拿 --sync 回写后的最新内容）──
+echo "[..] pre-commit: 版本一致性守护"
+run_bg check-version-consistency scripts/check-version-consistency.py --ci
+if in_changed '\.md$'; then
+    echo "[..] pre-commit: doc 域（doc-traces / doc-links）"
+    run_bg check-doc-traces scripts/check-doc-traces.py --ci
+    run_bg check-doc-links scripts/check-doc-links.py --ci
+fi
+
+wait
+
+# ── 3) 统一回放结果（固定顺序，保证输出可读）
+echo "[..] pre-commit: 守护结果回放"
+show_guard check-code-traces
+show_guard check-task-numbering
+show_guard check-semantic-index
+show_guard check-requirement-trace
+show_guard check-version-consistency
+show_guard check-doc-traces
+show_guard check-doc-links
+show_guard check-file-length
+show_guard check-test-redundancy
 
 if [ -n "$GUARD_FAILED" ]; then
     echo "[ERR] pre-commit: 守护未通过:$GUARD_FAILED" >&2
-    echo "       按上方输出提示修复后重试（清单与 P0 门禁 / CI guards job 同源）" >&2
+    echo "       按上方输出提示修复后重试（清单与 P0 门禁 / CI guards job 同源，CI 恒全量兜底）" >&2
     exit 1
 fi
 
-echo "[OK] pre-commit: 十守护全量通过"
+echo "[OK] pre-commit: 分域守护全部通过"
 exit 0

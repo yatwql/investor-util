@@ -22,7 +22,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))  # 同目录共享模�
 import os
 
 # Windows GBK 控制台兜底：子进程捕获输出经 errors="replace" 处理后可能含 U+FFFD
-# 替换字符，直接 print 会触发 UnicodeEncodeError 使 runner 中途崩溃（丢 Phase B）
+# 替换字符，直接 print 会触发 UnicodeEncodeError 使 runner 中途崩溃（丢后续阶段输出）
 if sys.stdout and hasattr(sys.stdout, "reconfigure"):
     try:
         sys.stdout.reconfigure(errors="replace")

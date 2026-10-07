@@ -191,6 +191,12 @@ def _isolate_sensitive_paths(tmp_path, monkeypatch, _doctor_probe_targets):
     机制：
     - 替换 _config_defaults._CONFIG_FILE → tmp_path/data/config/config.json
     - 替换 cache._CACHE_DIR → tmp_path/data/cache
+    - 设置 DOC_DRIFT_SNAPSHOT_CACHE → tmp_path/data/cache/test_coverage_snapshot.json
+      （check-doc-drift 测试计数快照缓存，见 _path_isolation.seed_sensitive_path_isolation）
+    - 设置 TEST_REDUNDANCY_CACHE → tmp_path/data/cache/test_redundancy_facts.json
+      （check-test-redundancy 按文件事实缓存，同上重定向）
+    - 设置 CHECK_CONCLUSION_CACHE_DIR → tmp_path/data/cache/guard_conclusions
+      （三守护结论缓存目录——doc-traces / semantic-index / doc-links，同上重定向）
     - 替换 HISTORY_SNAPSHOT_DIR → tmp_path/data/history/snapshots
     - 清除 config 内存缓存，使 get_config() 从临时路径读取
     （无文件时自动回退到 _DEFAULT_CONFIG 默认值）

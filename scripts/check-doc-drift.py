@@ -157,7 +157,7 @@ from _doc_drift import (  # noqa: E402,F401  # 原面 re-export（实现见 _doc
 def run_checks(with_test_count: bool = False) -> list[str]:
     """跑全部检查，返回不一致描述列表（空 = 全部一致）。"""
     docs = _scan_docs()
-    snapshot = _collect_test_snapshot() if with_test_count else {}
+    snapshot = _collect_test_snapshot(full_buckets=True) if with_test_count else {}
     findings: list[str] = []
     findings += check_section_table(docs[_REPORTS_MD])
     findings += check_section_counts(docs)
