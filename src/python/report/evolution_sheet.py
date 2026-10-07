@@ -2,7 +2,7 @@
 
 输出内容：
   1. 汇总：快照数 / 有效观察日数
-  2. 总市值趋势表（观察日 × 总市值 / 总成本 / 总盈亏 / 持仓数）
+  2. 总市值与总盈亏趋势表（观察日 × 总市值 / 总成本 / 总盈亏 / 持仓数）
   3. 集中度 HHI 趋势表（观察日 × HHI）
   4. TOP 持仓占比变迁表（品种 × 观察日，市值口径权重 %）
   5. 账户配置流（多账户时展示，市值占比 %）
@@ -22,6 +22,7 @@ from openpyxl.worksheet.worksheet import Worksheet
 from src.python.core.registry import get_report_sheet_name
 from src.python.report.data_status import STATUS_MESSAGES
 from src.python.report.excel_writer import (
+    write_block_title,
     _write_placeholder,
     auto_width,
     freeze_header,
@@ -78,7 +79,7 @@ def write_evolution_sheet(
 
     # ── 1.5 自上次快照变化摘要（snapshot_diff_data） ──
     row += 1
-    row = write_title_row(ws, row, "自上次快照变化摘要", ncols=_ncols)
+    row = write_block_title(ws, row, "自上次快照变化摘要", ncols=_ncols)
     diff = snapshot_diff_data or {}
     if not diff.get("available"):
         row = write_data_row(
@@ -110,9 +111,9 @@ def write_evolution_sheet(
         for _r in _diff_rows:
             row = write_data_row(ws, row, [_r] + [""] * (_ncols - 1))
 
-    # ── 2. 总市值趋势表 ──
+    # ── 2. 总市值与总盈亏趋势表 ──
     row += 1
-    row = write_title_row(ws, row, "总市值趋势", ncols=5)
+    row = write_block_title(ws, row, "总市值与总盈亏趋势", ncols=5)
     row = write_header_row(ws, row, ["观察日", "总市值(元)", "总成本(元)", "总盈亏(元)", "持仓数量"])
     tv = evolution_data.get("total_value", [])
     tc = evolution_data.get("total_cost", [])
@@ -135,7 +136,7 @@ def write_evolution_sheet(
     # ── 3. HHI 趋势表（观察日横向） ──
     hhi = evolution_data.get("hhi", [])
     row += 1
-    row = write_title_row(ws, row, "持仓集中度（HHI）趋势", ncols=n_periods + 1)
+    row = write_block_title(ws, row, "持仓集中度（HHI）趋势", ncols=n_periods + 1)
     row = write_header_row(ws, row, ["指标"] + list(periods))
     row = write_data_row(ws, row, ["HHI 集中度"] + ["%.4f" % h if h is not None else "-" for h in hhi])
 
@@ -143,7 +144,7 @@ def write_evolution_sheet(
     top = evolution_data.get("top_holdings", [])
     if top:
         row += 1
-        row = write_title_row(ws, row, f"TOP {len(top)} 持仓占比变迁（%）", ncols=n_periods + 2)
+        row = write_block_title(ws, row, "TOP 持仓占比变迁（%）", ncols=n_periods + 2)
         row = write_header_row(ws, row, ["排名", "品种"] + list(periods) + ["出现期数"])
         for idx, th in enumerate(top, start=1):
             _weights = th.get("weights", [])
@@ -156,7 +157,7 @@ def write_evolution_sheet(
     flows = evolution_data.get("account_flows", {}) or {}
     if len(flows) > 1:
         row += 1
-        row = write_title_row(ws, row, "账户配置流（市值占比 %）", ncols=n_periods + 1)
+        row = write_block_title(ws, row, "账户配置流（市值占比 %）", ncols=n_periods + 1)
         row = write_header_row(ws, row, ["账户"] + list(periods))
         for aname, shares in flows.items():
             row = write_data_row(ws, row, [aname] + ["%.2f" % s for s in shares])

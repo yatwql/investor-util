@@ -8,6 +8,7 @@ from typing import Any
 from jinja2 import Environment, FileSystemLoader
 
 from src.python.core.code_utils import is_qdii_extended
+from src.python.core.registry import _REPORT_SECTION_DEFAULT
 from src.python.core.constants import PROJECT_ROOT
 
 # ── 路径 & Jinja2 环境 ─────────────────────────────────────
@@ -126,3 +127,7 @@ _ENV.filters["thousands"] = _jinja_thousands
 _ENV.filters["sentiment_colorize"] = _jinja_sentiment_colorize
 
 _ENV.globals["section_visible"] = lambda key: False  # fail-closed 默认值，生产环境由 context 变量覆盖
+
+# 章节显示名单源：模板/partials 标题一律 {{ section_names[key] }}（与导航、Excel 页签同源于
+# core/registry.py 的 _REPORT_SECTION_DEFAULT[].name），改名收敛为注册表单点变更
+_ENV.globals["section_names"] = {sec["key"]: sec["name"] for sec in _REPORT_SECTION_DEFAULT}

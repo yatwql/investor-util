@@ -1,0 +1,175 @@
+    <div class="section" id="sec-holdings_detail" style="order: {{ section_numbers['holdings_detail'] }};">
+        <div class="section-title">{{ section_numbers['holdings_detail'] }}、{{ section_names['holdings_detail'] }}</div>
+        <div class="block-title">一、市值核算明细</div>
+        <div class="section-content" style="padding: 0;">
+            <table>
+                <thead>
+                    <tr>
+                        <th>账户</th><th>名称</th><th>代码</th><th>最新价</th><th>净值日期</th>
+                        <th>昨日价</th><th>取价方式</th><th>溢价率</th><th>份额</th><th>市值</th>
+                        <th>成本</th><th>盈亏</th><th>收益率</th><th>本日盈亏</th><th>取价渠道</th>
+                        {% if flow_display %}<th>资金加权成本</th>{% endif %}
+                        {% if purchase_status_display %}<th>申购状态</th>{% endif %}
+                    </tr>
+                </thead>
+                <tbody>
+                    {% set grand_mv = namespace(v=0.0) %}
+                    {% set grand_cost = namespace(v=0.0) %}
+                    {% set grand_profit = namespace(v=0.0) %}
+                    {% set grand_today = namespace(v=0.0) %}
+                    {% for acc_name, acc_details in accounts.items() %}
+                        {% for d in acc_details %}
+                        <tr>
+                            <td class="text-left">{{ d.account }}</td>
+                            <td class="text-left">{{ d.name }}</td>
+                            <td>{{ d.code }}</td>
+                            <td class="text-right">{{ d.price | price }}</td>
+                            <td>{{ d.nav_date }}</td>
+                            <td class="text-right">{{ d.yesterday_close | price }}</td>
+                            <td{% if (d.price_type | price_type_color(d.name)) %} style="color: {{ d.price_type | price_type_color(d.name) }}; font-weight: bold;"{% endif %}>{{ d.price_type }}</td>
+                            <td>{{ d.premium }}</td>
+                            <td class="text-right">{{ d.shares | shares }}</td>
+                            <td class="text-right">{{ d.market_value | money }}</td>
+                            <td class="text-right">{{ d.cost | money }}</td>
+                            <td class="text-right" style="color: {{ d.profit | profit_color }}">{{ d.profit | money }}</td>
+                            <td class="text-right" style="color: {{ d.profit_rate | profit_color }}">{{ d.profit_rate | pct }}</td>
+                            <td class="text-right" style="color: {{ d.today_profit | profit_color }}">{{ d.today_profit | money }}</td>
+                            <td>{{ d.source }}</td>
+                            {% if flow_display %}
+                            {% set wac = flow_display.cost_map.get(d.code) %}
+                            <td class="text-right">{% if wac is not none %}{{ wac | price }}{% else %}--{% endif %}</td>
+                            {% endif %}
+                            {% if purchase_status_display %}
+                            <td class="text-left">{{ purchase_status_display.cells.get(d.code, "—") }}</td>
+                            {% endif %}
+                        </tr>
+                        {% endfor %}
+                        {% set acc_tot = account_totals.get(acc_name, {}) %}
+                        <tr class="subtotal-row">
+                            <td class="text-left" colspan="2">{{ acc_name }} 小计</td>
+                            <td></td><td></td><td></td><td></td><td></td><td></td>
+                            <td class="text-right">--</td>
+                            <td class="text-right">{{ acc_tot.get("market_value", 0) | money }}</td>
+                            <td class="text-right">{{ acc_tot.get("cost", 0) | money }}</td>
+                            <td class="text-right" style="color: {{ acc_tot.get("profit", 0) | profit_color }}">{{ acc_tot.get("profit", 0) | money }}</td>
+                            <td class="text-right" style="color: {{ acc_tot.get("profit_rate", 0) | profit_color }}">{{ acc_tot.get("profit_rate", 0) | pct }}</td>
+                            <td class="text-right" style="color: {{ acc_tot.get("today_profit", 0) | profit_color }}">{{ acc_tot.get("today_profit", 0) | money }}</td>
+                            <td></td>
+                            {% if flow_display %}<td></td>{% endif %}
+                            {% if purchase_status_display %}<td></td>{% endif %}
+                        </tr>
+                        {% set grand_mv.v = grand_mv.v + acc_tot.get("market_value", 0) %}
+                        {% set grand_cost.v = grand_cost.v + acc_tot.get("cost", 0) %}
+                        {% set grand_profit.v = grand_profit.v + acc_tot.get("profit", 0) %}
+                        {% set grand_today.v = grand_today.v + acc_tot.get("today_profit", 0) %}
+                    {% endfor %}
+                    {% set g_rate = (grand_profit.v / grand_cost.v * 100) if grand_cost.v > 0 else 0 %}
+                    <tr class="grand-total-row">
+                        <td colspan="2" class="text-left">总计</td>
+                        <td></td><td></td><td></td><td></td><td></td><td></td>
+                        <td class="text-right">--</td>
+                        <td class="text-right">{{ grand_mv.v | money }}</td>
+                        <td class="text-right">{{ grand_cost.v | money }}</td>
+                        <td class="text-right" style="color: {{ grand_profit.v | profit_color }}">{{ grand_profit.v | money }}</td>
+                        <td class="text-right" style="color: {{ (g_rate / 100) | profit_color }}">{{ g_rate | change }}</td>
+                        <td class="text-right" style="color: {{ grand_today.v | profit_color }}">{{ grand_today.v | money }}</td>
+                        <td></td>
+                        {% if flow_display %}<td></td>{% endif %}
+                        {% if purchase_status_display %}<td></td>{% endif %}
+                    </tr>
+                </tbody>
+            </table>
+            {% if purchase_status_display %}
+            <div style="padding: 4px 8px; font-size: 12px; color: {% if purchase_status_display.level == 'stale' %}#B8860B; font-weight: bold;{% else %}#888888;{% endif %}">{{ purchase_status_display.footnote }}</div>
+            {% endif %}
+        </div>
+
+        <div class="block-title">二、持仓分类汇总</div>
+        <div class="section-content" style="padding: 0;">
+            <table>
+                <thead>
+                    <tr>
+                        <th>资产属性</th><th>投资分类</th><th>名称</th><th>代码</th>
+                        <th>市值</th><th>成本</th><th>盈亏</th><th>收益率</th><th>本日盈亏</th><th>年均股息率</th>
+                        {% if flow_display %}<th>成本分档</th><th>分红累计</th>{% endif %}
+                        {% if purchase_status_display %}<th>申购状态</th>{% endif %}
+                    </tr>
+                </thead>
+                <tbody>
+                    {% set cat_grand_mv = namespace(v=0.0) %}
+                    {% set cat_grand_cost = namespace(v=0.0) %}
+                    {% set cat_grand_profit = namespace(v=0.0) %}
+                    {% set cat_grand_today = namespace(v=0.0) %}
+                    {% for group in cat_data %}
+                        {% for item in group["items"] %}
+                        <tr>
+                            <td class="text-left">{{ group["property"] }}</td>
+                            <td class="text-left">{{ group["sub_category"] }}</td>
+                            <td class="text-left">{{ item["name"] }}</td>
+                            <td>{{ item["code"] }}</td>
+                            <td class="text-right">{{ item["market_value"] | money }}</td>
+                            <td class="text-right">{{ item["cost"] | money }}</td>
+                            <td class="text-right" style="color: {{ item["profit"] | profit_color }}">{{ item["profit"] | money }}</td>
+                            <td class="text-right" style="color: {{ item["profit_rate"] | profit_color }}">{{ item["profit_rate"] | pct }}</td>
+                            <td class="text-right" style="color: {{ item["today_profit"] | profit_color }}">{{ item["today_profit"] | money }}</td>
+                            <td>{{ item.get("yield_text", "--") }}</td>
+                            {% if flow_display %}
+                            <td>{{ flow_display.tier_map.get(item["code"], "--") }}</td>
+                            <td class="text-right">{{ flow_display.div_map.get(item["code"], 0.0) | money }}</td>
+                            {% endif %}
+                            {% if purchase_status_display %}
+                            <td class="text-left">{{ purchase_status_display.cells.get(item["code"], "—") }}</td>
+                            {% endif %}
+                        </tr>
+                        {% endfor %}
+                        <tr class="subtotal-row">
+                            <td class="text-left" colspan="2">{{ group["property"] }} - {{ group["sub_category"] }} 小计</td>
+                            <td></td><td></td>
+                            <td class="text-right">{{ group["sub_mv"] | money }}</td>
+                            <td class="text-right">{{ group["sub_cost"] | money }}</td>
+                            <td class="text-right" style="color: {{ group["sub_profit"] | profit_color }}">{{ group["sub_profit"] | money }}</td>
+                            <td class="text-right" style="color: {{ group["sub_rate"] | profit_color }}">{{ group["sub_rate"] | pct }}</td>
+                            <td class="text-right" style="color: {{ group["sub_today"] | profit_color }}">{{ group["sub_today"] | money }}</td>
+                            <td></td>
+                            {% if flow_display %}<td></td><td></td>{% endif %}
+                            {% if purchase_status_display %}<td></td>{% endif %}
+                        </tr>
+                        </tr>
+                        {% set cat_grand_mv.v = cat_grand_mv.v + group["sub_mv"] %}
+                        {% set cat_grand_cost.v = cat_grand_cost.v + group["sub_cost"] %}
+                        {% set cat_grand_profit.v = cat_grand_profit.v + group["sub_profit"] %}
+                        {% set cat_grand_today.v = cat_grand_today.v + group["sub_today"] %}
+                    {% endfor %}
+                    {% set cat_g_rate = (cat_grand_profit.v / cat_grand_cost.v * 100) if cat_grand_cost.v > 0 else 0 %}
+                    <tr class="grand-total-row">
+                        <td colspan="4" class="text-left">总计</td>
+                        <td class="text-right">{{ cat_grand_mv.v | money }}</td>
+                        <td class="text-right">{{ cat_grand_cost.v | money }}</td>
+                        <td class="text-right" style="color: {{ cat_grand_profit.v | profit_color }}">{{ cat_grand_profit.v | money }}</td>
+                        <td class="text-right" style="color: {{ (cat_g_rate / 100) | profit_color }}">{{ cat_g_rate | change }}</td>
+                        <td class="text-right" style="color: {{ cat_grand_today.v | profit_color }}">{{ cat_grand_today.v | money }}</td>
+                        <td></td>
+                        {% if flow_display %}<td></td><td></td>{% endif %}
+                        {% if purchase_status_display %}<td></td>{% endif %}
+                    </tr>
+                </tbody>
+            </table>
+            {% if enable_interactive_charts %}
+            {# 资产构成 Doughnut：按资产属性聚合市值的交互环形图 #}
+            <div style="max-width:480px;margin:12px auto;">
+                <div class="chart-box" style="height:320px;">
+                    {% if chart_datasets and chart_datasets.get("category_doughnut", {}).get("labels") %}
+                    <canvas id="chart_category_doughnut" width="480" height="320" style="width:100%;height:100%;" aria-label="资产构成环形图（悬停查看占比）" role="img">图表无法显示，数据见持仓分类表</canvas>
+                    {% else %}
+                    <div class="chart-empty-note">资产构成数据暂不可用</div>
+                    {% endif %}
+                </div>
+                {% if chart_datasets and chart_datasets.get("category_doughnut", {}).get("labels") %}
+                <div class="chart-caption">资产构成分布</div>
+                {% endif %}
+            </div>
+            {% endif %}
+        </div>
+        {{ render_data_status(data_status_category) }}
+        {{ render_back_to_top() }}
+    </div>

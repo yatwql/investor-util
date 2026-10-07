@@ -5,7 +5,8 @@
   - 退出码 **0 = 通过，2 = 发现 finding**（`check-code-traces.py` 另有 LOW 级别 1，属其自身分级语义）
   - 通过时打印 `[OK] …`；失败时逐条 `[ERR] file:desc`（或 `--ci` 下仅 `file:desc`）+ `[!] 发现 N 处…`
 
-本模块只提供**无副作用的原语**，不替脚本决定检查内容；脚本以
+本模块提供**无副作用的原语**（例外：结论缓存 `conclusion_cache_*`——仅在调用方
+显式调用时读写，写入原子、失败静默，见文末章节）；脚本以
 ``sys.path.insert(0, str(Path(__file__).resolve().parent))`` 后 ``from _checklib import …`` 引用
 （`pyproject.toml` 对 `scripts/*.py` 声明了 E402 豁免，理由即此）。
 """
@@ -13,7 +14,12 @@
 from __future__ import annotations
 
 import argparse
+import hashlib
+import json
+import os
 import re
+import sys
+from collections.abc import Sequence
 from pathlib import Path
 
 #: 仓库根目录（`scripts/` 的上一级）
@@ -135,3 +141,103 @@ def replace_table_region(doc_text: str, markers: tuple[str, str], updated_lines:
     if count != 1:
         raise ValueError(f"表区域标记 {markers[0]} 与 {markers[1]} 未匹配")
     return new_text
+
+
+# ── 结论缓存（输入指纹未变时复用上次结论） ──────────────────────────
+# 设计边界（质量前提，本地降频不降级）：
+#   - **通过与发现都缓存**——输入字节未变 ⇒ 结论必然相同，退出码同源；
+#   - **失效方向永远偏向全量**：逻辑版本（调用脚本 + 本模块 + 解释器大版本）
+#     或输入文件集/逐文件指纹任一失配、状态缺失损坏 → 返回 None，调用方全量重算；
+#   - **只作加速不是真值**：写入原子（tmp + replace）、失败静默不抛；
+#   - **加载建议限定 `--ci`**：结论按 ci 输出形态缓存，verbose 详细过程仍全量执行。
+
+#: 结论缓存目录环境变量（测试隔离经 `_path_isolation` 重定向到 tmp）
+_CONCLUSION_CACHE_ENV = "CHECK_CONCLUSION_CACHE_DIR"
+_CONCLUSION_CACHE_DEFAULT = REPO_ROOT / "data" / "cache" / "guard_conclusions"
+
+
+def conclusion_cache_dir() -> Path:
+    """结论缓存目录（环境变量可重定向）。"""
+    override = os.environ.get(_CONCLUSION_CACHE_ENV)
+    return Path(override) if override else _CONCLUSION_CACHE_DEFAULT
+
+
+def _logic_fingerprint(logic_files: Sequence[Path]) -> str:
+    """收集逻辑版本指纹：调用脚本 + 本模块字节 + 解释器大版本。"""
+    parts = [f"py{sys.version_info[0]}.{sys.version_info[1]}"]
+    for p in logic_files:
+        try:
+            parts.append(hashlib.sha1(p.read_bytes()).hexdigest())
+        except OSError:
+            parts.append("?")
+    parts.append(hashlib.sha1(Path(__file__).read_bytes()).hexdigest())
+    return hashlib.sha1("|".join(parts).encode("utf-8")).hexdigest()
+
+
+def _input_fingerprint(input_files: Sequence[Path]) -> dict[str, str]:
+    """输入面指纹：``{仓库相对 POSIX: size:mtime_ns}``，路径排序。
+
+    文件集增删、内容或时间戳任一变化即失配（宁可多失效不漏失效）；
+    声明了但已消失的文件记 ``<absent>``（调用方下次重算会同步文件集）。
+    """
+    out: dict[str, str] = {}
+    for p in sorted({Path(x) for x in input_files}, key=lambda q: q.as_posix()):
+        try:
+            st = p.stat()
+        except OSError:
+            out[rel(p)] = "<absent>"
+            continue
+        out[rel(p)] = f"{st.st_size}:{st.st_mtime_ns}"
+    return out
+
+
+def conclusion_cache_load(
+    namespace: str,
+    logic_files: Sequence[Path],
+    input_files: Sequence[Path],
+) -> dict | None:
+    """命中 → 结论 dict（须含 ``findings`` 列表，调用方可附带其他回放字段）；否则 None。
+
+    None（一律全量重算）：缓存缺失 / 损坏 / 非法结构 / 逻辑版本变化 /
+    文件集或逐文件指纹变化 / ``findings`` 非列表。
+    """
+    path = conclusion_cache_dir() / f"{namespace}.json"
+    logic = _logic_fingerprint(logic_files)
+    inputs = _input_fingerprint(input_files)
+    try:
+        data = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return None
+    if not isinstance(data, dict):
+        return None
+    if data.get("logic") != logic or data.get("inputs") != inputs:
+        return None
+    conclusion = data.get("conclusion")
+    if not isinstance(conclusion, dict) or not isinstance(conclusion.get("findings"), list):
+        return None
+    return conclusion
+
+
+def conclusion_cache_save(
+    namespace: str,
+    logic_files: Sequence[Path],
+    input_files: Sequence[Path],
+    conclusion: dict,
+) -> None:
+    """原子写结论（通过与发现都缓存）；任何失败静默——缓存只是加速，不是真值。"""
+    payload = {
+        "logic": _logic_fingerprint(logic_files),
+        "inputs": _input_fingerprint(input_files),
+        "conclusion": conclusion,
+    }
+    path = conclusion_cache_dir() / f"{namespace}.json"
+    tmp = path.with_name(path.name + ".tmp")
+    try:
+        path.parent.mkdir(parents=True, exist_ok=True)
+        tmp.write_text(json.dumps(payload, ensure_ascii=False), encoding="utf-8")
+        os.replace(tmp, path)
+    except OSError:
+        try:
+            tmp.unlink(missing_ok=True)
+        except OSError:
+            pass

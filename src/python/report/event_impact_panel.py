@@ -452,16 +452,16 @@ def write_event_impact_footer(ws: Any, event_impact_data: dict[str, Any] | None,
     （新闻内容之后留一空行）。区块标题与 partial 章内标题同为「事件窗量化对照」。
     """
     from src.python.report.excel_writer import (
+        write_block_title,
         _write_placeholder,
         auto_width,
         write_data_row,
         write_header_row,
-        write_title_row,
     )
 
     view = build_event_impact_view(event_impact_data)
     _ncols = len(EVENT_TABLE_HEADER)
-    row = write_title_row(ws, start_row, "事件窗量化对照", ncols=_ncols)
+    row = write_block_title(ws, start_row, "事件窗量化对照", ncols=_ncols)
 
     if not view["available"]:
         _write_placeholder(ws, view["reason"], row=row + 1, max_cols=_ncols)
@@ -475,7 +475,7 @@ def write_event_impact_footer(ws: Any, event_impact_data: dict[str, Any] | None,
 
     # ── 2. 事件窗对照表（一致/分歧列）+ 口径标注（同现） ──
     row += 1
-    row = write_title_row(ws, row, "事件窗对照表", ncols=_ncols)
+    row = write_block_title(ws, row, "事件窗对照表", ncols=_ncols)
     row = write_header_row(ws, row, view["event_header"])
     for cells in view["event_rows"]:
         row = write_data_row(ws, row, cells)

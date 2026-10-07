@@ -16,7 +16,7 @@ from datetime import datetime
 
 from src.python.llm.pricing import CURRENCY_SYMBOLS
 from src.python.core.logger import setup_logger
-from src.python.core.reader import get_xlsx_info, list_xlsx_files, read_holdings_with_flows
+from src.python.core.reader import get_xlsx_info, list_xlsx_files, read_holdings_with_flows, require_holdings
 from src.python.report.progress import TuiProgressReporter
 from src.python.tui.tui_menu import MENU_ITEMS, get_config_cache, press_any_key, refresh_config
 
@@ -116,10 +116,10 @@ def prepare_holdings() -> "tuple[list, list, list] | None":
         print("  [..] 正在读取持仓数据...")
         parsed = read_holdings_with_flows(filepath)
         holdings = parsed.holdings
-        if not holdings:
-            print("  [ERR] 未读取到有效的持仓数据")
-            print("     请检查持仓文件中是否有数据，列名是否正确")
-            print("     需要的列名：名称、代码、持仓份额、每份成本")
+        try:
+            require_holdings(holdings, filepath)
+        except ValueError as e:
+            print(f"  [ERR] {e}")
             press_any_key()
             return None
         print(f"  [OK] 成功读取 {len(holdings)} 条持仓记录")

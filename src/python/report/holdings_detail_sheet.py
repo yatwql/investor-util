@@ -45,6 +45,7 @@ from src.python.report.purchase_status import (
     stale_level,
 )
 from src.python.report.excel_writer import (
+    write_block_title,
     _write_data_status_foot,
     auto_width,
     freeze_header,
@@ -348,7 +349,7 @@ def _write_market_value_block(
         headers = headers + _MV_PURCHASE_HEADERS
     _details = details or []
 
-    row = write_title_row(ws, start_row, _BLOCK_TITLE_MARKET_VALUE, ncols)
+    row = write_block_title(ws, start_row, _BLOCK_TITLE_MARKET_VALUE, ncols)
     row = write_header_row(ws, row, headers)
 
     # 若所有行情数据全零，写一行醒目提示。注意：提示行**整行合并**（标题样式），
@@ -514,7 +515,7 @@ def _write_category_block(
         key=lambda x: (_PROP_ORDER.get(x[0][0], 99), _SUB_ORDER.get(x[0][1], 99)),
     )
 
-    row = write_title_row(ws, start_row, _BLOCK_TITLE_CATEGORY, ncols)
+    row = write_block_title(ws, start_row, _BLOCK_TITLE_CATEGORY, ncols)
     row = write_header_row(ws, row, headers)
 
     # 若所有行情数据全零，写一行醒目提示（该行为单格写入、未合并，数据自其后开始）

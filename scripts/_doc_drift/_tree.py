@@ -4,13 +4,18 @@ from __future__ import annotations
 
 import re
 from pathlib import Path
+from typing import cast
 from _checklib import REPO_ROOT, rel
+from src.python.core.registry import _REPORT_SECTION_DEFAULT
+from src.python.core.section_block_registry import SECTION_BLOCK_SPECS
+from src.python.report.section_block_extraction import extract_excel_block_titles, extract_html_block_titles
 
 from _doc_drift._shared import (
     _FOLDERS_MD,
     _MANAGEMENTS,
     _MANUALS,
     _README,
+    _TECHNICAL_MD,
     _TREE_ROOTS,
     _collect_test_count,
     _count,
@@ -228,3 +233,160 @@ def _sync_cell_number(line: str, cell_idx: int, new_value: int) -> str:
     replacement = _reformat_number(new_value, num.group(0))
     raw_parts[cell_idx] = old_cell.replace(num.group(0), replacement, 1)
     return "| " + " | ".join(raw_parts) + " |" + suffix
+
+
+# ──章节-区块矩阵（technical.md §4.22，双端章内区块对账） ──────────────
+
+_BLOCK_MATRIX_TITLE = "章节-区块矩阵"
+#: 矩阵表头列关键字（列按表头文本定位，不依赖列序）
+_BLOCK_KEY_HEADER = "章节"
+_BLOCK_COUNT_HEADER = "HTML 区块数"
+_BLOCK_PARTIAL_HEADER = "HTML 载体"
+_BLOCK_MARKER_HEADER = "Excel 区块清单"
+_BLOCK_MODULE_HEADER = "Excel 载体"
+#: 计数占位（流式章/单表章不计数）
+_NO_COUNT = "—"
+#: 同一单元格内多项的分隔符（载体多文件用 ` + `，区块清单用 ` / `）
+_MULTI_SEP = " + "
+_MARKER_SEP = " / "
+_BLOCK_PARTIAL_DIR = REPO_ROOT / "src" / "static" / "tmpl" / "partials"
+_BLOCK_SHEET_DIR = REPO_ROOT / "src" / "python" / "report"
+
+
+def _strip_cell(text: str) -> str:
+    """去掉单元格内的 markdown 装饰（反引号/加粗），保留 CJK 与括号。"""
+    return text.replace("`", "").replace("**", "").strip()
+
+
+def parse_block_matrix(doc_text: str) -> tuple[list[dict[str, str]], list[str]]:
+    """解析 §4.22 章节-区块矩阵表 → ``(行列表, 解析 findings)``。"""
+    findings: list[str] = []
+    lines = doc_text.splitlines()
+    title_idx = next((i for i, ln in enumerate(lines) if ln.startswith("#") and _BLOCK_MATRIX_TITLE in ln), None)
+    if title_idx is None:
+        return [], [f"未找到「{_BLOCK_MATRIX_TITLE}」章节标题"]
+    header_idx: int | None = None
+    header_cells: list[str] | None = None
+    for i in range(title_idx + 1, min(title_idx + 12, len(lines))):
+        cells = _split_table_row(lines[i])
+        if cells and any(_BLOCK_COUNT_HEADER in c for c in cells):
+            header_idx, header_cells = i, cells
+            break
+    if header_idx is None or header_cells is None:
+        return [], [f"「{_BLOCK_MATRIX_TITLE}」章节下未找到含「{_BLOCK_COUNT_HEADER}」列的表头"]
+
+    def _col(keyword: str) -> int | None:
+        return next((i for i, c in enumerate(header_cells or []) if keyword in c), None)
+
+    cols = {
+        "key": _col(_BLOCK_KEY_HEADER),
+        "count": _col(_BLOCK_COUNT_HEADER),
+        "partials": _col(_BLOCK_PARTIAL_HEADER),
+        "markers": _col(_BLOCK_MARKER_HEADER),
+        "module": _col(_BLOCK_MODULE_HEADER),
+    }
+    absent = [name for name, idx in cols.items() if idx is None]
+    if absent:
+        return [], [f"矩阵表头缺少列：{'、'.join(absent)}"]
+    # absent 为空即五列齐备：cast 收窄为 int（表达上述校验契约，替代下标抑制注释）
+    col = {name: cast(int, idx) for name, idx in cols.items()}
+
+    rows: list[dict[str, str]] = []
+    for i in range(header_idx + 1, len(lines)):
+        if not lines[i].startswith("|"):
+            break
+        cells = _split_table_row(lines[i]) or []
+        if cells and all(re.fullmatch(r":?-{2,}:?", c.strip()) for c in cells):
+            continue  # 分隔行
+        if any(col[name] >= len(cells) for name in col):
+            findings.append(f"{rel(_TECHNICAL_MD)}:{i + 1}: 矩阵行单元格数不足（须与表头列数一致）")
+            continue
+        rows.append(
+            {
+                "line": str(i + 1),
+                "key": _strip_cell(cells[col["key"]]),
+                "count": _strip_cell(cells[col["count"]]),
+                "partials": _strip_cell(cells[col["partials"]]),
+                "markers": _strip_cell(cells[col["markers"]]),
+                "module": _strip_cell(cells[col["module"]]),
+            }
+        )
+    if not rows:
+        findings.append(f"{rel(_TECHNICAL_MD)}:「{_BLOCK_MATRIX_TITLE}」表无数据行")
+    return rows, findings
+
+
+def check_block_matrix(doc_text: str) -> list[str]:
+    """章节-区块矩阵三向对账：文档行 ↔ 区块注册表 ↔ 双端实现提取。
+
+    - 文档行：计数/清单/载体列与 `section_block_registry` 逐列相等（篡改矩阵即报）；
+    - 注册表：键集与章节注册表双向一致（缺条目/幽灵条目均报）；
+    - 实现：HTML partial 归一化标题提取、Excel `write_block_title` 调用点提取，
+      与注册表集合双向相等（任一端增删/改名即报）。
+    """
+    findings: list[str] = []
+    rows, findings = parse_block_matrix(doc_text)
+    if findings and not rows:
+        return findings
+
+    reg_keys = [sec["key"] for sec in _REPORT_SECTION_DEFAULT]
+    mat_keys = [r["key"] for r in rows]
+    if len(mat_keys) != len(set(mat_keys)):
+        dup = sorted({k for k in mat_keys if mat_keys.count(k) > 1})
+        findings.append(f"{rel(_TECHNICAL_MD)}: 矩阵表章节 key 重复：{'、'.join(dup)}")
+    for key in sorted(set(reg_keys) - set(mat_keys)):
+        findings.append(f"{rel(_TECHNICAL_MD)}: 矩阵表缺少注册表章节 `{key}`（须补行）")
+    for key in sorted(set(mat_keys) - set(reg_keys)):
+        findings.append(f"{rel(_TECHNICAL_MD)}: 矩阵表章节 `{key}` 不在注册表（删行或改 key）")
+    for key in sorted(set(reg_keys) - set(SECTION_BLOCK_SPECS)):
+        findings.append(f"{rel(_TECHNICAL_MD)}: 章节 `{key}` 缺区块契约（section_block_registry 须补条目）")
+    for key in sorted(set(SECTION_BLOCK_SPECS) - set(reg_keys)):
+        findings.append(f"{rel(_TECHNICAL_MD)}: 区块契约 `{key}` 不在章节注册表（删条目或改 key）")
+
+    for row in rows:
+        key = row["key"]
+        spec = SECTION_BLOCK_SPECS.get(key)
+        if spec is None:
+            continue  # 键集检查已报缺契约
+        loc = f"{rel(_TECHNICAL_MD)}:{row['line']}"
+        # ── 文档行 ↔ 注册表：计数 / 清单 / 载体逐列相等 ──
+        want_count = _NO_COUNT if spec.html is None else str(len(spec.html))
+        if row["count"] != want_count:
+            findings.append(f"{loc}: `{key}` HTML 区块数「{row['count']}」与区块注册表「{want_count}」不一致")
+        want_markers = _NO_COUNT if spec.excel is None else _MARKER_SEP.join(spec.excel)
+        if row["markers"] != want_markers:
+            findings.append(f"{loc}: `{key}` Excel 区块清单与区块注册表不一致（须同步矩阵或注册表）")
+        if row["partials"] != _MULTI_SEP.join(spec.partials):
+            findings.append(f"{loc}: `{key}` HTML 载体与区块注册表不一致")
+        if row["module"] != _MULTI_SEP.join(spec.modules):
+            findings.append(f"{loc}: `{key}` Excel 载体与区块注册表不一致")
+        # ── 实现 ↔ 注册表：双端提取集合相等 ──
+        partial_paths = [_BLOCK_PARTIAL_DIR / p for p in spec.partials]
+        missing = [p.name for p in partial_paths if not p.is_file()]
+        if missing:
+            findings.append(f"{loc}: 矩阵 HTML 载体不存在：{'、'.join(missing)}")
+        else:
+            try:
+                html_got = extract_html_block_titles(partial_paths)
+            except (OSError, ValueError, SyntaxError) as exc:
+                findings.append(f"{loc}: `{key}` HTML 区块提取失败：{exc}")
+            else:
+                if html_got != set(spec.html or ()):
+                    findings.append(
+                        f"{loc}: `{key}` HTML 区块实测 {sorted(html_got)} 与注册表 {sorted(spec.html or ())} 不一致"
+                    )
+        module_paths = [_BLOCK_SHEET_DIR / m for m in spec.modules]
+        missing_mods = [p.name for p in module_paths if not p.is_file()]
+        if missing_mods:
+            findings.append(f"{loc}: 矩阵 Excel 载体不存在：{'、'.join(missing_mods)}")
+        else:
+            try:
+                excel_got = extract_excel_block_titles(module_paths)
+            except (OSError, ValueError, SyntaxError) as exc:
+                findings.append(f"{loc}: `{key}` Excel 区块提取失败：{exc}")
+            else:
+                if excel_got != set(spec.excel or ()):
+                    findings.append(
+                        f"{loc}: `{key}` Excel 区块实测 {sorted(excel_got)} 与注册表 {sorted(spec.excel or ())} 不一致"
+                    )
+    return findings

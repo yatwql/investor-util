@@ -26,10 +26,6 @@ _EXIT_SUCCESS = 0
 _EXIT_PARTIAL = 1
 _EXIT_SEVERE = 2
 
-# 产物固定文件名（与 report/html_save.py / excel_writer.py 最新版固定名一致）
-_LATEST_HTML = "个人投资分析报告.html"
-_LATEST_XLSX = "个人投资分析报告.xlsx"
-
 # 预览/下载扩展名白名单（.lower() 归一化后校验，防 .HTML/.XLSX 绕过）
 _ALLOWED_REPORT_EXT = {"html", "js", "map", "css", "png", "svg", "json", "xlsx"}
 
@@ -85,7 +81,7 @@ def _run_generation(state, params: dict) -> int:
     不影响已提交的正式文件（正式模式语义，UI/文档已说明）。
     """
     from src.python.config import get_config
-    from src.python.core.reader import read_holdings_with_flows
+    from src.python.core.reader import read_holdings_with_flows, require_holdings
     from src.python.report.orchestrator import generate_report
 
     from src.python.web.holdings_update import promote_upload_to_holdings
@@ -135,8 +131,10 @@ def _run_generation(state, params: dict) -> int:
 
         parsed = read_holdings_with_flows(holdings_path)
         holdings = parsed.holdings
-        if not holdings:
-            state.errors.append("持仓文件为空或格式异常")
+        try:
+            require_holdings(holdings)  # 不传服务端路径（错误面向浏览器）
+        except ValueError as e:
+            state.errors.append(str(e))
             return _EXIT_SEVERE
 
         reporter = WebProgressReporter(state)
@@ -172,20 +170,21 @@ def _run_generation(state, params: dict) -> int:
 def _build_artifacts(params: dict, state) -> list[dict]:
     """按 report_type 计算产物清单（路径相对 output_dir，供前端渲染按钮）。
 
-    basic → 仅 Excel；both/full → HTML + Excel（对齐 CLI --type 语义）。
+    类型 → kind 规则委托 `orchestrator.artifacts_for_report_type` 单源（禁止渠道
+    层镜像 CLI --type 语义）；文件名取 `core.constants` 最新版常量。
     严重失败（exit_code 2）或执行失败（failed）时无可用产物，返回空。
     """
+    from src.python.core.constants import LATEST_HTML_NAME, LATEST_XLSX_NAME
+    from src.python.report.orchestrator import artifacts_for_report_type
+
     report_type = params.get("report_type", "basic")
     if not state.output_dir:
         return []
     # 严重失败/执行失败：报告未生成，产物按钮无意义（点击只会 404）
     if state.status == "failed" or state.exit_code == _EXIT_SEVERE:
         return []
-    artifacts = []
-    if report_type in ("both", "full"):
-        artifacts.append({"kind": "html", "name": "HTML 报告", "path": _LATEST_HTML})
-    artifacts.append({"kind": "xlsx", "name": "Excel 报告", "path": _LATEST_XLSX})
-    return artifacts
+    names = {"html": ("HTML 报告", LATEST_HTML_NAME), "xlsx": ("Excel 报告", LATEST_XLSX_NAME)}
+    return [{"kind": k, "name": names[k][0], "path": names[k][1]} for k in artifacts_for_report_type(report_type)]
 
 
 # ── 系统信息组装（版本 / 机器 IP / LLM 状态，对齐 TUI 状态面板）────────

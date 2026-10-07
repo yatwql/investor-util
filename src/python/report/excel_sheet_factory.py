@@ -7,7 +7,30 @@ from __future__ import annotations
 
 from typing import Any
 
+from openpyxl.styles import Font
+
 from src.python.core.registry import LLM_MODULE_GATED_SECTIONS as _LLM_MODULE_GATED_SECTIONS
+
+# ── 页签分组配色（tabColor） ──────────────────────────────────
+# 键 = core/registry.py::NAV_GROUPS 的组 key，值 = 6 位 hex 页签色。
+# HTML 目录折叠分组（report/html_writer_nav.py）与本表同源于注册表条目
+# nav_group 字段——同章同组必同色；键集与 NAV_GROUPS 双向一致由测试锁定
+# （无孤儿组、无未登记组）。
+_GROUP_TAB_COLORS: dict[str, str] = {
+    "basic": "4472C4",  # 基础信息 — 蓝
+    "fund_deep": "70AD47",  # 基金深度分析 — 绿
+    "action": "ED7D31",  # 行动建议 — 橙
+    "history": "FFC000",  # 历史 — 金
+    "llm": "7030A0",  # LLM — 紫
+    "appendix": "A5A5A5",  # 附录 — 灰
+}
+
+
+def apply_tab_color(ws: Any, section: dict) -> None:
+    """按章节条目的 nav_group 给页签上色（未登记分组不上色，保持默认）。"""
+    color = _GROUP_TAB_COLORS.get(section.get("nav_group", ""))
+    if color:
+        ws.sheet_properties.tabColor = color
 
 
 def should_create_sheet(section: dict, data_availability: dict[str, bool] | None = None) -> bool:
@@ -122,8 +145,7 @@ def create_sheets(
 
     # should_create_sheet 查 data_availability dict
     sheets: dict[str, Any] = {}
-    have_llm_usage = False
-    llm_usage_name = ""
+    llm_usage_sec: dict | None = None
     visible_count = 0
     _data_avail = data_availability or {}
 
@@ -146,20 +168,43 @@ def create_sheets(
 
         # llm_usage 强制末位，先标记稍后创建
         if sec["key"] == "llm_usage":
-            have_llm_usage = True
-            llm_usage_name = sec["name"]
+            llm_usage_sec = sec
             continue
 
         visible_count += 1
         ws = wb.create_sheet()
         ws.title = f"{visible_count}.{sec['name']}"
+        apply_tab_color(ws, sec)
         sheets[sec["key"]] = ws
 
     # llm_usage 始终在最后
-    if have_llm_usage:
+    if llm_usage_sec is not None:
         visible_count += 1
         ws = wb.create_sheet()
-        ws.title = f"{visible_count}.{llm_usage_name}"
+        ws.title = f"{visible_count}.{llm_usage_sec['name']}"
+        apply_tab_color(ws, llm_usage_sec)
         sheets["llm_usage"] = ws
 
     return sheets
+
+
+def stamp_back_to_summary(sheets: dict[str, Any]) -> None:
+    """给除汇总页外的每个页签标题行尾追加「↩ 返回汇总」内部超链接。
+
+    写在标题行合并区之外（最后一列的下一列），不占新行、不移位后续
+    内容与冻结窗格；汇总页本身为导航宿主不打标。须在各页签内容写完
+    后调用（取 max_column 定位行尾）。
+    """
+    summary_ws = sheets.get("summary")
+    if summary_ws is None:
+        return
+    summary_title = summary_ws.title
+    for key, ws in sheets.items():
+        if ws is None or key == "summary":
+            continue
+        cell = ws.cell(
+            row=1,
+            column=ws.max_column + 1,
+            value=f'=HYPERLINK("#\'{summary_title}\'!A1","↩ 返回汇总")',
+        )
+        cell.font = Font(color="0563C1", underline="single")

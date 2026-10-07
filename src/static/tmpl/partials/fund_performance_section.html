@@ -1,0 +1,150 @@
+    <div class="section" id="sec-fund_performance" style="order: {{ section_numbers['fund_performance'] }};">
+        <div class="section-title">{{ section_numbers['fund_performance'] }}、{{ section_names['fund_performance'] }}</div>
+        {% if perf_data %}
+        <div class="section-content" style="padding: 0;">
+            <table>
+                <thead>
+                    <tr>
+                        <th>基金</th><th>代码</th><th>类型</th><th>近3月</th><th>近6月</th><th>近1年</th>
+                        <th>持仓累计盈亏(¥)</th><th>持仓收益率</th><th>业绩基准</th><th>业绩评价</th><th>同类排名</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for p in perf_data %}
+                    <tr>
+                        <td class="text-left">{{ p["name"] }}</td>
+                        <td>{{ p["code"] }}</td>
+                        <td>{{ p["type_label"] }}</td>
+                        <td class="{% if p.get('syl_3m_raw') is defined and p['syl_3m_raw'] is number %}{% if p['syl_3m_raw'] >= 0 %}profit{% else %}loss{% endif %}{% endif %}">{{ p["syl_3m"] }}</td>
+                        <td class="{% if p.get('syl_6m_raw') is defined and p['syl_6m_raw'] is number %}{% if p['syl_6m_raw'] >= 0 %}profit{% else %}loss{% endif %}{% endif %}">{{ p["syl_6m"] }}</td>
+                        <td class="{% if p.get('syl_1y_raw') is defined and p['syl_1y_raw'] is number %}{% if p['syl_1y_raw'] >= 0 %}profit{% else %}loss{% endif %}{% endif %}">{{ p["syl_1y"] }}</td>
+                        <td class="text-right" style="color: {{ p.get('profit_raw', 0) | profit_color }}">{{ p["profit"] }}</td>
+                        <td class="text-right" style="color: {{ p.get('profit_rate_raw', 0) | profit_color }}">{{ p["profit_rate"] }}</td>
+                        <td class="text-left" style="font-size: 12px;">{{ p["benchmark"] }}</td>
+                        <td class="text-left" style="font-size: 12px;{{ ' color: var(--rating-excellent); font-weight: 600;' if p['rating_tag'] == '优秀' }}{{ ' color: var(--rating-poor); font-weight: 600;' if p['rating_tag'] == '较差' }}{{ ' color: var(--rating-deviation); font-weight: 600;' if p['rating_tag'] == '偏差' }}{{ ' color: var(--rating-stable); font-weight: 600;' if p['rating_tag'] == '稳定' }}">{{ p["rating"] }}</td>
+                        <td>{{ p["rank"] }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% else %}
+        <div class="empty-note">未检测到基金持仓</div>
+        {% endif %}
+        {% if candidate_data %}
+        {% if candidate_data.get("available") %}
+        <div class="block-title">候选基金比较（比较对象由配置指定）</div>
+        <div class="section-content" style="padding: 0;">
+            <table>
+                <thead>
+                    <tr>
+                        <th>候选基金</th><th>代码</th><th>评级</th><th>近1月</th><th>近3月</th><th>近6月</th><th>近1年</th>
+                        <th>同类排名</th><th>最大回撤</th><th>风格</th><th>与持仓重合</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for c in candidate_data["rows"] %}
+                    {% if c.get("available") %}
+                    <tr>
+                        <td class="text-left">{{ c["name"] }}</td>
+                        <td>{{ c["code"] }}</td>
+                        <td class="text-left" style="font-size: 12px;">{{ c["rating"] }}</td>
+                        <td class="{% if c.get('syl_近1月_raw') is number %}{% if c['syl_近1月_raw'] >= 0 %}profit{% else %}loss{% endif %}{% endif %}">{{ c["syl_近1月"] }}</td>
+                        <td class="{% if c.get('syl_近3月_raw') is number %}{% if c['syl_近3月_raw'] >= 0 %}profit{% else %}loss{% endif %}{% endif %}">{{ c["syl_近3月"] }}</td>
+                        <td class="{% if c.get('syl_近6月_raw') is number %}{% if c['syl_近6月_raw'] >= 0 %}profit{% else %}loss{% endif %}{% endif %}">{{ c["syl_近6月"] }}</td>
+                        <td class="{% if c.get('syl_近1年_raw') is number %}{% if c['syl_近1年_raw'] >= 0 %}profit{% else %}loss{% endif %}{% endif %}">{{ c["syl_近1年"] }}</td>
+                        <td>{{ c["rank_text"] }}</td>
+                        <td class="{% if c.get('max_drawdown_raw') is number and c['max_drawdown_raw'] < 0 %}loss{% endif %}">{{ c["max_drawdown"] }}</td>
+                        <td class="text-left" style="font-size: 12px;">{{ c["style"] }}</td>
+                        <td class="text-left" style="font-size: 12px;">{% if c.get("overlap_name") %}{{ c["overlap_jaccard"] }}（{{ c["overlap_name"] }}）{% else %}{{ c["overlap_jaccard"] }}{% endif %}</td>
+                    </tr>
+                    {% else %}
+                    <tr>
+                        <td class="text-left">{{ c.get("name", c["code"]) }}</td>
+                        <td>{{ c["code"] }}</td>
+                        <td colspan="9" class="text-left" style="font-size: 12px; color: #b0413e;">数据获取失败（排名接口不可用），该候选跳过</td>
+                    </tr>
+                    {% endif %}
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% set _cand_periods = candidate_data["rows"] | selectattr("available") | map(attribute="report_label") | select | list %}
+        {% set _stale_baseline = candidate_data.get("stale_baseline_notes") or [] %}
+        {% if _cand_periods or _stale_baseline %}
+        <div class="penetration-notes">
+            {% if _cand_periods %}
+            <div>* 持仓报告期：{{ _cand_periods | join("；") }}</div>
+            {% endif %}
+            {% if _stale_baseline %}
+            <div>* ⚠ 现有持仓报告期陈旧、未计入重合度基准：{{ _stale_baseline | join("；") }}</div>
+            {% endif %}
+        </div>
+        {% endif %}
+        {% if candidate_data.get("exceed_limit") %}
+        <div class="penetration-notes"><div>* 候选基金超过 10 只，仅比较前 10 只（超出部分忽略）。</div></div>
+        {% endif %}
+        {% if candidate_data.get("invalid") %}
+        <div class="penetration-notes"><div>* 无效候选代码（忽略）: {{ candidate_data["invalid"] | join('、') }}。</div></div>
+        {% endif %}
+        {% else %}
+        <!-- 候选基金比较开关已开启但无有效候选（config.comparison_candidates 未配置或代码非法） -->
+        <div class="block-title">候选基金比较（比较对象由配置指定）</div>
+        <div class="empty-section">📭 未配置候选基金（config.comparison_candidates 为空），无法输出候选基金比较。请在 config.json 中配置 comparison_candidates 后重新生成报告。{% if candidate_data.get("invalid") %}（无效候选代码已忽略：{{ candidate_data["invalid"] | join('、') }}）{% endif %}</div>
+        {% endif %}
+        {% endif %}
+        <div class="penetration-notes">
+            <div>* 业绩评价标准(5级)：前10%→优秀(红)、10%~30%→良好、30%~50%→稳定(蓝)、50%~75%→偏差(绿)、后25%→较差(深绿)；超额收益评分≥80上调一级、&lt;40下调一级</div>
+        </div>
+
+        {# ── 基金经理变更监控块（基金业绩的子视图；manager_analysis 为 None 表示基金深度分析未开启）── #}
+        {% if manager_analysis %}
+        {% set _mgr_results = manager_analysis.get("results") or [] %}
+        <div class="block-title">基金经理变更监控</div>
+        {% if _mgr_results %}
+        {% if manager_analysis.get("first_check_summary") %}
+        <div class="notice-banner">📋 {{ manager_analysis["first_check_summary"] }}</div>
+        <br>
+        {% endif %}
+        {% set high_risk = _mgr_results | selectattr("alert_level", "in", ["紧急", "关注"]) | list %}
+        {% if high_risk %}
+        <div class="summary-tag" style="margin-bottom: 8px;">
+            ⚠️ <strong>{{ high_risk | length }}</strong> 只基金存在变更风险
+        </div>
+        {% endif %}
+        <table>
+            <thead>
+                <tr>
+                    <th>基金名称</th><th>代码</th><th>当前基金经理</th><th>任职天数</th>
+                    <th>1月内变更</th><th>3月内变更</th><th>6月内变更</th><th>预警级别</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for r in _mgr_results %}
+                {% set _alert = r.get("alert_level", "") %}
+                <tr class="{% if _alert == '紧急' %}row-danger{% elif _alert == '关注' %}row-warning{% elif _alert == '首检' %}row-first-check{% endif %}">
+                    <td class="text-left">{{ r["name"] }}</td>
+                    <td>{{ r["code"] }}</td>
+                    <td class="text-left">{{ r["current_manager"] }}</td>
+                    <td>{{ r["tenure_days"] }}</td>
+                    <td>{{ "—" if r["is_first_check"] else ("🔴 是" if r["changed_1m"] else "✅ 否") }}</td>
+                    <td>{{ "—" if r["is_first_check"] else ("⚠️ 是" if r["changed_3m"] else "✅ 否") }}</td>
+                    <td>{{ "—" if r["is_first_check"] else ("⚠️ 是" if r["changed_6m"] else "✅ 否") }}</td>
+                    <td class="{% if _alert == '紧急' %}red-text{% elif _alert == '关注' %}orange-text{% elif _alert == '首检' %}gray-text{% endif %}">
+                        {% if _alert == "紧急" %}🔴 {{ _alert }}{% elif _alert == "关注" %}⚠️ {{ _alert }}{% elif _alert == "首检" %}📋 {{ _alert }}{% else %}✅ {{ _alert }}{% endif %}
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+        <div class="penetration-notes">
+            <div>* 预警级别标准：30天内变更→🔴紧急，90天内→⚠️关注，首次运行→📋首检（自下次起跟踪）</div>
+        </div>
+        {% else %}
+        <div class="empty-section">📭 暂无基金经理变更数据（本次分析未检测到基金经理任职未满180天）</div>
+        {% endif %}
+        {% endif %}
+
+        {{ render_data_status(data_status_perf) }}
+        {{ render_back_to_top() }}
+    </div>

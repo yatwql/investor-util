@@ -37,22 +37,20 @@ MODES: dict[str, dict] = {
     "dev-verify": {
         "desc": "开发期快速验证（core/providers/fetcher/analysis/report 单元 + 基础场景；耗时参考 docs/managements/test-coverage.md 环境耗时对照）",
         "order": 5,
+        # 预检只留 <100ms 的编号快检（fail-fast）；重量守护（check-doc-drift /
+        # check-test-redundancy）不入预检——它们由 pre-commit 钩子对同一待提交树
+        # 唯一执行、CI guards job 全量兜底，入预检会造成同树重复调用。
         "preflight": [
             [sys.executable, "scripts/check-task-numbering.py", "--ci"],
-            [sys.executable, "scripts/check-doc-drift.py", "--ci"],
-            [sys.executable, "scripts/check-test-redundancy.py", "--ci"],
         ],
+        # 双阶段合一：原「核心单元 ∪ 基础场景」两轮 pytest 收敛为单轮（并集 marker），
+        # 省一整轮全量收集 + worker 启动 + conftest 装配；合并前后 --collect-only 对拍
+        # 用例集合精确一致（零重叠零遗漏）。timeout = 原两阶段 300s×2 预算总和不变。
         "phases": [
             {
-                "marker": "(unit_core or unit_providers or unit_fetcher or unit_analysis or unit_scripts or unit_web or unit_report) and not (edge or data)",
-                "desc": "核心模块单元测试",
-                "timeout_sec": 300,
-                "parallel": True,
-            },
-            {
-                "marker": "scenario_basic",
-                "desc": "基础业务场景（耗时参考 docs/managements/test-coverage.md 环境耗时对照）",
-                "timeout_sec": 300,
+                "marker": "((unit_core or unit_providers or unit_fetcher or unit_analysis or unit_scripts or unit_web or unit_report) and not (edge or data)) or scenario_basic",
+                "desc": "核心模块单元 + 基础业务场景（单轮；耗时参考 docs/managements/test-coverage.md 环境耗时对照）",
+                "timeout_sec": 600,
                 "parallel": True,
             },
         ],

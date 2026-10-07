@@ -1,0 +1,159 @@
+    <div class="section" id="sec-summary" style="order: {{ section_numbers['summary'] }};">
+        <div class="section-title">{{ section_numbers['summary'] }}、{{ section_names['summary'] }}</div>
+        <div class="section-content">
+
+            <!-- 基本信息 -->
+            <table class="kv-table">
+                <tr><td>统计时间</td><td style="font-weight: 700;">{{ now }}</td></tr>
+                <tr><td>所属交易日</td><td style="font-weight: 700; font-size: 16px; color: #2E75B6;">{{ trading_day }}</td></tr>
+            </table>
+
+            <br>
+
+            <!-- 持仓概况 -->
+            <h3 style="color: #2E75B6; font-size: 15px; margin-bottom: 8px;">【持仓概况】</h3>
+            <table class="kv-table">
+                {% if categories %}
+                <tr><td>场内股票</td><td>{{ categories.get("场内股票", 0) }}</td></tr>
+                <tr><td>场内ETF</td><td>{{ categories.get("场内ETF", 0) }}</td></tr>
+                <tr><td>国内场外</td><td>{{ categories.get("国内场外", 0) }}</td></tr>
+                <tr><td>QDII</td><td>{{ categories.get("QDII", 0) }}</td></tr>
+                <tr><td>持仓总数</td>
+                    <td>{{ categories.get("场内股票", 0) + categories.get("场内ETF", 0) + categories.get("国内场外", 0) + categories.get("QDII", 0) }}</td>
+                </tr>
+                {% else %}
+                <tr><td>持仓总数</td><td>--</td></tr>
+                {% endif %}
+                <tr>
+                    <td>价格更新状态</td>
+                    <td>
+                        {% if update_status %}
+                        <span class="{% if update_status.all_updated %}update-ok{% else %}update-warn{% endif %}">
+                            {{ update_status.updated }}/{{ update_status.total }}
+                            {% if update_status.all_updated %}(全部已更新){% else %}(尚有缺失){% endif %}
+                        </span>
+                        {% else %}--{% endif %}
+                    </td>
+                </tr>
+            </table>
+
+            <br>
+
+            {% if data_unavailable %}
+            <div class="empty-section" style="background: var(--warn-bg); border-color: var(--warn-border); color: var(--warn-text);">
+                ⚠ 行情数据全部不可用（非交易时段/网络异常/API限速），以下市值/盈亏为占位显示，不影响持仓成本统计
+            </div>
+            <br>
+            {% endif %}
+
+            <!-- 盈亏汇总 -->
+            <h3 style="color: #2E75B6; font-size: 15px; margin-bottom: 8px;">【盈亏汇总】</h3>
+            <div class="summary-grid">
+                <div class="summary-card">
+                    <h3>总市值 (元)</h3>
+                    <div class="value">{{ total_mv | money }}</div>
+                </div>
+                <div class="summary-card">
+                    <h3>总成本 (元)</h3>
+                    <div class="value">{{ total_cost | money }}</div>
+                </div>
+                <div class="summary-card">
+                    <h3>总盈亏 (元)</h3>
+                    <div class="value" style="color: {{ total_profit | profit_color }}">{{ total_profit | money }}</div>
+                </div>
+                <div class="summary-card">
+                    <h3>总收益率</h3>
+                    <div class="value" style="color: {{ total_profit_rate | profit_color }}">{{ total_profit_rate | pct }}</div>
+                </div>
+                <div class="summary-card">
+                    <h3>本日盈亏 (元)</h3>
+                    <div class="value" style="color: {{ total_today_profit | profit_color }}">{{ total_today_profit | money }}</div>
+                </div>
+                <div class="summary-card">
+                    <h3>本日收益率</h3>
+                    <div class="value" style="color: {{ today_profit_rate | profit_color }}">{{ today_profit_rate | pct }}</div>
+                </div>
+                {% if flow_display and flow_display.xirr_rate is not none %}
+                <div class="summary-card">
+                    <h3>资金加权收益率 (XIRR{% if flow_display.approximate %}，近似{% endif %})</h3>
+                    <div class="value" style="color: {{ flow_display.xirr_rate | profit_color }}">{{ flow_display.xirr_rate | pct }}</div>
+                </div>
+                {% endif %}
+            </div>
+            {% if flow_display and flow_display.approximate %}
+            <div class="empty-note">成本流水为可选进阶增强：当前未录入交易/分红流水，已用持仓快照近似计算成本分档（每份成本 vs 市价）{% if flow_display.xirr_rate is none %}。未配置建仓日期（config.json → holdings_start_date），近似年化暂未计算{% endif %}。如需精确的资金加权收益率 (XIRR)、分批成本分档、分红累计，请在持仓 Excel 补充「交易流水」「分红流水」页签后重新生成</div>
+            {% elif flow_display and not flow_display.available %}
+            <div class="empty-note">成本流水子模块已开启，但持仓 Excel 未录入交易/分红流水，资金加权收益率 (XIRR)、成本分档、分红累计无法计算。如需启用，请在持仓 Excel 中补充「交易流水」「分红流水」页签后重新生成</div>
+            {% endif %}
+
+            <br>
+
+            <!-- 市场指数 -->
+            <h3 style="color: #2E75B6; font-size: 15px; margin-bottom: 8px;">【市场指数】</h3>
+            <div class="indices-grid">
+                <div class="indices-group">
+                    <h4>A 股指数</h4>
+                    {% if a_indices %}
+                    {% for idx in a_indices %}
+                    <div class="index-row">
+                        <span class="index-name">{{ idx.name }}</span>
+                        <span>
+                            <span class="index-price">{{ idx.price | price }}</span>
+                            <span class="index-change" style="color: {{ idx.change_pct | profit_color }}">
+                                {{ idx.change_pct | change }}
+                            </span>
+                        </span>
+                    </div>
+                    {% endfor %}
+                    {% else %}
+                    <div class="index-row"><span class="index-name">暂无数据</span></div>
+                    {% endif %}
+                </div>
+                <div class="indices-group">
+                    <h4>美股指数</h4>
+                    {% if us_indices %}
+                    {% for idx in us_indices %}
+                    <div class="index-row">
+                        <span class="index-name">{{ idx.name }}</span>
+                        <span>
+                            <span class="index-price">{{ idx.price | price }}</span>
+                            <span class="index-change" style="color: {{ idx.change_pct | profit_color }}">
+                                {{ idx.change_pct | change }}
+                            </span>
+                        </span>
+                    </div>
+                    {% endfor %}
+                    {% else %}
+                    <div class="index-row"><span class="index-name">暂无数据</span></div>
+                    {% endif %}
+                </div>
+            </div>
+
+            {# 市场温度（功能开关 market_temperature，features.json；默认开）：不可用时整块静默省略，
+               避免在用户未主动要求的功能上出现降级痕迹（与 Excel 同判据） #}
+            {% if market_temperature and market_temperature.available %}
+            <h3 style="color: #2E75B6; font-size: 15px; margin-bottom: 8px;">【市场温度】</h3>
+            <table class="kv-table">
+                {% if market_temperature.score is not none %}
+                <tr><td>市场温度</td><td style="font-weight: 700;">{{ market_temperature.score | round(0) | int }} / 100（{{ market_temperature.tier }}）</td></tr>
+                {% else %}
+                <tr><td>市场温度</td><td>--（{{ market_temperature.tier }}）</td></tr>
+                {% endif %}
+                {% if market_temperature.components %}
+                <tr>
+                    <td>三因子（{{ market_temperature.index_name }}）</td>
+                    <td>
+                        价格分位 {{ market_temperature.components.price_percentile }}
+                        · 20日均线偏离 {{ market_temperature.components.ma_deviation }}
+                        · 年化波动率 {{ market_temperature.components.volatility }}
+                    </td>
+                </tr>
+                {% endif %}
+                <tr><td>注</td><td style="font-size: 12px; color: #888;">{{ market_temperature.disclaimer }}</td></tr>
+            </table>
+            {% endif %}
+        </div>
+
+        {{ render_data_status(data_status_summary) }}
+        {{ render_back_to_top() }}
+    </div>

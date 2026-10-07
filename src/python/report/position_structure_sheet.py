@@ -24,6 +24,7 @@ from openpyxl.worksheet.worksheet import Worksheet
 from src.python.core.registry import get_report_sheet_name
 from src.python.report.data_status import STATUS_MESSAGES
 from src.python.report.excel_writer import (
+    write_block_title,
     _write_placeholder,
     auto_width,
     freeze_header,
@@ -160,7 +161,7 @@ def _write_overlap_block(
     stale_fund_notes: list[str] | None = None,
 ) -> int:
     """写入一、持仓重合度矩阵区块，返回下一行起始行号。"""
-    write_title_row(ws, row, "一、持仓重合度矩阵", ncols=ncols)
+    write_block_title(ws, row, "一、持仓重合度矩阵", ncols=ncols)
     row += 1
     row = _write_stale_note(ws, row, stale_fund_notes or [])
 
@@ -236,7 +237,7 @@ def _write_correlation_block(
     ncols: int,
 ) -> int:
     """写入二、持仓相关性矩阵区块，返回下一行起始行号。"""
-    write_title_row(ws, row, "二、持仓相关性矩阵", ncols=ncols)
+    write_block_title(ws, row, "二、持仓相关性矩阵", ncols=ncols)
     row += 1
 
     if not correlation_data or not correlation_data.get("available"):
@@ -388,7 +389,7 @@ def _write_concentration_block(
     报告期列标注本期持仓所依据的定期报告期次；报告期与上期相同的基金环比无
     对比意义（本次与上期读的是同一份报告），据实标注而非报 0。
     """
-    parent_row = write_title_row(ws, row, "三、持仓集中度监控", ncols=_CONC_NCOLS)
+    parent_row = write_block_title(ws, row, "三、持仓集中度监控", ncols=_CONC_NCOLS)
     row = write_header_row(ws, parent_row, _CONC_HEADERS)
 
     if not concentration_data:

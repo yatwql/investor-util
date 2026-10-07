@@ -364,6 +364,7 @@ def _intent_view(metrics: dict[str, Any]) -> tuple[list[list[str]], list[str]]:
 def write_holding_change_sheet(ws: Any, holding_change_data: dict[str, Any] | None) -> None:
     """写入「持仓变动复盘」页签（与 HTML partial 消费同一份 view 字符串）。"""
     from src.python.report.excel_writer import (
+        write_block_title,
         _write_placeholder,
         auto_width,
         freeze_header,
@@ -391,7 +392,7 @@ def write_holding_change_sheet(ws: Any, holding_change_data: dict[str, Any] | No
 
     # ── 2. 变动事件清单 + 「区间净额推断、非逐笔」标注（同现） ──
     row += 1
-    row = write_title_row(ws, row, "变动事件清单（区间净额推断）", ncols=_ncols)
+    row = write_block_title(ws, row, "变动事件清单（区间净额推断）", ncols=_ncols)
     row = write_header_row(ws, row, view["event_header"])
     for cells in view["event_rows"]:
         row = write_data_row(ws, row, cells)
@@ -400,14 +401,14 @@ def write_holding_change_sheet(ws: Any, holding_change_data: dict[str, Any] | No
     # ── 3. 频率与结构演变 ──
     if view["metrics_lines"]:
         row += 1
-        row = write_title_row(ws, row, "频率与结构演变", ncols=_ncols)
+        row = write_block_title(ws, row, "频率与结构演变", ncols=_ncols)
         for line in view["metrics_lines"]:
             row = write_data_row(ws, row, [line] + [""] * (_ncols - 1))
 
     # ── 4. 意图对账（决策账本只读对照） ──
     if view["intent_rows"] or view["intent_lines"]:
         row += 1
-        row = write_title_row(ws, row, "意图对账（决策账本只读对照）", ncols=_ncols)
+        row = write_block_title(ws, row, "意图对账（决策账本只读对照）", ncols=_ncols)
         if view["intent_rows"]:
             row = write_header_row(ws, row, view["intent_header"])
             for cells in view["intent_rows"]:
@@ -418,7 +419,7 @@ def write_holding_change_sheet(ws: Any, holding_change_data: dict[str, Any] | No
     # ── 5. LLM 归因块（迭代 4 注入 llm_review 后出现；缺席 = 分支隐藏） ──
     if view["llm_review_paragraphs"]:
         row += 1
-        row = write_title_row(ws, row, LLM_BLOCK_TITLE, ncols=_ncols)
+        row = write_block_title(ws, row, LLM_BLOCK_TITLE, ncols=_ncols)
         for paragraph in view["llm_review_paragraphs"]:
             row = write_data_row(ws, row, [paragraph] + [""] * (_ncols - 1))
 

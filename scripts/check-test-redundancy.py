@@ -30,6 +30,11 @@
 退出码：
   0 — 全部通过
   2 — 发现死用例 / 无断言 / 完全重复 / 自证用例 / 硬编码演进总数
+
+性能（增量事实缓存）：
+  按文件「size:mtime_ns」签名缓存每文件检查事实，未变更文件免解析免检查；跨文件重复
+  比对仍跨全集归并（质量不降）。缓存逻辑版本（本脚本 + 同目录 _checklib + 解释器大版本）
+  任一变化全量重算；缓存读写失败静默降级（只影响速度不影响结论）。
 """
 
 from __future__ import annotations
@@ -37,6 +42,8 @@ from __future__ import annotations
 import argparse
 import ast
 import hashlib
+import json
+import os
 import re
 import sys
 from collections import Counter, defaultdict
@@ -252,13 +259,17 @@ def _asserted_literals(node: ast.AST) -> set[str]:
 
 
 def cases_in_module(path: Path, tree: ast.Module) -> list[TestCase]:
-    """从单个已解析模块中提取全部测试用例（含所在类）。"""
+    """从单个已解析模块中提取全部测试用例（含所在类）。
+
+    单次 BFS：`ast.walk` 层序保证类先于其直属语句被访问，类登记与用例提取合并为一遍。
+    """
     cls_of: dict[ast.AST, ast.ClassDef] = {}
-    for cls in [n for n in ast.walk(tree) if isinstance(n, ast.ClassDef)]:
-        for stmt in cls.body:
-            cls_of[stmt] = cls
     cases: list[TestCase] = []
     for node in ast.walk(tree):
+        if isinstance(node, ast.ClassDef):
+            for stmt in node.body:
+                cls_of[stmt] = node
+            continue
         if not (isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)) and node.name.startswith("test")):
             continue
         cls = cls_of.get(node)
@@ -274,22 +285,6 @@ def cases_in_module(path: Path, tree: ast.Module) -> list[TestCase]:
             )
         )
     return cases
-
-
-def collect_cases(include_live: bool) -> tuple[list[TestCase], dict[Path, ast.Module], list[str]]:
-    """收集全部测试用例，并顺带返回（解析失败的文件）提示。"""
-    cases: list[TestCase] = []
-    modules: dict[Path, ast.Module] = {}
-    parse_errors: list[str] = []
-    for path in _iter_test_files(include_live):
-        try:
-            tree = ast.parse(path.read_text(encoding="utf-8"))
-        except SyntaxError as exc:  # 语法错误由 pytest 自己报，这里不重复报
-            parse_errors.append(f"{rel(path)}: 无法解析（{exc.msg}）")
-            continue
-        modules[path] = tree
-        cases.extend(cases_in_module(path, tree))
-    return cases, modules, parse_errors
 
 
 # ═══════════════════════════════════════════════════════════════
@@ -372,26 +367,35 @@ def body_signature(case: TestCase) -> str | None:
     return hashlib.sha1(payload.encode()).hexdigest()
 
 
-def check_duplicate_bodies(cases: list[TestCase]) -> tuple[list[str], int]:
-    """返回（findings, 被跳过的用例数）。"""
+def _group_duplicate_entries(entries: list[tuple[str, int, str, str | None]]) -> tuple[list[str], int]:
+    """跨全集按指纹归并重复用例：entries = [(rel_path, lineno, name, sig|None)] → (findings, skipped)。
+
+    冷路径（新增/变更文件）从 AST 用例构造 entries，命中缓存的文件直接复用缓存指纹——
+    归并始终跨全集，重复比对质量不降。
+    """
     findings: list[str] = []
-    groups: dict[str, list[TestCase]] = defaultdict(list)
+    groups: dict[str, list[tuple[str, int, str]]] = defaultdict(list)
     skipped = 0
-    for case in cases:
-        sig = body_signature(case)
+    for rel_path, lineno, name, sig in entries:
         if sig is None:
             skipped += 1
             continue
-        groups[sig].append(case)
+        groups[sig].append((rel_path, lineno, name))
     for members in groups.values():
         if len(members) < 2:
             continue
-        head = members[0]
-        others = "、".join(f"{rel(m.path)}:{m.lineno} {m.name}" for m in members[1:])
+        head_path, head_lineno, head_name = members[0]
+        others = "、".join(f"{p}:{ln} {n}" for p, ln, n in members[1:])
         findings.append(
-            f"{rel(head.path)}:{head.lineno}: 用例 {head.name} 与 {len(members) - 1} 个用例完全重复（函数体/参数/装饰器归一化后一致）：{others}"
+            f"{head_path}:{head_lineno}: 用例 {head_name} 与 {len(members) - 1} 个用例完全重复"
+            f"（函数体/参数/装饰器归一化后一致）：{others}"
         )
     return findings, skipped
+
+
+def check_duplicate_bodies(cases: list[TestCase]) -> tuple[list[str], int]:
+    """返回（findings, 被跳过的用例数）。"""
+    return _group_duplicate_entries([(rel(c.path), c.lineno, c.name, body_signature(c)) for c in cases])
 
 
 # ═══════════════════════════════════════════════════════════════
@@ -402,11 +406,14 @@ def check_duplicate_bodies(cases: list[TestCase]) -> tuple[list[str], int]:
 def check_self_fulfilling(cases: list[TestCase]) -> list[str]:
     findings: list[str] = []
     for case in cases:
+        targets = _patch_targets(case.node)
+        if not targets:  # 绝大多数用例无 @patch 装饰器：早退，免两次全量 walk
+            continue
         called = _called_names(case.node)
         asserted = _asserted_literals(case.node)
         if not called or not asserted:
             continue
-        for mock_name, target in _patch_targets(case.node):
+        for mock_name, target in targets:
             short = target.split(".")[-1]
             if short not in called:
                 continue
@@ -487,26 +494,138 @@ def check_hardcoded_evolving_totals(cases: list[TestCase]) -> list[str]:
     return findings
 
 
+# ═══════════════════════════════════════════════════════════════
+#  增量事实缓存（性能层，不改判定口径）
+# ═══════════════════════════════════════════════════════════════
+
+_CACHE_ENV = "TEST_REDUNDANCY_CACHE"
+_CACHE_FILE = "test_redundancy_facts.json"
+
+
+def _facts_cache_path() -> Path:
+    override = os.environ.get(_CACHE_ENV)
+    return Path(override) if override else REPO_ROOT / "data" / "cache" / _CACHE_FILE
+
+
+def _cache_version() -> str:
+    """缓存格式/判定逻辑版本：本脚本 + 同目录 _checklib + 解释器大版本，任一变化全量失效。"""
+    parts = [f"{sys.version_info[0]}.{sys.version_info[1]}"]
+    for src in (Path(__file__), Path(__file__).with_name("_checklib.py")):
+        try:
+            parts.append(hashlib.sha1(src.read_bytes()).hexdigest())
+        except OSError:
+            parts.append("?")
+    return hashlib.sha1("|".join(parts).encode("utf-8")).hexdigest()
+
+
+def _file_signature(path: Path) -> str:
+    st = path.stat()
+    return f"{st.st_size}:{st.st_mtime_ns}"
+
+
+def _load_facts_cache(path: Path) -> dict[str, dict]:
+    try:
+        data = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return {}
+    if not isinstance(data, dict) or data.get("version") != _cache_version():
+        return {}
+    files = data.get("files")
+    return files if isinstance(files, dict) else {}
+
+
+def _save_facts_cache(path: Path, files: dict[str, dict]) -> None:
+    try:
+        path.parent.mkdir(parents=True, exist_ok=True)
+        tmp = path.with_suffix(".tmp")
+        tmp.write_text(
+            json.dumps({"version": _cache_version(), "files": files}, ensure_ascii=False),
+            encoding="utf-8",
+        )
+        os.replace(tmp, path)
+    except OSError:  # 缓存只影响速度不影响结论：写失败静默降级为下次全量
+        pass
+
+
+def _file_facts(path: Path, tree: ast.Module, cases: list[TestCase]) -> dict:
+    """单文件冷路径事实：四类文件内检查结果 + 跨文件重复比对所需指纹。
+
+    检查函数本体不改（单测契约不变），仅把调用从「全集两遍」变为「每文件一遍、命中缓存零遍」。
+    """
+    return {
+        "count": len(cases),
+        "dead": check_dead_tests(cases, {path: tree}),
+        "assertion": check_assertion_free(cases),
+        "self": check_self_fulfilling(cases),
+        "hard": check_hardcoded_evolving_totals(cases),
+        "entries": [{"sig": body_signature(c), "lineno": c.lineno, "name": c.name} for c in cases],
+    }
+
+
+def _collect_facts(include_live: bool) -> tuple[dict[str, dict], list[str]]:
+    """逐文件取事实：签名未变直接复用缓存（免解析免检查），变更文件仅增量重算。
+
+    返回（{绝对路径: 事实}, parse_errors）。已删除文件的陈旧条目随写回自动剔除。
+    """
+    cache_path = _facts_cache_path()
+    cached = _load_facts_cache(cache_path)
+    facts: dict[str, dict] = {}
+    parse_errors: list[str] = []
+    for path in _iter_test_files(include_live):
+        key = str(path)
+        sig = _file_signature(path)
+        old = cached.get(key)
+        if isinstance(old, dict) and old.get("sig") == sig:
+            facts[key] = old
+            continue
+        try:
+            tree = ast.parse(path.read_text(encoding="utf-8"))
+        except SyntaxError as exc:  # 语法错误由 pytest 自己报，这里不重复报
+            parse_errors.append(f"{rel(path)}: 无法解析（{exc.msg}）")
+            continue
+        facts[key] = {"sig": sig, **_file_facts(path, tree, cases_in_module(path, tree))}
+    if facts != cached:
+        _save_facts_cache(cache_path, facts)
+    return facts, parse_errors
+
+
 def run_checks(include_live: bool = False) -> tuple[list[str], dict[str, int]]:
-    """跑全部检查，返回（findings, 统计）。"""
-    cases, modules, parse_errors = collect_cases(include_live)
-    dup_findings, skipped = check_duplicate_bodies(cases)
+    """跑全部检查，返回（findings, 统计）。
+
+    判定逐文件调用同一组 check_*（冷路径才算），跨文件只做事实归并与重复比对归并。
+    """
+    facts, parse_errors = _collect_facts(include_live)
+    dead: list[str] = []
+    assertion_free: list[str] = []
+    self_fulfilling: list[str] = []
+    hardcoded: list[str] = []
+    entries: list[tuple[str, int, str, str | None]] = []
+    n_cases = 0
+    for key, item in facts.items():
+        rel_path = rel(Path(key))
+        dead += item["dead"]
+        assertion_free += item["assertion"]
+        self_fulfilling += item["self"]
+        hardcoded += item["hard"]
+        n_cases += item["count"]
+        entries.extend((rel_path, e["lineno"], e["name"], e["sig"]) for e in item["entries"])
+    dup_findings, skipped = _group_duplicate_entries(entries)
     findings: list[str] = []
     findings += parse_errors
-    findings += check_dead_tests(cases, modules)
-    findings += check_assertion_free(cases)
+    findings += dead
+    findings += assertion_free
     findings += dup_findings
-    findings += check_self_fulfilling(cases)
-    findings += check_hardcoded_evolving_totals(cases)
+    findings += self_fulfilling
+    findings += hardcoded
     stats = {
-        "files": len(modules),
-        "cases": len(cases),
+        "files": len(facts),
+        "cases": n_cases,
         "duplicate_skipped": skipped,
-        "dead": len(check_dead_tests(cases, modules)),
-        "assertion_free": len(check_assertion_free(cases)),
+        "dead": len(dead),
+        "assertion_free": len(assertion_free),
         "duplicate": len(dup_findings),
-        "self_fulfilling": len(check_self_fulfilling(cases)),
-        "hardcoded_totals": len(check_hardcoded_evolving_totals(cases)),
+        "self_fulfilling": len(self_fulfilling),
+        "hardcoded_totals": len(hardcoded),
     }
     return findings, stats
 

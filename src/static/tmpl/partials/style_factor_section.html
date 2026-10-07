@@ -1,0 +1,219 @@
+    <div class="section" id="sec-style_factor" style="order: {{ section_numbers['style_factor'] }};">
+        <div class="section-title">{{ section_numbers['style_factor'] }}、{{ section_names['style_factor'] }}</div>
+        <details class="section-fold">
+            <summary class="section-fold-summary">
+                {{ (style_results or []) | length }} 只基金风格 —— 点击展开/收起基金风格表、风格因子回归与行业 Beta
+            </summary>
+        <div class="section-content">
+            <!-- 区块一：基金风格表 -->
+            <div class="block-title">一、基金风格表</div>
+            {% if style_results %}
+            {% set drifted = style_results | selectattr("drift_level", "in", ["轻度", "中度", "严重"]) | list %}
+            {% if drifted %}
+            <div class="summary-tag" style="margin-bottom: 8px;">
+                ⚠️ <strong>{{ drifted | length }}</strong> 只基金存在风格漂移
+            </div>
+            {% endif %}
+            <table>
+                <thead>
+                    <tr>
+                        <th>基金名称</th><th>代码</th><th>当前风格</th><th>上期风格</th>
+                        <th>漂移等级</th><th>漂移评分</th><th>备注</th><th>标识</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for r in style_results %}
+                    {% set _drift = r.get("drift_level", "") %}
+                    <tr class="{% if _drift == '严重' %}row-danger{% elif _drift == '中度' %}row-warning{% elif _drift == '基准确立中' %}row-first-check{% endif %}">
+                        <td class="text-left">{{ r["name"] }}</td>
+                        <td>{{ r["code"] }}</td>
+                        <td>{{ r.get("current_style", "--") }}</td>
+                        <td>{{ r.get("prev_style", "--") }}</td>
+                        <td class="{% if _drift == '严重' %}red-text{% elif _drift == '中度' %}orange-text{% elif _drift == '基准确立中' %}gray-text{% endif %}">
+                            {% if _drift == "严重" %}🔴 {{ _drift }}{% elif _drift == "中度" %}⚠️ {{ _drift }}{% elif _drift == "轻度" %}▲ {{ _drift }}{% elif _drift == "基准确立中" %}📋 {{ _drift }}{% else %}✅ {{ _drift }}{% endif %}
+                        </td>
+                        <td>{{ r.get("drift_score", "--") if r.get("drift_score") is not none else "--" }}</td>
+                        <td style="font-size: 12px;">{{ r.get("remark", "") if r.get("remark") else "" }}</td>
+                        <td>{% if r.get("is_first_check") %}📋 基线{% else %}✅{% endif %}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+            <div class="penetration-notes">
+                <div>* 风格判定：按持仓个股的市值×PE 加权（东方财富 push2 数据），无数据时按代码段降级</div>
+                <div>* 漂移评分 = 网格曼哈顿距离（size差 + style差，0~4）</div>
+                <div>* 轻度(1分) / 中度(2分) / 严重(≥3分) — 首次运行记录基线，基准确立中</div>
+            </div>
+            {% else %}
+            <div class="empty-section">📭 暂无基金风格表数据（未检测到基金持仓或 API 返回为空）</div>
+            {% endif %}
+
+            <!-- 区块二：风格因子回归 -->
+            <div class="block-title">二、风格因子回归</div>
+            {% if sf_data and sf_data.get("available") %}
+            <div class="summary-tag" style="margin-bottom: 8px;">
+                基于最近 <strong>{{ sf_data["window"] }}</strong> 个交易日 OLS 回归（有效样本 {{ sf_data["sample_count"] }} 期）
+                {% if sf_data.get("stale_factors") %}
+                <span style="color:var(--warn-text);"> · 已剔除停更因子：{{ sf_data["stale_factors"] | join("、") }}</span>
+                {% endif %}
+            </div>
+            <table>
+                <thead>
+                    <tr>
+                        <th>风格因子</th><th>暴露系数 β</th><th>t 值</th><th>显著（95%）</th><th style="width: 32%;">风格归属占比</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for f in ["value", "growth", "quality"] %}
+                    {% if f in sf_data["betas"] %}
+                    {% set _alloc = sf_data["style_allocation"].get(f, 0) %}
+                    {% set _bar_w = (_alloc * 100) | round(1) %}
+                    <tr>
+                        <td>{{ factor_names.get(f, f) }}</td>
+                        <td>{{ sf_data["betas"][f] }}</td>
+                        <td>{{ sf_data["t_stats"].get(f, "--") }}</td>
+                        <td>{% if sf_data["significant"].get(f) %}✅ 显著{% else %}—{% endif %}</td>
+                        <td>
+                            <div style="display:flex; align-items:center; gap:6px;">
+                                <div style="flex:1; background:var(--progress-track); border-radius:4px; height:14px;">
+                                    <div style="width: {{ _bar_w }}%; height:14px; background:{% if _alloc >= 0.5 %}#2E75B6{% elif _alloc >= 0.3 %}#70AD47{% else %}#C00000{% endif %}; border-radius:4px;"></div>
+                                </div>
+                                <span style="font-size:12px; white-space:nowrap;">{{ (_alloc * 100) | round(1) }}%</span>
+                            </div>
+                        </td>
+                    </tr>
+                    {% endif %}
+                    {% endfor %}
+                </tbody>
+            </table>
+            {% if sf_data.get("factor_correlations") %}
+            <div class="penetration-notes">
+                <div>* 因子间相关性：{% for pair, v in sf_data["factor_correlations"].items() %}{{ pair }}={{ v }}　{% endfor %}</div>
+                {% if sf_data.get("correlation_note") %}
+                <div style="color:var(--warn-text);">* {{ sf_data["correlation_note"] }}</div>
+                {% endif %}
+            </div>
+            {% endif %}
+            {% if sf_data.get("baseline_betas") %}
+            <div class="summary-tag" style="margin: 10px 0 4px;">基准对照（沪深300 同窗口回归）</div>
+            <table>
+                <thead>
+                    <tr><th>风格因子</th><th>组合 β</th><th>基准 β</th><th>相对暴露</th></tr>
+                </thead>
+                <tbody>
+                    {% for f in ["value", "growth", "quality"] %}
+                    {% if f in sf_data["betas"] and f in sf_data["baseline_betas"] %}
+                    {% set _rel = sf_data["betas"][f] - sf_data["baseline_betas"][f] %}
+                    <tr>
+                        <td>{{ factor_names.get(f, f) }}</td>
+                        <td>{{ sf_data["betas"][f] }}</td>
+                        <td>{{ sf_data["baseline_betas"][f] }}</td>
+                        <td class="{% if _rel > 0.1 %}red-text{% elif _rel < -0.1 %}green-text{% endif %}">{{ _rel | round(3) }}</td>
+                    </tr>
+                    {% endif %}
+                    {% endfor %}
+                </tbody>
+            </table>
+            {% endif %}
+            <div class="penetration-notes">
+                <div>* 因子暴露 = 组合日收益对因子指数日收益的 OLS 回归系数 β（窗口 {{ sf_data["window"] }} 期）</div>
+                <div>* α（截距）={{ sf_data.get("alpha", 0) }}；t 值显著性采用 95% 双尾 t 检验（复用 _math_utils）</div>
+                <div>* 风格归属占比 = |β| 归一化；基准对照用于判断组合相对市场风格的偏离</div>
+            </div>
+            {% elif sf_data %}
+            {% if sf_data.get("status") == "source_failed" %}
+            <div class="empty-section">📭 因子数据源暂不可用，请稍后重试</div>
+            {% else %}
+            <div class="empty-section">📭 因子暴露数据不足（有效样本 {{ sf_data.get("sample_count", 0) }} 期，低于阈值 36），暂不计算</div>
+            {% endif %}
+            {% else %}
+            <div class="empty-section">📭 因子暴露数据暂不可用</div>
+            {% endif %}
+
+            <!-- 区块三：行业 Beta 子表（开关关闭时 ind_beta 为 none → 不渲染） -->
+            {% if ind_beta %}
+            <div class="block-title">三、行业 Beta（组合对各行业指数敏感性）</div>
+            {% if ind_beta.get("available") %}
+            <table>
+                <thead>
+                    <tr>
+                        <th>行业</th><th>暴露占比</th><th>指数代码</th><th>β</th><th>t 值</th><th>显著（95%）</th><th>相关性 r</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for ind in ind_beta["betas"].keys() %}
+                    <tr>
+                        <td>{{ ind }}</td>
+                        <td>{{ "{:.2%}".format(ind_beta["exposure"].get(ind, 0)) }}</td>
+                        <td>{{ ind_beta["index_codes"].get(ind, "--") }}</td>
+                        <td>{{ ind_beta["betas"][ind] }}</td>
+                        <td>{{ ind_beta["t_stats"].get(ind, "--") }}</td>
+                        <td>{% if ind_beta["significant"].get(ind) %}✅ 显著{% else %}—{% endif %}</td>
+                        <td>{{ ind_beta["correlations"].get(ind, "--") }}</td>
+                    </tr>
+                    {% endfor %}
+                    {% for ind in ind_beta.get("unmapped_industries", []) %}
+                    <tr>
+                        <td>{{ ind }}</td>
+                        <td>{{ "{:.2%}".format(ind_beta["exposure"].get(ind, 0)) }}</td>
+                        <td>—</td><td>—</td><td>—</td><td>—</td><td>—</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+            <div class="penetration-notes">
+                <div>* 行业暴露占比按持仓市值加权；行业指数为中证行业指数（近似代理）</div>
+                <div>* β = 组合日收益对行业指数日收益的一元 OLS 系数（复用因子回归机制）；显著列为 95% 双尾 t 检验</div>
+                <div>* 仅参与暴露占比、无指数映射的行业（—）不参与 Beta 回归</div>
+            </div>
+            {% else %}
+            <div class="empty-section">📭 行业 Beta 数据不足（行业分类或指数 K 线缺失），子表不渲染</div>
+            {% endif %}
+            {% endif %}
+
+            <!-- 区块四：因子目录（实验开关 factor_catalog；fc_data 为 none → 不渲染） -->
+            {% if fc_data and fc_data.get("available") %}
+            <div class="block-title">四、因子目录（25 因子五来源族横截面）</div>
+            <div class="summary-tag" style="margin-bottom: 8px;">
+                池内 <strong>{{ fc_data.get("pool_size", 0) }}</strong> 只 · 可算
+                <strong>{{ fc_data.get("computed", 0) }}</strong>/{{ fc_data.get("catalog_size", 0) }} ·
+                {{ fc_data.get("rating", "--") }}
+                <span style="color:var(--warn-text);"> · 实验功能（输出质量可能不稳定）</span>
+            </div>
+            <table>
+                <thead>
+                    <tr>
+                        <th>因子</th><th>来源族</th><th>最新横截面</th><th>中性点</th><th>相对中性</th><th>可算码数</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for f in fc_data.get("factors", []) %}
+                    <tr>
+                        <td class="text-left">{{ f.get("label", f.get("slug")) }}</td>
+                        <td>{{ f.get("family_label", f.get("family", "--")) }}</td>
+                        <td>{{ f.get("value") if f.get("value") is not none else "--" }}</td>
+                        <td>{{ f.get("neutral") if f.get("neutral") is not none else "—" }}</td>
+                        <td>
+                            {% if not f.get("computable") %}（{{ f.get("reason") or "不可算" }}）
+                            {% elif f.get("neutral") is none %}—
+                            {% elif f.get("above") %}▲ 中性上方
+                            {% else %}▼ 中性下方{% endif %}
+                        </td>
+                        <td>{{ f.get("codes_ok", 0) }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+            <div class="penetration-notes">
+                <div>* 横截面 = 池内各码最新有效因子值的均值（有效码数 &lt; 3 当期不出值）</div>
+                <div>* 中性点为技术指标经典中枢（0 轴 / 50 轴等）；「—」= 该因子无中性语义（恒正强度类 / 量纲类）</div>
+                <div>* 实验功能 · 目录版本 {{ fc_data.get("version", "--") }}（与门槛判定书冻结清单同源）</div>
+            </div>
+            {% elif fc_data %}
+            <div class="block-title">四、因子目录</div>
+            <div class="empty-section">📭 因子目录数据不足（{{ fc_data.get("reason", "池内有效成分数不足") }}），明细不渲染</div>
+            {% endif %}
+        </div>
+        </details>
+        {{ render_back_to_top() }}
+    </div>

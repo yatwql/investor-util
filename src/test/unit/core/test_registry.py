@@ -432,6 +432,62 @@ class TestReportSheetNames:
 
         assert get_report_sheet_name("not_a_section") == "not_a_section"
 
+    def test_sheet_names_view_derived_from_section_registry(self):
+        """`_REPORT_SHEET_NAMES` 键集 = 章节注册表减 LLM 差集（双向一致），值 = 注册表显示名。"""
+        from src.python.core.registry import _LLM_SHEET_NAME_KEYS, _REPORT_SHEET_NAMES
+
+        assert set(_REPORT_SHEET_NAMES) == get_report_section_keys() - _LLM_SHEET_NAME_KEYS
+        for key, name in _REPORT_SHEET_NAMES.items():
+            entry = next(sec for sec in _REPORT_SECTION_DEFAULT if sec["key"] == key)
+            assert name == entry["name"], f"{key} 页签名 {name!r} 与注册表显示名 {entry['name']!r} 不一致"
+        # LLM 章差集显式声明：走 get_llm_module_name() 第四条路径的五章恰好在此
+        assert _LLM_SHEET_NAME_KEYS == {
+            "news_correlation",
+            "global_macro",
+            "expert_review",
+            "health_check",
+            "penetration_deep",
+        }
+
+
+class TestNavGroupRegistry:
+    """章节注册表 nav_group / NAV_GROUPS 分组元数据完整性（HTML 目录折叠与 Excel 页签配色同源）。"""
+
+    def test_every_section_declares_valid_nav_group(self):
+        """每个章节条目声明 nav_group 且取值 ∈ NAV_GROUPS 键集（防漏配后渲染层静默回退）。"""
+        from src.python.core.registry import NAV_GROUPS
+
+        valid = {g["key"] for g in NAV_GROUPS}
+        for sec in _REPORT_SECTION_DEFAULT:
+            assert sec.get("nav_group") in valid, f"{sec['key']} 缺少 nav_group 或取值非法: {sec.get('nav_group')!r}"
+
+    def test_nav_groups_bidirectional_with_sections(self):
+        """NAV_GROUPS 与章节实际使用的分组双向一致（无孤儿组、无未登记组）。"""
+        from src.python.core.registry import NAV_GROUPS
+
+        used = {sec["nav_group"] for sec in _REPORT_SECTION_DEFAULT}
+        assert used == {g["key"] for g in NAV_GROUPS}
+
+    def test_nav_group_keys_and_labels_unique(self):
+        """组 key 与组名均唯一（两端按 key 索引、按 label 展示，重复即歧义）。"""
+        from src.python.core.registry import NAV_GROUPS
+
+        keys = [g["key"] for g in NAV_GROUPS]
+        labels = [g["label"] for g in NAV_GROUPS]
+        assert len(keys) == len(set(keys))
+        assert len(labels) == len(set(labels))
+
+    def test_llm_supported_pins_semantic_boundary(self):
+        """🧠 标记集合覆盖 LLM 语义边界：门控四章 + 新闻关联 + API 用量，且 llm 组 ⊆ 🧠。"""
+        from src.python.core.registry import LLM_MODULE_GATED_SECTIONS
+
+        llm_keys = {sec["key"] for sec in _REPORT_SECTION_DEFAULT if sec.get("llm_supported")}
+        assert LLM_MODULE_GATED_SECTIONS <= llm_keys
+        assert {"news_correlation", "llm_usage"} <= llm_keys
+        # 导航 llm 组各章均由 LLM 参与生成（组与标记解耦但此子集关系是防漂移锚点）
+        llm_group = {sec["key"] for sec in _REPORT_SECTION_DEFAULT if sec["nav_group"] == "llm"}
+        assert llm_group <= llm_keys
+
 
 class TestGetReportSectionKeys:
     """get_report_section_keys() 单元测试。"""

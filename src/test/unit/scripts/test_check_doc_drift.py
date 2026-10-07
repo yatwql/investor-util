@@ -1,4 +1,4 @@
-"""测试：check-doc-drift.py — 文档与实现一致性（章节/开关/默认值/面板编号/目录树/统计表/归档索引/分区纪律）
+"""测试：check-doc-drift.py — 文档与实现一致性（章节/开关/默认值/面板编号/目录树/统计表/归档索引/分区纪律/章节-区块矩阵）
 
 覆盖：
   - 章节表解析与比对（行数不符 / 序号或名称漂移）
@@ -13,6 +13,7 @@
   - 项目统计表比对（文件数 / 行数）
   - 归档索引完整性（管理文档 ↔ `docs/archive/` 双向对齐）
   - 管理文档分区纪律（未完成/已解决/已归档错置、现行 changelog 只允许开发段头）
+  - 章节-区块矩阵（technical.md §4.22：文档行 ↔ 区块注册表逐列 / 键集双向 / 双端实现提取集合三向对账）
 
 兄弟分片：test_check_doc_drift_crosscheck.py（文档↔代码交叉校验：数据源链路表/Extended Thinking 支持矩阵/
 测试收集快照/生成产物/真实仓库冒烟/统计表回写同步/守护清单同源）。
@@ -25,7 +26,10 @@ from __future__ import annotations
 
 import importlib.util
 import re
+from dataclasses import replace
 from pathlib import Path
+
+from src.python.core.section_block_registry import SECTION_BLOCK_SPECS
 
 import pytest
 
@@ -552,3 +556,93 @@ class TestManagementPartitions:
     def test_missing_files_do_not_crash(self, drift):
         """空文本（文件缺失）不抛异常，也不臆造 finding。"""
         assert drift.audit_management_partitions(review_findings="", plan="", changelog="") == []
+
+
+# ═══ 章节-区块矩阵 ═══
+
+
+class TestBlockMatrix:
+    """§4.22 章节-区块矩阵三向对账：文档行 ↔ 区块注册表 ↔ 双端实现提取。"""
+
+    @staticmethod
+    def _doc(drift) -> str:
+        return drift._TECHNICAL_MD.read_text(encoding="utf-8")
+
+    def test_current_doc_passes(self, drift):
+        """真实 technical.md 矩阵与注册表/双端实现三向一致（零 finding）。"""
+        assert drift.check_block_matrix(self._doc(drift)) == []
+
+    def test_matrix_keys_match_registry_bidirectionally(self, drift):
+        """矩阵 key 集合与注册表双向相等且无重复（结构关系断言，不写死条数）。"""
+        rows, findings = drift.parse_block_matrix(self._doc(drift))
+        assert findings == []
+        assert {r["key"] for r in rows} == {sec["key"] for sec in drift._REPORT_SECTION_DEFAULT}
+        assert len({r["key"] for r in rows}) == len(rows)
+
+    def test_stale_html_count_reported(self, drift):
+        """改大某章 HTML 区块数 → 与 partial 实测重算不一致。"""
+        doc = self._doc(drift)
+        rows, _ = drift.parse_block_matrix(doc)
+        target = next(r for r in rows if r["count"].isdigit())
+        lines = doc.splitlines(keepends=True)
+        idx = int(target["line"]) - 1
+        old = f"| `{target['key']}` | {target['count']} |"
+        assert old in lines[idx]
+        lines[idx] = lines[idx].replace(old, f"| `{target['key']}` | {int(target['count']) + 1} |", 1)
+        findings = drift.check_block_matrix("".join(lines))
+        assert any("HTML 区块数" in f for f in findings)
+
+    def test_missing_row_reported(self, drift):
+        """删掉矩阵一行 → 注册表章节缺行被报出。"""
+        doc = self._doc(drift)
+        rows, _ = drift.parse_block_matrix(doc)
+        lines = doc.splitlines(keepends=True)
+        victim = lines.pop(int(rows[0]["line"]) - 1)
+        assert victim.startswith("|")
+        findings = drift.check_block_matrix("".join(lines))
+        assert any("缺少注册表章节" in f for f in findings)
+
+    def test_tampered_excel_list_reported(self, drift):
+        """篡改矩阵 Excel 区块清单单元格 → 与区块注册表逐列不一致被报出。"""
+        doc = self._doc(drift)
+        rows, _ = drift.parse_block_matrix(doc)
+        target = next(r for r in rows if r["markers"] != "—")
+        marker = target["markers"].split(" / ")[0]
+        lines = doc.splitlines(keepends=True)
+        idx = int(target["line"]) - 1
+        assert marker in lines[idx]
+        lines[idx] = lines[idx].replace(marker, "已改名的占位区块", 1)
+        findings = drift.check_block_matrix("".join(lines))
+        assert any("Excel 区块清单与区块注册表不一致" in f for f in findings)
+
+    def test_dash_row_not_counted(self, drift):
+        """「—」行不参与重算；把计数行改成「—」会被报出（双向而非单向放行）。"""
+        doc = self._doc(drift)
+        rows, _ = drift.parse_block_matrix(doc)
+        target = next(r for r in rows if r["count"].isdigit())
+        lines = doc.splitlines(keepends=True)
+        idx = int(target["line"]) - 1
+        old = f"| `{target['key']}` | {target['count']} |"
+        lines[idx] = lines[idx].replace(old, f"| `{target['key']}` | — |", 1)
+        findings = drift.check_block_matrix("".join(lines))
+        assert any("HTML 区块数" in f for f in findings)
+
+    def test_impl_html_drift_reported(self, drift, monkeypatch):
+        """注册表 html 清单多出一区块 → HTML 实现提取与注册表不一致被报出。"""
+        spec = SECTION_BLOCK_SPECS["holdings_detail"]
+        monkeypatch.setitem(SECTION_BLOCK_SPECS, "holdings_detail", replace(spec, html=spec.html + ("幽灵区块",)))
+        findings = drift.check_block_matrix(self._doc(drift))
+        assert any("HTML 区块实测" in f for f in findings)
+
+    def test_impl_excel_drift_reported(self, drift, monkeypatch):
+        """注册表 excel 清单多出一区块 → Excel 实现提取与注册表不一致被报出。"""
+        spec = SECTION_BLOCK_SPECS["holdings_detail"]
+        monkeypatch.setitem(SECTION_BLOCK_SPECS, "holdings_detail", replace(spec, excel=spec.excel + ("幽灵区块",)))
+        findings = drift.check_block_matrix(self._doc(drift))
+        assert any("Excel 区块实测" in f for f in findings)
+
+    def test_missing_block_contract_reported(self, drift, monkeypatch):
+        """删掉注册表某章区块契约 → 键集双向检查报缺契约。"""
+        monkeypatch.delitem(SECTION_BLOCK_SPECS, "llm_usage")
+        findings = drift.check_block_matrix(self._doc(drift))
+        assert any("缺区块契约" in f for f in findings)

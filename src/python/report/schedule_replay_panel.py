@@ -345,6 +345,7 @@ def build_schedule_replay_view(panel: dict[str, Any] | None) -> dict[str, Any]:
 def write_schedule_replay_sheet(ws: Any, schedule_replay_data: dict[str, Any] | None) -> None:
     """写入「调仓纪律回放」页签（与 HTML partial 消费同一份 view 字符串）。"""
     from src.python.report.excel_writer import (
+        write_block_title,
         _write_placeholder,
         auto_width,
         freeze_header,
@@ -370,13 +371,13 @@ def write_schedule_replay_sheet(ws: Any, schedule_replay_data: dict[str, Any] | 
         row = write_data_row(ws, row, [line] + [""] * (ncols - 1))
 
     row += 1
-    row = write_title_row(ws, row, "纪律回放 vs 买入持有（指标对照）", ncols=ncols)
+    row = write_block_title(ws, row, "纪律回放 vs 买入持有（指标对照）", ncols=ncols)
     row = write_header_row(ws, row, view["metric_header"])
     for cells in view["metric_rows"]:
         row = write_data_row(ws, row, cells)
 
     row += 1
-    row = write_title_row(ws, row, "规则 A 逐期调仓与成本", ncols=ncols)
+    row = write_block_title(ws, row, "规则 A 逐期调仓与成本", ncols=ncols)
     row = write_header_row(ws, row, view["period_header"])
     if view["period_rows"]:
         for cells in view["period_rows"]:

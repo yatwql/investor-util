@@ -22,84 +22,34 @@ _EXIT_SEVERE = 2
 
 
 def _show_llm_config_status_cli() -> None:
-    """CLI 模式显示 LLM 配置状态（含多链详细信息）。"""
+    """CLI 模式显示 LLM 配置状态（消费 system_info.llm_status 单源，仅做日志渲染）。"""
     import logging
 
     logger = logging.getLogger("invest")
 
-    from src.python.config import get_llm_config
-    from src.python.llm.circuit_breaker import get_circuit_status
-    from src.python.core.registry import get_llm_module_names
+    from src.python.core.system_info import llm_status
 
-    llm_config = get_llm_config()
-    if llm_config is None:
-        logger.info("LLM: 未配置（配置 data/config/llm_key.json 或 llm_providers.json 后重启生效）")
-        return
-
-    provider_list = llm_config.get("_provider_list") or []
+    llm = llm_status()
 
     logger.info("─" * 40)
     logger.info("LLM Provider 状态")
-
-    # ── 多链模式 ──
-    if provider_list and not llm_config.get("api_key"):
-        strategy_raw = llm_config.get("_strategy", "priority")
-        strategy_labels = {
-            "priority": "优先级排序",
-            "weighted": "加权随机",
-            "cost_first": "价格最低优先",
-            "fallback_only": "仅 Fallback",
-        }
-        strategy_label = strategy_labels.get(strategy_raw, strategy_raw)
-        logger.info("状态: 已配置 | 策略: %s | 多链服务: %d provider", strategy_label, len(provider_list))
-
-        for i, entry in enumerate(provider_list, 1):
-            name = entry.get("name", "?")
-            backend = entry.get("provider", "?")
-
-            model = entry.get("model", "")
-            endpoint = entry.get("endpoint") or ""
-            creds_ref = entry.get("credentials_ref")
-            if creds_ref and (not model or not endpoint):
-                all_creds = llm_config.get("_llm_credentials", {})
-                ref_creds = all_creds.get(creds_ref, {})
-                if isinstance(ref_creds, dict):
-                    if not model:
-                        model = ref_creds.get("model", "")
-                    if not endpoint:
-                        endpoint = ref_creds.get("endpoint", "") or ""
-
-            model_display = model or "默认"
-            raw_priority = entry.get("priority")
-            priority_display = str(raw_priority) if raw_priority is not None else "99（默认）"
-            cb_status = get_circuit_status(endpoint) if endpoint else "—"
-
-            logger.info("  [%d] %s (%s)", i, name, backend)
-            logger.info("      模型: %s    优先级: %s    熔断: %s", model_display, priority_display, cb_status)
-
-        preferred = llm_config.get("_preferred_providers", {})
-        if preferred:
-            parts = []
-            for mk, pname in preferred.items():
-                display_name = get_llm_module_names().get(mk, mk)
-                parts.append(f"{display_name} → {pname}")
-            logger.info("  ▶ 模块偏好: %s", " / ".join(parts))
-
-    # ── 传统 flat 模式 ──
-    elif llm_config.get("api_key") and llm_config.get("provider"):
-        provider = llm_config["provider"]
-        model = llm_config.get("model") or "默认"
-        endpoint = llm_config.get("endpoint") or "默认"
-        ep_display = (
-            endpoint.split("/")[2] if endpoint and endpoint != "默认" and len(endpoint.split("/")) > 2 else endpoint
-        )
-        cb_status = get_circuit_status(endpoint) if endpoint and endpoint != "默认" else "—"
-        logger.info(
-            "状态: 已配置 | provider=%s | model=%s | endpoint=%s | 熔断: %s", provider, model, ep_display, cb_status
-        )
-    else:
+    if not llm.get("configured"):
         logger.info("状态: 未配置（配置 data/config/llm_key.json 或 llm_providers.json）")
-
+    elif llm.get("mode") == "multi":
+        logger.info("状态: 已配置 | 策略: %s | 多链服务: %d provider", llm["strategy"], len(llm["providers"]))
+        for i, p in enumerate(llm["providers"], 1):
+            logger.info("  [%d] %s (%s)", i, p["name"], p["backend"])
+            logger.info("      模型: %s    优先级: %s    熔断: %s", p["model"], p["priority"], p["circuit"])
+        if llm.get("preferred"):
+            logger.info("  ▶ 模块偏好: %s", " / ".join(llm["preferred"]))
+    else:
+        logger.info(
+            "状态: 已配置 | provider=%s | model=%s | endpoint=%s | 熔断: %s",
+            llm["provider"],
+            llm["model"],
+            llm["endpoint_display"],
+            llm["circuit"],
+        )
     logger.info("─" * 40)
 
 
@@ -159,14 +109,13 @@ def _cli_read_holdings(config: dict) -> list | None:
     if filepath is None:
         return None
 
-    from src.python.core.reader import read_holdings
+    from src.python.core.reader import read_holdings, require_holdings
 
     holdings = read_holdings(filepath)
-    if not holdings:
-        logger.error(
-            "持仓文件为空或格式异常: %s —— 请确保持仓文件包含「名称, 代码, 持仓份额, 每份成本」四列",
-            filepath,
-        )
+    try:
+        require_holdings(holdings, filepath)
+    except ValueError as e:
+        logger.error("%s", e)
         return None
 
     logger.info("成功读取持仓文件: %s（共 %d 条记录）", filepath, len(holdings))
@@ -191,14 +140,13 @@ def _cli_read_holdings_with_flows(config: dict) -> "tuple[list, list, list] | No
     if filepath is None:
         return None
 
-    from src.python.core.reader import read_holdings_with_flows
+    from src.python.core.reader import read_holdings_with_flows, require_holdings
 
     parsed = read_holdings_with_flows(filepath)
-    if not parsed.holdings:
-        logger.error(
-            "持仓文件为空或格式异常: %s —— 请确保持仓文件包含「名称, 代码, 持仓份额, 每份成本」四列",
-            filepath,
-        )
+    try:
+        require_holdings(parsed.holdings, filepath)
+    except ValueError as e:
+        logger.error("%s", e)
         return None
 
     logger.info(

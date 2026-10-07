@@ -533,6 +533,23 @@ def _real_valuation_for_code(code: str, bars: list[dict]) -> dict:
         return {"available": False, "reason": "compute_failed"}
 
 
+# ── 产物类型语义 ──
+
+
+def artifacts_for_report_type(report_type: str) -> tuple[str, ...]:
+    """报告类型 → 产物 kind 序列（类型语义与 generate_report 生成分支同源）。
+
+    basic → 仅 Excel；both/full → HTML + Excel。Web 产物按钮等消费方从本函数
+    派生，禁止在渠道层镜像同一类型规则。
+
+    Returns:
+        kind 元组（"html" / "xlsx"），顺序为展示顺序。
+    """
+    if report_type in ("both", "full"):
+        return ("html", "xlsx")
+    return ("xlsx",)
+
+
 # ── generate_report ──
 
 

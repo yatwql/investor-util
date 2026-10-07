@@ -612,6 +612,13 @@ def generate_excel_report(
                     write_privacy_footer(_ws, ncols=5)
                 except Exception:
                     logger.debug("[privacy] 页签 %s 写入隐私脚注失败（非关键）", _ws_name, exc_info=True)
+        # 各页签标题行尾「↩ 返回汇总」内部超链接（内容写完后定位行尾，不移位）
+        try:
+            from src.python.report.excel_sheet_factory import stamp_back_to_summary
+
+            stamp_back_to_summary(sheets)
+        except Exception:
+            logger.debug("[excel] 返回汇总链接写入失败（非关键）", exc_info=True)
         prog.info("正在保存 Excel 报告...")
         path = save_workbook(wb, output_dir=output_dir)
         logger.info("Excel 报告已生成: %s", path)

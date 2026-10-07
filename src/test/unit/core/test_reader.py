@@ -1034,5 +1034,31 @@ class TestParseFlowSheets(unittest.TestCase):
         self.assertEqual(reader._normalize_action("BUY"), "buy")
 
 
+@pytest.mark.unit_core
+class TestRequireHoldings(unittest.TestCase):
+    """require_holdings — 空持仓门（读取域不变量，三渠道共用单一入口）。"""
+
+    def test_nonempty_passes(self):
+        """非空持仓直接通过（不抛异常、无返回值）。"""
+        self.assertIsNone(reader.require_holdings([object()], "/tmp/a.xlsx"))
+
+    def test_empty_raises_unified_hint(self):
+        """空持仓 → ValueError，含「持仓文件为空」与四列格式提示。"""
+        with self.assertRaises(ValueError) as ctx:
+            reader.require_holdings([], "/tmp/holdings.xlsx")
+        msg = str(ctx.exception)
+        self.assertIn("持仓文件为空", msg)
+        self.assertIn("四列", msg)
+        self.assertIn("/tmp/holdings.xlsx", msg)
+
+    def test_no_filepath_omits_path(self):
+        """不传 filepath（HTTP 端）→ 文案不带服务端路径（无路径分隔符）。"""
+        with self.assertRaises(ValueError) as ctx:
+            reader.require_holdings([])
+        msg = str(ctx.exception)
+        self.assertIn("持仓文件为空", msg)
+        self.assertNotIn("/", msg)
+
+
 if __name__ == "__main__":
     unittest.main()

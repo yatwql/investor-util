@@ -43,7 +43,6 @@ from src.python.report.html_writer_display import (  # noqa: F401
 from src.python.report.html_writer_nav import (  # noqa: F401
     _LLM_SUPPORTED_SECTIONS,
     _NAV_GROUP_LABELS,
-    _SECTION_NAV_GROUP_MAP,
     _build_section_nav_groups,
     _compute_section_visibility,
 )

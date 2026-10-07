@@ -314,5 +314,36 @@ class TestFeatureGatedMenuItems:
         assert tm.MENU_ITEMS == first
 
 
+class TestLlmStatusRendering:
+    """_show_llm_config_status — 消费 llm_status 单源的三态终端渲染。"""
+
+    @staticmethod
+    def _render() -> str:
+        import src.python.tui.tui_menu as tm
+
+        buf = StringIO()
+        with patch("sys.stdout", buf):
+            tm._show_llm_config_status()
+        return buf.getvalue()
+
+    def test_unconfigured_line(self):
+        with patch("src.python.config.get_llm_config", return_value=None):
+            assert "未配置" in self._render()
+
+    def test_flat_configured_line(self):
+        with patch("src.python.config.get_llm_config", return_value={"api_key": "k", "provider": "claude"}):
+            out = self._render()
+        assert "已配置" in out
+        assert "provider=claude" in out
+        assert "模型路由" in out
+
+    def test_multi_chain_render(self):
+        cfg = {"_provider_list": [{"name": "alpha", "provider": "claude", "priority": 10}]}
+        with patch("src.python.config.get_llm_config", return_value=cfg):
+            out = self._render()
+        assert "多链服务 (1 provider)" in out
+        assert "alpha" in out
+
+
 if __name__ == "__main__":
     unittest.main()

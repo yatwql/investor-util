@@ -37,7 +37,13 @@ PROJECT_ROOT = _find_project_root()
 # 应用名称（单一来源，TUI 首页 / 启动日志 / Web 首页 / HTML 报告首页 / Excel 首页统一引用）
 APP_NAME = "投资复盘助手"
 
-APP_VERSION = "0.12.4"
+APP_VERSION = "0.12.5"
+
+# ── 报告产物文件名（单一来源：Excel/HTML 写入器与 Web 预览下载统一引用） ──
+# 报告产物文件基名（归档名 = 基名 + 时间戳后缀）
+REPORT_FILE_BASE = "个人投资分析报告"
+LATEST_XLSX_NAME = f"{REPORT_FILE_BASE}.xlsx"
+LATEST_HTML_NAME = f"{REPORT_FILE_BASE}.html"
 
 # ── 缓存频率常量（秒，用作代码内默认值） ──────────────────
 

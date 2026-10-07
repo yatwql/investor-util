@@ -1,6 +1,6 @@
 # 开发者指南
 
-> 文档版本：0.12.4
+> 文档版本：0.12.5
 
 ## 概述
 
@@ -96,7 +96,7 @@ ln -sf "$PWD/.pi/models.json" ~/.pi/agent/models.json
 | **P1** | 合入 master 前 | `.venv/bin/python scripts/test-runner.py --mode verify` | 阻塞合入，不得 merge |
 | **P2** | 发布前 | `.venv/bin/python scripts/test-runner.py --mode verify,regression` + 9 个 check 脚本 | 阻塞发布，不得 release |
 
-**P0 提交前门禁**（全部通过才可 commit）：
+**P0 提交前门禁**（全部通过才可 commit；手动项 = dev-verify，下列十守护由 pre-commit 钩子在 `git commit` 时自动执行、CI guards job 同源兜底，本地不手动重复——清单为五处同源引用）：
 
 ```bash
 .venv/bin/python scripts/test-runner.py --mode dev-verify   # 核心单元 + 基础场景快速验证
@@ -104,7 +104,7 @@ ln -sf "$PWD/.pi/models.json" ~/.pi/agent/models.json
 .venv/bin/python scripts/check-doc-traces.py --ci           # 文档历史痕迹检查
 .venv/bin/python scripts/check-task-numbering.py --ci       # 任务编号全局一致性检查
 .venv/bin/python scripts/check-semantic-index.py --ci       # 语义命名索引正反向校验
-.venv/bin/python scripts/check-doc-drift.py --ci            # 文档与实现一致性（章节/开关/默认值/面板编号/目录树/统计表/归档索引/分区纪律/Thinking 支持矩阵）
+.venv/bin/python scripts/check-doc-drift.py --ci            # 文档与实现一致性（章节/开关/默认值/面板编号/目录树/统计表/归档索引/分区纪律/Thinking 支持矩阵/章节-区块矩阵）
 .venv/bin/python scripts/check-test-redundancy.py --ci      # 测试用例冗余与无效（死用例/无断言/完全重复/自证用例/硬编码演进总数）
 .venv/bin/python scripts/check-requirement-trace.py --ci   # 需求 ID ↔ 验证载体追溯（已补全域全覆盖 + 载体文件存在）
 .venv/bin/python scripts/check-version-consistency.py --ci   # 版本号全局一致性（APP_VERSION ↔ README/pyproject/管理文档 10 份）
@@ -134,7 +134,7 @@ ln -sf "$PWD/.pi/models.json" ~/.pi/agent/models.json
 
 **辅助（非阻塞）**：`.venv/bin/ruff check`（lint 基线，选择项与刻意豁免均在 `pyproject.toml` 显式声明）+ `.venv/bin/ruff format --check`（代码格式一致性）——问题可经 `.venv/bin/ruff check --fix` / `.venv/bin/ruff format` 自动修复，不阻止合并/发布。当前两者均为零告警基线，新增代码应在提交前保持干净。
 
-**CI 同步执行（`.github/workflows/ci.yml`）**：三档测试按分支/标签分流——`dev` 推送跑 P0（`dev-verify`）、`master` 推送或 PR 跑 P1（`verify`）、打 `v*` tag 跑 P2（`verify,regression`），矩阵覆盖 Python 3.11/3.12/3.13；另有三个独立 job：`guards`（**阻塞**，10 个 `--ci` 守护脚本，即上方 P0/P2 清单全量）、`portability`（**阻塞**，非 UTF-8 locale + 隐式编码双探针，见下方「编码/locale 自检」）与 `format`（非阻塞，`ruff format --check src/python/ scripts/` + `ruff check`）。
+**CI 同步执行（`.github/workflows/ci.yml`）**：三档测试按分支/标签分流——`dev` 推送跑 P0（`dev-verify`）、`master` 推送或 PR 跑 P1（`verify`）、打 `v*` tag 跑 P2（`verify,regression`），矩阵覆盖 Python 3.11/3.12/3.13；另有三个独立 job：`guards`（**阻塞**，10 个 `--ci` 守护脚本即上方 P0/P2 清单全量——job 内按 pre-commit 同款后台并行回放，任一守护非零退出折叠为 FAIL 分组并使 job 红；守护经 src.python 链依赖项目运行时包（如 check-doc-drift → httpx），故 editable 安装保留）、`portability`（**阻塞**，非 UTF-8 locale + 隐式编码双探针，见下方「编码/locale 自检」）与 `format`（非阻塞，`ruff format --check src/python/ scripts/` + `ruff check`）。
 
 ### 编码/locale 自检（旧 pip 回退解码 / 隐式编码）
 
@@ -183,9 +183,9 @@ PYTHONWARNDEFAULTENCODING=1 .venv/bin/python -m pytest src/test/unit -q
 
 **三步工作流**：
 
-1. **一次枚举**：编辑全部完成后先跑 `check-doc-drift.py --sync`（回写统计/目录树），再一次跑齐十守护 `--ci`，收集**全量** finding（不边改边跑）。
-2. **批量修复**：按上表 + 守护 finding 一次性修完，同一文件多处改动合并为一次 edit。
-3. **单次复核**：再跑十守护复核 + `ruff` + 测试门禁；`git commit` 交给 pre-commit 钩子（内含 `--sync` + 十守护，失败即中止）。
+1. **一次枚举**：编辑全部完成后按下方「计划收尾：文档触点清单」主动扫触点批量核对/修复（统计快照回写与十守护校验由提交时的 pre-commit 钩子自动完成，本地不手动重复）。
+2. **批量修复**：按上表 + 触点一次性修完，同一文件多处改动合并为一次 edit。
+3. **单次复核**：手动只跑 `ruff` + `dev-verify` 测试门禁；十守护交由 `git commit` 的 pre-commit 钩子一次收集（失败即中止）→ 批量修复 → 重新提交，不手动重复跑守护。
 
 **红线**：编辑批次与 `--sync`/检查类脚本**永不同批**（sync 写文件，与编辑并行会竞态）；`ruff` / `check-file-length` 随每批代码改动跑，不留到收尾才爆。
 
@@ -229,16 +229,16 @@ PYTHONWARNDEFAULTENCODING=1 .venv/bin/python -m pytest src/test/unit -q
 | 机制 | 触发 | 跨机器 |
 |:-----|:-----|:------|
 | **P0/P2 门禁** | 提交/发布前 10 个 `--ci` 守护脚本全量（清单见 P0/P2 门禁条款） | ✅ 零配置 |
-| **dev-verify preflight** | `test-runner.py --mode dev-verify` 自动运行 | ✅ 零配置 |
+| **dev-verify preflight** | `test-runner.py --mode dev-verify` 自动运行（仅 `check-task-numbering` 快检；重量守护不入预检，由钩子唯一执行防同树重复） | ✅ 零配置 |
 | **Claude Code hook** | 编辑 `plan.md`/`review-findings.md` 后实时校验 | ⚠️ clone 后运行 `.venv/bin/python scripts/install-claude-hook.py` |
-| **git pre-commit** | `git commit` 全量执行 10 个守护脚本（与 P0/CI guards 同源，约 5~6 秒）；提交涉及 `docs/managements/` 或 `src/test/` 时 `check-doc-drift --sync` 自动回写统计快照 | ⚠️ clone 后运行 `sh .githooks/install-hooks.sh` |
+| **git pre-commit** | `git commit` 执行十守护（与 P0/CI guards 同源）：**读写分层调度**——不读 folders.md 的守护（快集 code-traces/task-numbering/semantic-index/requirement-trace + py 域 file-length + 测试域 test-redundancy）先行后台启动，与 `check-doc-drift` 串行段（跨域守护，恒跑；涉及 `docs/managements/` 或 `src/test/` 时 `--sync` 自动回写统计快照）并行执行；读 folders.md 的 version-consistency 与 doc 域（doc-traces/doc-links）在 doc-drift 完成后启动（避 --sync 写读竞态）；域条件不变（doc 域仅 `*.md`、py 域仅 `*.py`、测试域仅 `src/test/` 变更触发），典型提交约 1~4 秒；三守护另有结论缓存（输入指纹未变回放上次结论，冷/热 --ci 输出逐字一致）；CI guards job 恒全量兜底 | ⚠️ clone 后运行 `sh .githooks/install-hooks.sh` |
 | **CI guards job** | push / PR / tag 时自动校验（10 个 `--ci` 脚本之一） | ✅ 零配置 |
 
 > `core.hooksPath` 与 `.claude/settings.json` 均为本地配置、不随仓库同步，新机器 clone 后运行上方激活命令一次即可；hook 脚本本体（`.githooks/`、`scripts/`）随仓库同步。
 
 ## 测试指南
 
-**测试报告布局**：每次运行写入 `test-reports/latest/`——汇总页 `index.html`（各模式的通过/失败/耗时 + 报告链接）与该模式的 pytest-html 详细报告。**分阶段模式（如 `dev-verify` = Phase A 核心单元 + Phase B 基础场景）每阶段一个报告文件**（`<mode>/report_phase_A.html` / `report_phase_B.html`），汇总页逐阶段给链接；非分阶段模式仍是 `<mode>/report.html`。早前两阶段共用 `report.html`，后跑的阶段会覆盖前者，导致详细报告只剩最后一阶段（排查时看不到真正的失败面）。
+**测试报告布局**：每次运行写入 `test-reports/latest/`——汇总页 `index.html`（各模式的通过/失败/耗时 + 报告链接）与该模式的 pytest-html 详细报告。单轮/非分阶段模式为 `<mode>/report.html`（`dev-verify` 已双阶段合一，单轮报告即此名）；**多阶段模式每阶段一个报告文件**（`<mode>/report_phase_A.html` / `report_phase_B.html`），汇总页逐阶段给链接。早前两阶段曾共用 `report.html`，后跑的阶段会覆盖前者，导致详细报告只剩最后一阶段（排查时看不到真正的失败面）——多阶段逐文件机制即为防此。
 
 测试框架基于 **pytest**，通过标记（marker）分组支持灵活组合运行，使用 `scripts/test-runner.py` 统一驱动并自动输出结构化报告。各 `--mode` 的精确测试项数统计见 [test-coverage.md](test-coverage.md)。
 
@@ -536,7 +536,7 @@ def test_tencent_quote_parses(self):
 | `scenario` | `scenario` | ~18s |
 | `integration` | `scenario or integration` | ~14s |
 | `verify` | `unit_core or unit_providers or unit_fetcher or unit_config or unit_news or unit_llm or unit_analysis or unit_scripts or unit_web` | ~10s |
-| `dev-verify` | `(unit_core or unit_providers or unit_fetcher or unit_analysis or unit_scripts or unit_web) and not (edge or data)` + `scenario_basic`（两阶段） | ~20s |
+| `dev-verify` | `((unit_core or unit_providers or unit_fetcher or unit_analysis or unit_scripts or unit_web or unit_report) and not (edge or data)) or scenario_basic`（单轮合一，原两阶段并集，收集数对拍一致） | ~20s |
 | `all` | （无过滤，全量） | ~21s |
 | `all_no_unit` | `not unit and not live` | ~10s |
 | `report` | `unit_report` | ~11s |
@@ -1221,7 +1221,7 @@ sh .githooks/install-hooks.sh --off   # 停用
 - `pyproject.toml`（`version` 字段，`--fix` 可自动同步）
 - `README.md`
 - 管理文档 10 份：`plan.md`、`technical.md`、`requirements.md`、`testplan.md`、`review-findings.md`、`llm-technical.md`、`folders.md`、`test-coverage.md`、`changelog.md`、`developer-guide.md`
-- `folders.md` 另含一条 `evolution_head` 断言：版本演进对照表「当前开发版（」列头版本号与 `APP_VERSION` 同步（与文档版本头双点校验，发版漏改即报错，`--fix` 可自动同步）
+- `folders.md` 另含一条 `evolution_head` 断言：版本演进对照表「当前开发版（」列头版本号与 `APP_VERSION` 同步（与文档版本头双点校验，发版漏改即报错，`--fix` 可自动同步）；断言只锚列头文本，表内统计数据行的刷新义务在「版本发布流程 ② 发布数据文档刷新」
 
 ```bash
 # 无参数运行，逐项检查并报 [OK]/[ERR]
@@ -1619,7 +1619,7 @@ from src.python.core.registry import (
 - `get_report_sheet_name("summary")` → `"投资分析汇总"`
 - `get_report_section_order(config)` → 解析 `report_section_order` 配置，返回有序键列表
 - `get_report_section_number("position_structure")` → 当前配置下该模块的序号（被基金深度分析各页签写入器调用）
-- `get_report_section_keys()` → 全部 18 个模块键名（键名→中文标题对照见 [配置指南 → report_section_order](../manuals/how-to-config.md#report_section_order-报告序号配置)）
+- `get_report_section_keys()` → 全部 19 个模块键名（键名→中文标题对照见 [配置指南 → report_section_order](../manuals/how-to-config.md#report_section_order-报告序号配置)）
 
 **计算模块查询**：
 
@@ -1733,7 +1733,7 @@ DataModuleDef("我的固定键", "fixed",
 
 ### 计算模块注册表（_COMPUTATION_REGISTRY）
 
-除 `_MODULE_REGISTRY`（有缓存的数据模块）外，`core/registry.py` 还维护 `_COMPUTATION_REGISTRY`——纯计算模块（无缓存）的注册表：
+除 `_MODULE_REGISTRY`（有缓存的数据模块）外，还维护 `_COMPUTATION_REGISTRY`——纯计算模块（无缓存）的注册表，实现在 `core/computation_registry.py`（`core/registry.py` 顶部 re-export，原访问面不变）：
 
 ```python
 @dataclass(frozen=True)
@@ -1767,10 +1767,10 @@ class ComputModuleDef:
 - LLM 模块名称 → `get_llm_module_names()`
 
 > 报表页签标题与顺序由两张**独立**注册表分别驱动，**不**随 `_MODULE_REGISTRY` 自动派生：
-> - `get_report_sheet_name(sheet_key)` → 读 `_REPORT_SHEET_NAMES`（sheet key → 中文标题映射）
+> - `get_report_sheet_name(sheet_key)` → 读 `_REPORT_SHEET_NAMES`（sheet key → 中文标题映射；派生视图：非 LLM 章键值由 `_REPORT_SECTION_DEFAULT` 条目派生，LLM 章标题显式登记、差集键集为 `_LLM_SHEET_NAME_KEYS`）
 > - `get_report_section_order(config)` → 读 `_REPORT_SECTION_DEFAULT`（章顺序与分组）
 >
-> 二者职责不同：前者管「页签叫什么」，后者管「章按什么顺序排」。新增页签需在 `_REPORT_SHEET_NAMES` 登记标题；若该页签属报告章，还需在 `_REPORT_SECTION_DEFAULT` 登记顺序（`scripts/check-semantic-index.py` 校验合并章引用的 sheet key 存在于 `_REPORT_SECTION_DEFAULT`）。
+> 二者职责不同：前者管「页签叫什么」，后者管「章按什么顺序排」。新增报告章在 `_REPORT_SECTION_DEFAULT` 登记后，页签标题由派生视图自动跟进（LLM 章例外：其显示名在 `_REPORT_SHEET_NAMES` 显式登记并把键声明进 `_LLM_SHEET_NAME_KEYS`）；若该页签属报告章，还需在 `_REPORT_SECTION_DEFAULT` 登记顺序（`scripts/check-semantic-index.py` 校验合并章引用的 sheet key 存在于 `_REPORT_SECTION_DEFAULT`）。
 
 ### 测试
 
@@ -1804,7 +1804,7 @@ registry 的测试在 `src/test/unit/core/test_registry.py`，验证 TTL 默认�
 
 按实时收集结果核对/更新以下文档的数据快照（非版本号），保证统计与目录结构时效性：
 - `test-coverage.md` — 模式/unit 子标记/跨类/功能域各项测试计数
-- `folders.md` — 项目统计表及目录树新增/重命名文件
+- `folders.md` — 项目统计表及目录树新增/重命名文件；**版本演进对照表（`## 版本演进对照`）每次发布必须更新**：「最新发布」列按新 tag 重跑快照统计（复现方法见 folders.md 表头：`git ls-tree` + `git cat-file --batch` 计行 + `git grep -c "def test_"` 数用例），「当前开发版」列同步重跑；列头版本号与 tag/日期由 `check-version-consistency.py --fix`（`evolution_head`/`release_tag` 断言）同步，只改版本号不刷演进表数据行属发布遗漏
 - `datasource.md` + `datasource-reliability.md` — 数据源清单/路由归属/可靠性描述与实际代码配置一致
 
 数据快照更新与「版本号一致」的版本头同步可在同一次提交内完成。

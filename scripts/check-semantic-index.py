@@ -38,13 +38,25 @@ import tokenize
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))  # 同目录共享模块（_checklib）
-from _checklib import REPO_ROOT, add_common_args, extract_region, rel, report  # noqa: E402
+from _checklib import (  # noqa: E402
+    REPO_ROOT,
+    add_common_args,
+    conclusion_cache_load,
+    conclusion_cache_save,
+    extract_region,
+    rel,
+    report,
+)
 
 _TECHNICAL_MD = REPO_ROOT / "docs" / "managements" / "technical.md"
 _FEATURES_PY = REPO_ROOT / "src/python/config/features.py"
 _CONFIG_DEFAULTS = REPO_ROOT / "src" / "python" / "config" / "_config_defaults.py"
 _REGISTRY_PY = REPO_ROOT / "src" / "python" / "core" / "registry.py"
 _CODE_ROOT = REPO_ROOT / "src" / "python"
+
+#: 结论文案（全量与缓存回放两路共用，保证输出逐字一致）
+_OK_MESSAGE = "[OK] 语义命名索引正反向校验通过（表内 slug 均存在、功能开关均登记、合并章 key 均在 registry）"
+_FAIL_MESSAGE = "[!] 发现 {n} 处语义命名索引不一致，须修正后提交"
 
 _MARKER_START = "<!-- semantic-index:start -->"
 _MARKER_END = "<!-- semantic-index:end -->"
@@ -261,11 +273,19 @@ def main() -> None:
     add_common_args(parser)
     args = parser.parse_args()
 
+    # 结论缓存（仅 --ci 加载）：输入面 = technical.md + src/python 全部 *.py
+    inputs = [_TECHNICAL_MD, *_CODE_ROOT.rglob("*.py")]
+    if args.ci:
+        cached = conclusion_cache_load("semantic_index", [Path(__file__)], inputs)
+        if cached is not None:
+            sys.exit(report(cached["findings"], _OK_MESSAGE, ci=True, fail_message=_FAIL_MESSAGE))
+
     doc_text = _TECHNICAL_MD.read_text(encoding="utf-8")
     features_source = _FEATURES_PY.read_text(encoding="utf-8")
     registry_source = _REGISTRY_PY.read_text(encoding="utf-8")
 
     findings = run_checks(doc_text, features_source, registry_source, _CODE_ROOT)
+    conclusion_cache_save("semantic_index", [Path(__file__)], inputs, {"findings": findings})
 
     if args.verbose:
         table_slugs = parse_table_slugs(doc_text)
@@ -280,9 +300,9 @@ def main() -> None:
     sys.exit(
         report(
             findings,
-            "[OK] 语义命名索引正反向校验通过（表内 slug 均存在、功能开关均登记、合并章 key 均在 registry）",
+            _OK_MESSAGE,
             ci=args.ci,
-            fail_message="[!] 发现 {n} 处语义命名索引不一致，须修正后提交",
+            fail_message=_FAIL_MESSAGE,
         )
     )
 

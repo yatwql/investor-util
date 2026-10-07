@@ -1,0 +1,178 @@
+    <div class="section" id="sec-data_source_status" style="order: {{ section_numbers['data_source_status'] }};">
+        <div class="section-title">{{ section_numbers['data_source_status'] }}、{{ section_names['data_source_status'] }}</div>
+        <details class="section-fold">
+            <summary class="section-fold-summary">
+                {{ (data_source_matrix or []) | length }} 个数据源 · 状态/命中源/降级明细 —— 点击展开/收起数据源可用性矩阵与降级明细
+            </summary>
+        <div class="section-content">
+            {% if data_source_matrix %}
+            <table>
+                <tr>
+                    <th>数据源</th>
+                    <th>状态</th>
+                    <th>命中源（本次取数）</th>
+                    <th>详情</th>
+                    <th>正常</th>
+                    <th>降级/失败</th>
+                </tr>
+                {% for m in data_source_matrix %}
+                <tr>
+                    <td style="text-align:left;font-weight:600;">{{ m.name }}</td>
+                    <td>
+                        {% if m.status == "ok" %}
+                        <span class="src-matrix-ok">&#10003; 正常</span>
+                        {% elif m.status == "degraded" %}
+                        <span class="src-matrix-degraded">&#9888; 降级</span>
+                        {% else %}
+                        <span class="src-matrix-failed">&#10007; 失败</span>
+                        {% endif %}
+                    </td>
+                    <td style="text-align:left;" class="src-matrix-detail">{{ m.get('providers_text', '—') }}</td>
+                    <td style="text-align:left;" class="src-matrix-detail">{{ m.detail }}</td>
+                    <td>{{ m.ok }}</td>
+                    <td>{{ m.degraded }}/{{ m.failed }}</td>
+                </tr>
+                {% endfor %}
+            </table>
+            {% set _has_failures = namespace(value=false) %}
+            {% set _has_degraded = namespace(value=false) %}
+            {% for m in data_source_matrix %}
+            {% if m.sample_failures %}
+            {% set _has_failures.value = true %}
+            {% endif %}
+            {% if m.degraded_list %}
+            {% set _has_degraded.value = true %}
+            {% endif %}
+            {% endfor %}
+            {% if _has_degraded.value %}
+            <div class="data-status" style="margin-top:12px;">
+                <div class="data-status-title">降级明细</div>
+                {% for m in data_source_matrix %}
+                {% for dg in m.degraded_list %}
+                <div class="data-status-warn">&#9888; [{{ m.name }}] {{ dg }}</div>
+                {% endfor %}
+                {% endfor %}
+            </div>
+            {% endif %}
+            {% if _has_failures.value %}
+            <div class="data-status" style="margin-top:12px;">
+                <div class="data-status-title">失败明细</div>
+                {% for m in data_source_matrix %}
+                {% for sf in m.sample_failures %}
+                <div class="data-status-info">&#8505; [{{ m.name }}] {{ sf }}</div>
+                {% endfor %}
+                {% endfor %}
+            </div>
+            {% endif %}
+            {% else %}
+            <div class="data-status" style="margin-top:0;">
+                <div class="data-status-ok" style="border-left-color:#27ae60;padding-left:8px;">所有数据源运行正常</div>
+            </div>
+            {% endif %}
+            <!-- 数据源说明表（实际使用清单：用途 / 计费 / 凭据要求） -->
+            {% if data_source_catalog %}
+            <div class="data-status" style="margin-top:12px;">
+                <div class="data-status-title">数据源说明（实际使用清单）</div>
+                <table>
+                    <tr>
+                        <th>数据类别</th>
+                        <th>实际数据源（链路）</th>
+                        <th>用途</th>
+                        <th>计费</th>
+                        <th>凭据 / 就绪</th>
+                        <th>本次使用</th>
+                    </tr>
+                    {% for item in data_source_catalog %}
+                    <tr>
+                        <td style="text-align:left;font-weight:600;">{{ item.category }}</td>
+                        <td style="text-align:left;">{{ item.provider }}{% if item.note %}；{{ item.note }}{% endif %}</td>
+                        <td style="text-align:left;">{{ item.usage }}</td>
+                        <td>{{ item.billing }}</td>
+                        <td>{{ item.auth }}</td>
+                        <td>
+                            {% if item.used %}
+                            <span class="src-matrix-ok">&#10003; 已使用</span>
+                            {% else %}
+                            <span style="color:#999;">&#9675; 未使用</span>
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </table>
+            </div>
+            {% endif %}
+            {% if data_quality_enabled %}
+            <!-- 品种覆盖区块（数据质量仪表盘子模块，功能开关 data_quality 开启时显示） -->
+            <div class="data-status" style="margin-top:12px;">
+                <div class="data-status-title">品种覆盖（逐品种数据状态）</div>
+                {% if position_status and position_status.available and position_status.get("items") %}
+                <table>
+                    <tr>
+                        <th>代码</th>
+                        <th>名称</th>
+                        <th>账户</th>
+                        <th>状态</th>
+                        <th>原因</th>
+                    </tr>
+                    {% for item in position_status.get("items") %}
+                    <tr>
+                        <td style="text-align:left;">{{ item.code }}</td>
+                        <td style="text-align:left;">{{ item.name }}</td>
+                        <td style="text-align:left;">{{ item.account }}</td>
+                        <td>
+                            {% if item.status == "ok" %}
+                            <span class="src-matrix-ok">&#10003; {{ item.status_label }}</span>
+                            {% else %}
+                            <span class="src-matrix-failed">{{ item.status_label }}</span>
+                            {% endif %}
+                        </td>
+                        <td style="text-align:left;">{{ item.reason }}</td>
+                    </tr>
+                    {% endfor %}
+                </table>
+                {% else %}
+                <div class="data-status-info">&#8505; 未获取行情数据，品种覆盖无法判定</div>
+                {% endif %}
+            </div>
+            <!-- 可信度区块（数据质量仪表盘子模块，功能开关 data_quality 开启时显示） -->
+            <div class="data-status" style="margin-top:12px;">
+                <div class="data-status-title">可信度（数据新鲜度 + 单日跳变）</div>
+                {% if data_freshness and data_freshness.available and data_freshness.get("items") %}
+                <table>
+                    <tr>
+                        <th>代码</th>
+                        <th>名称</th>
+                        <th>账户</th>
+                        <th>新鲜度</th>
+                        <th>单日变化 / 跳变</th>
+                    </tr>
+                    {% for item in data_freshness.get("items") %}
+                    <tr>
+                        <td style="text-align:left;">{{ item.code }}</td>
+                        <td style="text-align:left;">{{ item.name }}</td>
+                        <td style="text-align:left;">{{ item.account }}</td>
+                        <td>
+                            {% if item.jump %}
+                            <span class="src-matrix-failed">&#9888; {{ item.freshness_label }}</span>
+                            {% elif item.freshness in ("stale", "degraded") %}
+                            <span class="src-matrix-failed">{{ item.freshness_label }}</span>
+                            {% else %}
+                            <span class="src-matrix-ok">&#10003; {{ item.freshness_label }}</span>
+                            {% endif %}
+                        </td>
+                        <td style="text-align:left;">
+                            {% if item.jump_label %}<span class="src-matrix-failed">{{ item.jump_label }}</span>
+                            {% else %}{{ "%.2f"|format(item.change_pct) }}%{% endif %}
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </table>
+                {% else %}
+                <div class="data-status-info">&#8505; 未获取可信度数据，新鲜度/跳变无法判定</div>
+                {% endif %}
+            </div>
+            {% endif %}
+        </div>
+        </details>
+        {{ render_back_to_top() }}
+    </div>

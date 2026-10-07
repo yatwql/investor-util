@@ -1,0 +1,59 @@
+    <div class="section" id="sec-expert_review" style="order: {{ section_numbers['expert_review'] }};">
+        <div class="section-title">{{ section_numbers['expert_review'] }}、{{ section_names['expert_review'] }}
+            {%- if debate_mode_label %}
+            <span class="experimental-badge">{{ debate_mode_label }}</span>
+            {%- endif %}
+        </div>
+        {% if llm_enabled and expert_review %}
+        <div class="section-content">
+            {% if debate_info and debate_info.get("pro_text") and debate_info.get("con_text") %}
+            {# 辩论模式：显示白脸/黑脸/综合三段 #}
+            <div class="debate-block debate-pro">
+                <div class="debate-label">👍 白脸观点（持有理由）</div>
+                <div class="debate-content">{{ debate_info.pro_text | safe }}</div>
+            </div>
+            <div class="debate-block debate-con">
+                <div class="debate-label">👎 黑脸观点（卖出理由）</div>
+                <div class="debate-content">{{ debate_info.con_text | safe }}</div>
+            </div>
+            <div class="debate-block debate-synthesis">
+                <div class="debate-label">⚖️ 综合权衡</div>
+                <div class="debate-content">{{ expert_review | safe }}</div>
+            </div>
+            {% else %}
+            {{ expert_review | safe }}
+            {% endif %}
+        </div>
+        {% elif module_disabled.get("expert_review") %}
+        {# 模块已禁用，完全跳过 #}
+        {% else %}
+        <div class="section-content">
+            <div class="empty-note placeholder-note">
+                <p><strong>本节内容待生成</strong></p>
+                <p style="margin-top: 8px; font-size: 13px; color: #888;">
+                    模块说明：基于持仓明细、盈亏数据和持仓分类表，
+                    LLM 将生成个性化投资复盘，包括持仓结构优化建议、
+                    行业集中度风险预警、收益归因分析及调仓策略参考。
+                </p>
+                <p style="margin-top: 12px; font-size: 12px; color: var(--text-faint);">
+                    功能入口：菜单 L（生成全系列完整版报告）|
+                    需配置 LLM API Key 后自动启用
+                </p>
+            </div>
+        </div>
+        {% endif %}
+
+        <!-- 行动摘要子块：引用行动建议结果（单源计算、两处呈现，渲染数据经context传递/数据契约） -->
+        {% if section_visible("action") and action_data and action_data.available %}
+        <div class="section-content" style="margin-top: 12px; padding: 12px 14px; background: var(--surface-2); border: 1px solid var(--border); border-radius: 6px;">
+            <div style="font-weight: bold; font-size: 14px; color: #2E75B6; margin-bottom: 6px;">
+                行动摘要（详见第 {{ section_numbers['action'] }} 章「{{ section_names['action'] }}」）
+            </div>
+            <div class="summary-tag" style="margin-bottom: 0;">
+                {% if action_data.get("summary") %}{{ action_data["summary"] }}{% else %}暂无行动建议{% endif %}
+            </div>
+        </div>
+        {% endif %}
+
+        {{ render_back_to_top() }}
+    </div>

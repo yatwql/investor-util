@@ -222,9 +222,14 @@ class TestCandidateCompareTemplate(unittest.TestCase):
         self.tmpl_path = os.path.normpath(tmpl_path)
 
     def _extract_candidate_block(self) -> str:
-        """从真实模板中提取候选基金比较区块（按 if/endif 配平截取）。"""
+        """从真实模板（含 partials）中提取候选基金比较区块（按 if/endif 配平截取）。"""
         with open(self.tmpl_path, encoding="utf-8") as f:
             html = f.read()
+        _partial_dir = os.path.join(os.path.dirname(self.tmpl_path), "partials")
+        for _name in sorted(os.listdir(_partial_dir)):
+            if _name.endswith(".html"):
+                with open(os.path.join(_partial_dir, _name), encoding="utf-8") as f:
+                    html += "\n" + f.read()
         start_marker = "{% if candidate_data %}"
         start = html.find(start_marker)
         self.assertNotEqual(start, -1, "模板中未找到候选基金比较区块起点")
@@ -414,6 +419,12 @@ class TestFundFlowTemplate(unittest.TestCase):
         )
         with open(tmpl_path, encoding="utf-8") as f:
             self.html = f.read()
+        # 章节已拆分到 partials：拼接主模板与全部 partial（标记查找与 if/endif 配平不受拆分影响）
+        _partial_dir = os.path.join(os.path.dirname(tmpl_path), "partials")
+        for _name in sorted(os.listdir(_partial_dir)):
+            if _name.endswith(".html"):
+                with open(os.path.join(_partial_dir, _name), encoding="utf-8") as f:
+                    self.html += "\n" + f.read()
 
     def _extract_balanced_from(self, start: int) -> str:
         """按 if/endif 配平从 start 起截取一段（含起点标记本身）。"""

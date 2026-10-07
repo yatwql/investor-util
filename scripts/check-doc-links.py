@@ -41,7 +41,14 @@ from typing import Sequence
 from urllib.parse import unquote
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))  # 同目录共享设施（_checklib）
-from _checklib import REPO_ROOT, add_common_args, rel, report  # noqa: E402
+from _checklib import (  # noqa: E402
+    REPO_ROOT,
+    add_common_args,
+    conclusion_cache_load,
+    conclusion_cache_save,
+    rel,
+    report,
+)
 
 _SCOPE_GLOBS = (
     "README.md",
@@ -348,19 +355,29 @@ def run_checks(targets: Sequence[Path] | None = None) -> list[str]:
     return findings
 
 
+#: 结论文案（全量与缓存回放两路共用，保证输出逐字一致）
+_OK_MESSAGE = "[OK] 文档链接与结构一致（无死链/死锚点/重复标题/层级跳变/序号跳变/§引用失配）"
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description="文档链接与结构一致性检查（死链/死锚点/重复标题/层级/编号序列/§引用）")
     add_common_args(parser)
     args = parser.parse_args(argv)
     targets = default_targets()
+    # 结论缓存（仅 --ci 加载）：输入面 = 受检文档集本身（跨文件解析只在集内发生）
+    if args.ci:
+        cached = conclusion_cache_load("doc_links", [Path(__file__)], targets)
+        if cached is not None:
+            return report(cached["findings"], _OK_MESSAGE, ci=True)
     if args.verbose:
         print(f"[..] 扫描 {len(targets)} 份当前文档（归档豁免）：")
         for p in targets:
             print(f"     {rel(p)}")
     findings = run_checks(targets)
+    conclusion_cache_save("doc_links", [Path(__file__)], targets, {"findings": findings})
     return report(
         findings,
-        "[OK] 文档链接与结构一致（无死链/死锚点/重复标题/层级跳变/序号跳变/§引用失配）",
+        _OK_MESSAGE,
         ci=args.ci,
     )
 

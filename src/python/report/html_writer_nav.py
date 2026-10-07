@@ -2,7 +2,8 @@
 
 承载报告章节的两层可见性计算（board 层开关 × data 层数据就绪 × LLM 章级模块禁用）
 与「基础信息/基金深度分析/行动建议/历史/LLM/附录」目录折叠导航构建。纯函数 + 模块常量，
-无外部副作用。
+无外部副作用。分组与 🧠 标记均自 core/registry.py 的章节注册表派生（NAV_GROUPS /
+条目 nav_group / llm_supported 字段），本模块不自持第二份分组事实源。
 
 由 `html_writer.py`（聚合门面）re-export 对外提供。
 """
@@ -11,66 +12,31 @@ from __future__ import annotations
 
 from typing import Any
 
+from src.python.core.registry import NAV_GROUPS, _REPORT_SECTION_DEFAULT
 
 # ── HTML 目录分组导航（「基础信息/基金深度分析/行动建议/历史/LLM/附录」六组，导航折叠收尾） ──
 
-# 导航分组注册表（组名, 组 key），空组不渲染。渲染顺序不在这里承诺——
+# 导航分组视图（组名, 组 key），空组不渲染。渲染顺序不在这里承诺——
 # `_build_section_nav_groups` 按报告号线性序扫描、同组连续段聚块，
 # 保证目录展开序 == 正文线性序（号是唯一排序权威；分组只做聚合视图，不重排）。
-_NAV_GROUP_LABELS: list[tuple[str, str]] = [
-    ("基础信息", "basic"),
-    ("基金深度分析", "fund_deep"),
-    ("行动建议", "action"),
-    ("历史", "history"),
-    ("LLM", "llm"),
-    ("附录", "appendix"),
-]
+# 组定义（key / label / 顺序）单源于 registry.NAV_GROUPS（Excel 页签配色同源），
+# 此处仅投影为 (label, key) 元组视图供既有消费方使用。
+_NAV_GROUP_LABELS: list[tuple[str, str]] = [(g["label"], g["key"]) for g in NAV_GROUPS]
 
-# 章节 → 分组映射（语义分组；与报告模块注册表 key 一一对应，未知 key 回退「基础信息」组）。
-# 默认注册序下每组成员的号段连续（basic=1..3、fund_deep=4..6、action=7、llm=8..12、
-# history=13..16、appendix=17..19），一块即一组、展开即严格 1..N；
-# 用户跨组插号（report_section_order）时组在号序断点处拆块（同组可出现多块），
+# 章节 → 分组由注册表条目 nav_group 字段派生（未知 key 仅可能来自测试构造的最小
+# 条目，回退「基础信息」组；注册表条目漏配由 test_registry 的 nav_group 完整性
+# 用例拦截，不在渲染层静默容错）。默认注册序下每组成员的号段连续
+# （basic=1..3、fund_deep=4..6、action=7、llm=8..12、history=13..16、
+# appendix=17..19），一块即一组、展开即严格 1..N；用户跨组插号
+# （report_section_order）时组在号序断点处拆块（同组可出现多块），
 # 展开恒等于正文线性序，与正文（flex order = 报告号）逐位一致。
-_SECTION_NAV_GROUP_MAP: dict[str, str] = {
-    # 基础信息：汇总/持仓明细与分类/穿透
-    "summary": "basic",
-    "holdings_detail": "basic",
-    "penetration": "basic",
-    # 基金深度分析：基金业绩 + 基金深度分析系列章节
-    "fund_performance": "fund_deep",
-    "position_structure": "fund_deep",
-    "style_factor": "fund_deep",
-    # 行动建议：再平衡信号/交易纪律/调仓建议/收益归因（决策建议，非风险章节）
-    "action": "action",
-    # 历史：组合历史走势与回撤 + 组合演进 + 持仓变动复盘（快照事件级）
-    "portfolio_history_drawdown": "history",
-    "portfolio_evolution": "history",
-    "holding_change": "history",
-    "schedule_replay": "history",
-    # LLM：新闻关联 + LLM 文本分析系列（号段 8..12 连续）
-    "news_correlation": "llm",
-    "global_macro": "llm",
-    "expert_review": "llm",
-    "health_check": "llm",
-    "penetration_deep": "llm",
-    # 附录：收尾信息（数据源矩阵 / 持仓基本面附表 / LLM API 用量，号段尾部）
-    "data_source_status": "appendix",
-    "fundamental_snapshot": "appendix",
-    "llm_usage": "appendix",
-}
 
-# LLM 支持章节标记（🧠）：新闻关联 + LLM 文本分析系列 + API 用量。
-# 与导航分组解耦——🧠 表示「该章节由 LLM 参与生成」，导航分组只管目录位置
-# （如 llm_usage 属「附录」组但仍带 🧠）；由测试断言 llm 组 ⊆ 此集合防漂移。
+# LLM 支持章节标记（🧠）：由注册表条目 llm_supported 字段派生——新闻关联 +
+# LLM 文本分析系列 + API 用量。与导航分组解耦——🧠 表示「该章节由 LLM 参与生成」，
+# 导航分组只管目录位置（如 llm_usage 属「附录」组但仍带 🧠）；
+# 由测试断言 llm 组 ⊆ 此集合防漂移。
 _LLM_SUPPORTED_SECTIONS: frozenset[str] = frozenset(
-    {
-        "news_correlation",
-        "global_macro",
-        "expert_review",
-        "health_check",
-        "penetration_deep",
-        "llm_usage",
-    }
+    sec["key"] for sec in _REPORT_SECTION_DEFAULT if sec.get("llm_supported")
 )
 
 
@@ -219,7 +185,7 @@ def _build_section_nav_groups(
                 "number": section_numbers.get(key, 0),
                 "name": sec.get("name", key),
                 "llm_supported": key in _LLM_SUPPORTED_SECTIONS,
-                "group": _SECTION_NAV_GROUP_MAP.get(key, "basic"),
+                "group": sec.get("nav_group", "basic"),
             }
         )
     # 号是唯一排序权威：先按号排成正文线性序，再按同组连续段分块

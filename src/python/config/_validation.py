@@ -378,14 +378,16 @@ def _validate_report_section_order(config: dict, issues: int) -> int:
         return issues
     valid_keys = get_report_section_keys()
     seen_numbers: set[int] = set()
+    unknown_keys: list[str] = []
     for key, num in order.items():
         if key == "llm_usage":
             logger.warning("config.json report_section_order 中不应包含 llm_usage")
             issues += 1
             continue
         if key not in valid_keys:
-            logger.warning("config.json report_section_order 中存在未知的模块标识 %r", key)
+            logger.warning("config.json report_section_order 中存在未知的模块标识 %r（已自动清理）", key)
             issues += 1
+            unknown_keys.append(key)
             continue
         try:
             n = int(num)
@@ -402,6 +404,11 @@ def _validate_report_section_order(config: dict, issues: int) -> int:
             issues += 1
         else:
             seen_numbers.add(n)
+    # 未知键从内存配置剔除：注册表没有对应条目时它既不参与排序也不占号，
+    # 留着会让「已配置在前/未配置排尾」的合并产生错位预期；文件层漂移仍计 1
+    # 问题提示同步 config.json（校验不回写文件）。
+    for key in unknown_keys:
+        order.pop(key, None)
     return issues
 
 

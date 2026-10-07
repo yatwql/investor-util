@@ -101,7 +101,13 @@ __all__ = [
     "_round_excludes",
 ]
 
-from _checklib import REPO_ROOT, add_common_args, rel  # noqa: E402
+from _checklib import (  # noqa: E402
+    REPO_ROOT,
+    add_common_args,
+    conclusion_cache_load,
+    conclusion_cache_save,
+    rel,
+)
 
 README_PATH = REPO_ROOT / "README.md"
 DOC_DIRS = [
@@ -479,15 +485,63 @@ def _iter_docs(trace_exempt: bool = False) -> list[Path]:
     return docs
 
 
+def _cache_inputs() -> list[Path]:
+    """结论缓存输入面：受检文档全集（复用 `_iter_docs` 两态走查，与扫描面严格一致）。"""
+    return [*_iter_docs(trace_exempt=False), *_iter_docs(trace_exempt=True)]
+
+
+def _render_summary(total: int, high: int, low: int, summary: dict[str, int]) -> int:
+    """结论汇总输出（全量与缓存回放两路共用，保证输出逐字一致）。"""
+    print()
+    if total == 0:
+        print("[OK] 未发现历史变更痕迹，文档干净")
+        return 0
+    cat_stats = ", ".join(f"{k}={v}" for k, v in sorted(summary.items()))
+    print(f"[!] 发现 {total} 处可疑痕迹（{cat_stats}）")
+    if high > 0:
+        print(f"    {high} 处高置信度（HIGH/ARCHIVE/CODE/CIPHER/CHAPTER/ROUND），应从文档中移除")
+        return 1
+    print(f"[!] 仅 {low} 处 LOW 级别痕迹（需人工判断），建议复核")
+    return 2
+
+
+def _replay_conclusion(conclusion: dict | None) -> tuple[list[str], int, int, int, dict] | None:
+    """校验缓存结论结构 → 回放元组；结构不完整 → None（全量重算）。"""
+    if not isinstance(conclusion, dict):
+        return None
+    lines = conclusion.get("findings")
+    try:
+        total = int(conclusion["total"])
+        high = int(conclusion["high"])
+        low = int(conclusion["low"])
+        cat_summary = conclusion["summary"]
+    except (KeyError, TypeError, ValueError):
+        return None
+    if not isinstance(lines, list) or not isinstance(cat_summary, dict):
+        return None
+    return lines, total, high, low, cat_summary
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description="扫描文档中的历史变更痕迹")
     add_common_args(parser)
     args = parser.parse_args()
 
+    # 结论缓存（仅 --ci 加载）：命中则逐字回放上次结论（通过与发现都缓存）
+    cache_inputs = _cache_inputs()
+    if args.ci:
+        replay = _replay_conclusion(conclusion_cache_load("doc_traces", [Path(__file__)], cache_inputs))
+        if replay is not None:
+            cached_lines, cached_total, cached_high, cached_low, cached_summary = replay
+            for line in cached_lines:
+                print(line)
+            return _render_summary(cached_total, cached_high, cached_low, cached_summary)
+
     total_hits = 0
     high_count = 0
     low_count = 0
     summary: dict[str, int] = {}
+    ci_lines: list[str] = []
 
     def report_doc(doc: Path, hits: list[tuple[int, str, str, str]]) -> None:
         """报告单个文档的命中（非 local，作为闭包读取/修改外层统计）。"""
@@ -507,8 +561,9 @@ def main() -> int:
             else:
                 low_count += 1
 
+            ci_lines.append(f"{rel_path}:{lineno} [{cat}] {desc} — {text}")
             if args.ci:
-                print(f"{rel_path}:{lineno} [{cat}] {desc} — {text}")
+                print(ci_lines[-1])
             else:
                 marker = "[ERR]" if is_high else "[!]"
                 print(f"    {marker} L{lineno:>4} [{cat}] {desc}")
@@ -524,18 +579,13 @@ def main() -> int:
     for doc in _iter_docs(trace_exempt=True):
         report_doc(doc, scan_file(doc, args.verbose, chapter_only=True))
 
-    print()
-    if total_hits == 0:
-        print("[OK] 未发现历史变更痕迹，文档干净")
-        return 0
-
-    cat_stats = ", ".join(f"{k}={v}" for k, v in sorted(summary.items()))
-    print(f"[!] 发现 {total_hits} 处可疑痕迹（{cat_stats}）")
-    if high_count > 0:
-        print(f"    {high_count} 处高置信度（HIGH/ARCHIVE/CODE/CHAPTER/ROUND），应从文档中移除")
-        return 1
-    print(f"[!] 仅 {low_count} 处 LOW 级别痕迹（需人工判断），建议复核")
-    return 2
+    conclusion_cache_save(
+        "doc_traces",
+        [Path(__file__)],
+        cache_inputs,
+        {"findings": ci_lines, "total": total_hits, "high": high_count, "low": low_count, "summary": summary},
+    )
+    return _render_summary(total_hits, high_count, low_count, summary)
 
 
 if __name__ == "__main__":

@@ -978,7 +978,8 @@ class TestWriteSummarySheet(unittest.TestCase):
             self.today,
             categories=self.categories,
         )
-        mocks["mock_freeze"].assert_called_once_with(self.ws, 2)
+        # 冻结跟随表头行（mock 的 write_title_row 返回 3 → 表头 3 → 冻结 3），导航区插入时自动下移
+        mocks["mock_freeze"].assert_called_once_with(self.ws, 3)
         mocks["mock_auto"].assert_called_once_with(self.ws)
 
     def test_worksheet_title_not_overwritten(self):

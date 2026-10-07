@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+from src.python.core.constants import LATEST_HTML_NAME, REPORT_FILE_BASE
 import os
 from datetime import datetime
 
@@ -28,7 +29,7 @@ def _save_html_report(
     _ensure_reports_dir(output_dir)
 
     # 最新版
-    latest_path = os.path.join(output_dir, "个人投资分析报告.html")
+    latest_path = os.path.join(output_dir, LATEST_HTML_NAME)
     with open(latest_path, "w", encoding="utf-8") as f:
         f.write(html)
     logger.info("最新 HTML 报告已保存: %s", latest_path)
@@ -39,7 +40,7 @@ def _save_html_report(
     os.makedirs(archive_dir, exist_ok=True)
     archive_path = os.path.join(
         archive_dir,
-        f"个人投资分析报告-{datetime.now().strftime('%Y%m%d-%H%M%S')}.html",
+        f"{REPORT_FILE_BASE}-{datetime.now().strftime('%Y%m%d-%H%M%S')}.html",
     )
     with open(archive_path, "w", encoding="utf-8") as f:
         f.write(html)

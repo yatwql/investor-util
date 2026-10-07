@@ -284,9 +284,10 @@ class TestSwitchAndWiring:
         assert _PIPELINE_DATA_TYPE_MAP["financial_indicator_data"] == (dict, type(None))
 
     def test_nav_group_and_template_include(self):
-        from src.python.report.html_writer_nav import _SECTION_NAV_GROUP_MAP
+        from src.python.core.registry import _REPORT_SECTION_DEFAULT
 
-        assert _SECTION_NAV_GROUP_MAP["fundamental_snapshot"] == "appendix"
+        entry = next(sec for sec in _REPORT_SECTION_DEFAULT if sec["key"] == "fundamental_snapshot")
+        assert entry["nav_group"] == "appendix"
 
         tmpl_dir = Path(__file__).resolve().parents[3] / "static" / "tmpl"
         template = (tmpl_dir / "report_template.html").read_text(encoding="utf-8")
