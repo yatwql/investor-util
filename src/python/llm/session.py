@@ -12,6 +12,7 @@ logger = logging.getLogger("invest")
 
 __all__ = [
     "_session_usage",
+    "_normalize_usage_tokens",
     "reset_session_usage",
     "get_session_usage",
     "format_session_usage",
@@ -105,19 +106,39 @@ def format_session_usage(raw: dict[str, Any] | None) -> dict[str, Any]:
     }
 
 
+def _normalize_usage_tokens(provider: str, usage: dict | None) -> tuple[int, int, int]:
+    """把 provider 原始 usage 归一为 ``(input, output, cache_hit)``。
+
+    - ``claude`` 协议：``input_tokens`` / ``output_tokens`` / ``cache_read_input_tokens``；
+    - 其余协议（``openai`` 原生；``gemini`` 经 ``usageMetadata`` 归一形）：
+      ``prompt_tokens`` / ``completion_tokens``，缓存命中读
+      ``prompt_tokens_details.cached_tokens``（字段缺失或为空时为 0）。
+
+    ``api_base._log_token_usage`` 与本模块 ``track_session_usage`` 共用本函数
+    ——两处计量口径由结构保证一致，而非靠两份分支逐字对齐。
+    """
+    if not usage:
+        return (0, 0, 0)
+    if provider == "claude":
+        return (
+            usage.get("input_tokens", 0) or 0,
+            usage.get("output_tokens", 0) or 0,
+            usage.get("cache_read_input_tokens", 0) or 0,
+        )
+    details = usage.get("prompt_tokens_details") or {}
+    return (
+        usage.get("prompt_tokens", 0) or 0,
+        usage.get("completion_tokens", 0) or 0,
+        details.get("cached_tokens", 0) or 0,
+    )
+
+
 def track_session_usage(provider: str, usage: dict | None, model_name: str = "") -> None:
     """将一次 LLM 调用的用量累计到会话统计。"""
     global _session_usage
     if not usage:
         return
-    if provider == "claude":
-        inp = usage.get("input_tokens", 0)
-        out = usage.get("output_tokens", 0)
-        cache_hit = usage.get("cache_read_input_tokens", 0)
-    else:
-        inp = usage.get("prompt_tokens", 0)
-        out = usage.get("completion_tokens", 0)
-        cache_hit = 0
+    inp, out, cache_hit = _normalize_usage_tokens(provider, usage)
     with _session_lock:
         _session_usage["input_tokens"] += inp
         _session_usage["output_tokens"] += out

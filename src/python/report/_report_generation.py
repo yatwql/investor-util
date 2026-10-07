@@ -13,13 +13,18 @@ from __future__ import annotations
 
 from src.python.report._experimental_seams import (
     apply_module_quality_banners,
+    inject_holding_change_data,
+    inject_schedule_replay_data,
     record_deterministic_decisions,
     record_deterministic_signals,
     record_llm_decisions_and_review_block,
     record_prosperity_diagnosis,
 )
 from src.python.report.progress import ProgressReporter
-from src.python.report._report_output import _generate_full_excel_report  # noqa: F401
+from src.python.report._report_output import (  # noqa: F401  # 产物落盘子模块（消费方在本门面，patch 点不变）
+    _generate_full_excel_report,
+    _generate_full_html_report,
+)
 
 # ── 子模块 re-export ────────────────────────────────────
 from src.python.report._chart_dataset_factory import _build_chart_datasets_for_report  # noqa: F401
@@ -38,146 +43,6 @@ logger = __import__("logging").getLogger("invest")
 
 
 # ── _generate_full_html_report ─────────────────────────
-
-
-def _generate_full_html_report(
-    holdings: list,
-    prep: dict,
-    output_dir: str | None,
-    sec_order: list,
-    llm_content: tuple,
-    news_data: list,
-    news_llm_meta: dict,
-    news_ok: bool,
-    history_data: dict | None,
-    reporter: ProgressReporter,
-    enable_fund_deep_analysis: bool,
-    enable_news: bool,
-    enable_history: bool,
-    enable_llm: bool,
-    debate_info: dict | None,
-    result,
-    metrics: dict | None = None,
-    style_factor_data: dict | None = None,
-    position_relationship_data: dict | None = None,
-    evolution_data: dict | None = None,
-    enable_portfolio_evolution: bool = True,
-    enable_action: bool = False,
-    enable_data_quality: bool = False,
-    position_status: dict | None = None,
-    data_freshness: dict | None = None,
-    action_data: dict | None = None,
-    crisis_annotation_data: dict | None = None,
-    tail_risk_data: dict | None = None,
-    snapshot_diff_data: dict | None = None,
-    fund_flow_data: dict | None = None,
-    valuation_data: dict | None = None,
-    market_temperature_data: dict | None = None,
-    decision_review_data: dict | None = None,
-    prosperity_framework_data: dict | None = None,
-    enable_fundamental_snapshot: bool = False,
-    financial_report_digest_data: dict | None = None,
-    financial_indicator_data: dict | None = None,
-    market_sentiment_data: dict | None = None,
-    purchase_status_data: dict | None = None,
-) -> bool:
-    """full 路径的 HTML 报告生成，返回是否成功。
-
-    Args:
-        metrics: compute_all_metrics() 返回值（14 项全量，仅 full 路径）；
-            用于构建 radar 图数据（无则从 risk_metrics/history_data 降级）。
-        style_factor_data: 风格与因子分析数据契约 dict（style_factor_data 主键，
-            内嵌 industry_beta 子键），基金深度分析关闭或数据不足时为 None/available=False。
-        position_relationship_data: 持仓关系矩阵数据契约 dict（相关性区块数据源），
-            基金深度分析关闭或数据不足时为 None/available=False。
-        evolution_data: 组合演进数据契约 dict（多快照趋势聚合），
-            数据不足时 available=False（模板写占位）。
-        enable_portfolio_evolution: board 层 — 组合演进章节是否开启。
-        enable_data_quality: 子模块 — 数据质量仪表盘（默认关，保持旧样式）。
-        position_status: 品种覆盖诊断 `position_status` 契约 dict，
-            品种覆盖区块数据源（开关关闭时忽略）。
-        data_freshness: 可信度摘要 `data_freshness` 契约 dict，
-            可信度区块 + 报告头部数据异常摘要行数据源（开关关闭时忽略）。
-        enable_action: board 层 — 行动建议章节是否开启（config 默认开）。
-        action_data: 行动建议单一数据源 `action_data` 契约 dict，
-            行动建议板块 + 智囊团深度复盘行动摘要数据源（开关关闭时忽略）。
-        fund_flow_data: 成本流水数据 dict
-            （汇总 XIRR / 持仓分类成本分档与分红 / 市值核算资金加权成本渲染数据源，
-            开关关闭或传入 None 时模板保持既有输出）。
-        valuation_data: 估值分位数据契约 dict（「资产穿透TOP10」估值分位列数据源，
-            开关关闭或传入 None 时模板保持既有输出）。
-        market_temperature_data: 市场温度数据契约 dict
-            （「投资分析汇总」市场温度刻度行数据源，开关关闭或传入 None 时保持既有输出）。
-        market_sentiment_data: 市场情绪与持仓热点契约 dict（报告增强开关 `market_sentiment`，
-            行动建议章内嵌区块数据源，开关关闭或传入 None 时保持既有输出）。
-            与 Excel 侧同源，由编排层 `_generate_report_full` 注入——须在写 HTML 之前完成
-            取数，否则本类别既不出现在矩阵、说明表也记「未使用」（与 Excel 自相矛盾）。
-    """
-    from src.python.config.features import is_feature_enabled
-    from src.python.report.html_writer import write_html_report
-
-    _report_label = "含新闻 + LLM" if news_ok else "仅 LLM"
-    reporter.info(f"正在生成 HTML 报告（{_report_label}分析章节）...")
-    try:
-        _enable_interactive_charts = is_feature_enabled("enable_interactive_charts")
-        chart_datasets = _build_chart_datasets_for_report(
-            history_data=history_data,
-            details=prep.get("details"),
-            risk_metrics=prep.get("risk_metrics"),
-            all_metrics=metrics,
-            enable_interactive=_enable_interactive_charts,
-        )
-        path = write_html_report(
-            holdings,
-            output_dir=output_dir or prep["output_dir"],
-            news_top_count=prep["news_top_count"],
-            include_news=news_ok,
-            llm_content=llm_content,
-            details=prep["details"],
-            news_data=news_data,
-            news_llm_meta=news_llm_meta,
-            section_order=sec_order,
-            history_data=history_data,
-            progress=reporter,
-            a_indices=prep["a_indices"],
-            us_indices=prep["us_indices"],
-            enable_fund_deep_analysis=enable_fund_deep_analysis,
-            enable_news=enable_news,
-            enable_history=enable_history,
-            enable_portfolio_evolution=enable_portfolio_evolution,
-            enable_action=enable_action,
-            enable_llm=enable_llm,
-            debate_info=debate_info,
-            chart_datasets=chart_datasets,
-            enable_interactive_charts=_enable_interactive_charts,
-            style_factor_data=style_factor_data,
-            position_relationship_data=position_relationship_data,
-            evolution_data=evolution_data,
-            enable_data_quality=enable_data_quality,
-            position_status=position_status,
-            data_freshness=data_freshness,
-            action_data=action_data,
-            prosperity_framework_data=prosperity_framework_data,
-            crisis_annotation_data=crisis_annotation_data,
-            tail_risk_data=tail_risk_data,
-            snapshot_diff_data=snapshot_diff_data,
-            fund_flow_data=fund_flow_data,
-            valuation_data=valuation_data,
-            market_temperature_data=market_temperature_data,
-            decision_review_data=decision_review_data,
-            market_sentiment_data=market_sentiment_data,
-            enable_fundamental_snapshot=enable_fundamental_snapshot,
-            financial_report_digest_data=financial_report_digest_data,
-            financial_indicator_data=financial_indicator_data,
-            purchase_status_data=purchase_status_data,
-        )
-        reporter.ok(f"HTML 报告已生成: {path}")
-        return True
-    except Exception:
-        reporter.add_error("HTML 报告生成失败（详情请查看日志文件 logs/app.log）")
-        logger.exception("HTML 报告写入失败")
-        result.errors.append("HTML 报告生成失败")
-        return False
 
 
 # ── _generate_report_both（生成 HTML+Excel，不含 LLM）──
@@ -299,6 +164,9 @@ def _generate_report_both(
         # 2b1. 快照差异摘要（snapshot_diff_data）：组合演进章顶部变化摘要，
         #      与演进数据同开关（同属组合演进章节）
         pipeline_data = _inject_snapshot_diff_data(pipeline_data, snapshot_namespace=snapshot_namespace)
+    # 2b2. 持仓变动复盘（实验开关 holding_change_review，默认关；独立于演进开关）：
+    #      事件清单差分须晚于本次快照捕获；开关关闭时键缺席 → 整章隐藏（见 seams）
+    inject_holding_change_data(pipeline_data, config, reporter, snapshot_namespace=snapshot_namespace)
     # 2c. 品种覆盖诊断 + 可信度摘要：逐品种数据状态/新鲜度标注，注入 pipeline_data
     #    （position_status + data_freshness）
     from src.python.core.data_freshness import build_freshness_summary
@@ -436,6 +304,9 @@ def _generate_report_both(
             financial_report_digest_data=financial_report_digest_data,
             financial_indicator_data=financial_indicator_data,
             purchase_status_data=purchase_status_data,
+            holding_change_data=(pipeline_data or {}).get("holding_change_data"),
+            event_impact_data=(pipeline_data or {}).get("event_impact_data"),
+            schedule_replay_data=(pipeline_data or {}).get("schedule_replay_data"),
         )
         reporter.ok(f"HTML 报告已生成: {path}")
         result.html_ok = True
@@ -570,6 +441,7 @@ def _generate_report_full(
     # 注入 pipeline_data 供 HTML/Excel 消费；capture_snapshot 在降级路径可能返回 None，需判空
     if pipeline_data is not None:
         pipeline_data["style_factor_data"] = prep.get("style_factor_data")
+        pipeline_data["factor_catalog_data"] = prep.get("factor_catalog_data")
         pipeline_data["position_relationship_data"] = prep.get("position_relationship_data")
         pipeline_data["position_status"] = prep.get("position_status")
         pipeline_data["data_freshness"] = prep.get("data_freshness")
@@ -591,6 +463,12 @@ def _generate_report_full(
         # 2b1. 快照差异摘要（snapshot_diff_data）：组合演进章顶部变化摘要，
         #      与演进数据同开关（同属组合演进章节）
         pipeline_data = _inject_snapshot_diff_data(pipeline_data, snapshot_namespace=snapshot_namespace)
+    # 2b2. 持仓变动复盘（实验开关 holding_change_review，默认关；独立于演进开关）：
+    #      事件清单差分须晚于本次快照捕获；开关关闭时键缺席 → 整章隐藏（见 seams）
+    inject_holding_change_data(pipeline_data, config, reporter, snapshot_namespace=snapshot_namespace)
+    # 2b3. 调仓纪律回放（实验开关 rebalance_schedule_replay，默认关）：多期规则回放
+    #     装配（持仓 + 历史净值 + 成本两态）；开关关闭时键缺席 → 整章隐藏（见 seams）
+    inject_schedule_replay_data(pipeline_data, reporter, holdings=holdings)
     perf.stop()
 
     # ── 3. 历史走势 + 全量量化指标 ──
@@ -728,6 +606,7 @@ def _generate_report_full(
         result,
         _metrics,
         prep.get("style_factor_data"),
+        prep.get("factor_catalog_data"),
         prep.get("position_relationship_data"),
         (pipeline_data or {}).get("evolution_data"),
         _enable_portfolio_evolution,
@@ -749,6 +628,9 @@ def _generate_report_full(
         financial_indicator_data=(pipeline_data or {}).get("financial_indicator_data"),
         purchase_status_data=(pipeline_data or {}).get("purchase_status_data"),
         market_sentiment_data=(pipeline_data or {}).get("market_sentiment_data"),
+        holding_change_data=(pipeline_data or {}).get("holding_change_data"),
+        event_impact_data=(pipeline_data or {}).get("event_impact_data"),
+        schedule_replay_data=(pipeline_data or {}).get("schedule_replay_data"),
     )
 
     # ── 7. Excel 报告 ──

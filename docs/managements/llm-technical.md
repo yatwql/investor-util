@@ -1,5 +1,5 @@
 # LLM 集成层技术设计
-> 文档版本：0.12.3
+> 文档版本：0.12.4
 
 本文档是 `technical.md` 的 LLM 集成层专项技术设计补充，对应 `technical.md` §5（LLM 集成层概要设计）。
 `technical.md` §5 提供 LLM 层的总体架构、模块清单、调用链概览、多 Provider 链模式概要及关键机制速览；
@@ -161,9 +161,11 @@ skeleton.py:generate_llm_content()
 
 | 模块 | 分类 | 职责 | 入口函数 |
 |:-----|:-----|:------|:---------|
-| `generators_orchestrator.py` | 编排层 | 4+1 模块并行调度，缓存预检查，线程池分发；**生成后一遍**（事实锚定校验 + 可选生成后自检） | `generate_all_llm()` |
-| `generators.py` | 生成层 | 4 个单例生成函数（global_macro / expert_review / health_check / penetration_deep）+ 辩论模式 pro/con/synthesis 生成 + `generate_self_review()`（生成后自检） | 各 `generate_*()` |
+| `generators_orchestrator.py` | 编排门面 | 缓存预检查（`_compute_module_cache_info` / `_precheck_*`）+ 主编排入口与**生成后一遍**（事实锚定校验 + 可选生成后自检）；worker 装配与线程池分发下沉 `_llm_dispatch.py` 并经本门面 re-export（`_dispatch_llm_workers`，patch 点不变） | `generate_all_llm()` |
+| `_llm_dispatch.py` | 编排层 | 4+1 模块并行调度：`_build_module_fns` 模块→生成函数映射（`_MODULE_FNS`）、`ThreadPoolExecutor` 分发与进度回调、thinking 串行上限与辩论模式 `_debate_wrapper` 路由、`_LLM_CLIENT_SETTINGS` HTTP 客户端设置 | `_dispatch_llm_workers()` |
+| `generators.py` | 生成层 | 4 个单例生成函数（global_macro / expert_review / health_check / penetration_deep）+ 辩论模式 pro/con/synthesis 生成 + `generate_self_review()`（生成后自检）+ `generate_holding_change_review()`（持仓变动复盘归因） | 各 `generate_*()` |
 | `self_review.py` | 运行作用域 | 生成后自检的开关判定/输入存在性判定/失败隔离与运行作用域载体（报告层零参 pull；**不经** `_MODULE_FNS` 并行调度） | `run_self_review()` / `get_self_review_block()` |
+| `holding_change_review.py` | 运行作用域 | 持仓变动复盘归因的契约准入（feature + 快照准入 + 事实块非空）/失败隔离，结果写回契约 `llm_review`（**不经** `_MODULE_FNS` 并行调度，编排层串行后置调用） | `run_holding_change_review()` |
 | `depth_profile.py` | 配置层 | 报告深度档位表（唯一事实来源）：档位只**收窄**模块集合与新闻采集规模，不进提示词正文 | `resolve_depth_profile()` / `depth_gate()` |
 | `generators_news.py` | 生成层 | 新闻 LLM 二次关联分析（批量模式 7 函数） | `enhance_news_correlation()` |
 | `_llm_news_correlation.py` | 私有 | 新闻关联安全直调入口（返回类型 `(list[dict], bool, dict)` 与其余四模块的 `(str, bool)` 不同，**不经编排层线程池**，由 `report/news_correlation.py` 直接调用），由 `generators_orchestrator.py`（聚合门面）re-export 对外提供 | `run_news_correlation_safe()` |
@@ -478,7 +480,7 @@ llm_providers.json
 | **复用既有原语** | 间隔与抖动等待由 `core/throttle.py::RateLimiter` 提供（`acquire_interval(key, interval, jitter_ratio)`；抖动算式 `interval_delay` 为唯一来源）——与数据层 qps 限速、`batch_rate_limit` 共用同一实现，`pacing` 只负责声明解析与在途并发上限 |
 | **异常必释放** | `PacingGate` 以 context manager 实现，`__exit__` 无条件 release，避免异常路径把端点占死 |
 | **配置容错** | `pacing` 字段类型错误**逐字段忽略**（记 WARNING），不因单个笔误使整条 provider 校验失败 |
-| **429 诊断回显** | 端点返回 429 时日志先回显两级实际配置（全局 `llm_max_concurrency` + 该 provider 条目 `pacing.max_concurrency`、`pacing.min_interval`；端点约束未声明标「未配置（不限流）」、间隔未声明标「未配置」），再按「还有没有下降空间」给建议：未声明 `pacing` → 提示配置端点约束；端点 >1 → 提示调低端点值（最低 1）；端点已=1 而全局 >1 → 只提示调低全局（带当前值）或加大 `min_interval`（带当前值）；**两级均已到底 → 明确再调低并发已无益，429 更可能来自配额（RPM/TPM）或风控，改指向 `min_interval`（带当前值）/减少同批调用/切换 provider**（`api_base._concurrency_hint`） |
+| **429 诊断回显** | 端点返回 429 时日志先回显两级实际配置（全局 `llm_max_concurrency` + 该 provider 条目 `pacing.max_concurrency`、`pacing.min_interval`；端点约束未声明标「未配置（不限流）」、间隔未声明标「未配置」），再按**生效并发 = min(全局, 端点)**（端点未配置时即全局值）判定还有没有下降空间：未声明 `pacing` → 提示配置端点约束；生效并发 >1 → 只建议**绑定项**（等于生效并发的那一级：端点 < 全局只调端点、全局 < 端点只调全局、相等则两个都列；非绑定项注明「须低于对方现值才生效」）；生效并发 =1（端点已=1 或全局已=1）→ 明确**调低任何并发旋钮均不再减少该端点在途并发**（端点=1 时调低全局对 min(全局,1) 恒无效），不给无效建议，改指向 `min_interval`（带当前值）/请求速率与配额（RPM/TPM）/风控判断/切换 provider（`pacing._concurrency_hint`） |
 | **策略惰性装载兜底** | 注册表由 `_inject_provider_chain_data() → register_policies()` 在配置装载时写入；未经该路径的入口（单测 / 脚本 / `doctor` 概览）由 `pacing._ensure_loaded()` 兜底，按与生产装载**同源**的 `get_llm_config()._provider_list` 再装载一次——否则这些路径拿不到策略、静默按「无约束」处理（与上表「缺省零影响」语义混淆） |
 
 **与 403 的配合**：端点返回 403（配额/风控，如 5 小时窗口用尽、并发上限）时**不重试**——这类限制按时间窗口滚动而非瞬时故障，重试无益且高频重试会加剧风控画像。`_attempt_api_call` 将其归为 `("quota", 403)`，重试骨架直接返回并记 `FAIL_REASON_QUOTA_EXCEEDED`，报告显示「LLM 端点配额/风控限制已触发」并降级到下一 provider。**429 / 503 仍按 `max_retries` 重试**（真正的瞬时限制）。
@@ -841,14 +843,15 @@ penetrated_assets ──→ extract_stable_penetration()
 | `metrics` | `expert_review` / 辩论三键 | 提示词正文（【量化指标】/ 情景分析 / 风格一致性） | 量化指标字典 |
 | `data_quality_text` | `health_check` | `prompts_tables._build_data_quality_detail_block()` | 数据质量详细状态块（【数据质量详细状态】：净值新鲜度基准 + 净值滞后/无有效行情清单 + 连接失败 / 数据为空 / 触发降级计数），由 `degradation_events`（本进程内的降级事件日志）与 `data_freshness` 契约（交易日 + 逐品种新鲜度）共同渲染而成 |
 | `pipeline_data` 派生的【环比变化】【数据质量降级】两段 | `expert_review` / `health_check` / 辩论三键 | `prompts_core._build_difpipeline_data_block()` / `_build_data_degradation_block()` | 由 `_pipeline_block_cache_suffix()` 调用**提示词侧同一构建器**取文本再哈希——「进键的文本」与「进提示词的文本」同源 |
-| `purchase_constraint_block`（申购限购约束块） | 标准四模块 + 辩论三键 + `self_review` | `prompts_tables._build_prompt_appendix()` 第 4 段 | 由 `extract_purchase_constraint_block(pipeline_data)` **唯一提取点**取契约字段 `constraint_block`（report 构建期渲染一次），同一实例交预检侧 `purchase_block` 与写侧附录；块空不进提示词也不进键（接线前录制四模块基线，断言空块 == 引入前黄金值，防「空串+分隔符」换哈希）；新闻批量路径 `_batch_prompt` 拼块 + `_batch_preparer` 并入 `context_fp` 同源 |
+| `purchase_constraint_block`（申购限购约束块） | 标准四模块 + 辩论三键 + `self_review` | `prompts_tables._build_prompt_appendix()` 第 4 段 |
+| `holding_change_block`（持仓变动复盘提示词块） | 标准四模块 + 辩论三键 + `self_review`（附录形态与 purchase 块平行） | `prompts_tables._build_prompt_appendix()` 第 5 段 | 由 `extract_holding_change_block(pipeline_data)` **唯一提取点**取契约字段 `prompt_block`（report 构建期经展示视图同源渲染一次），同一实例交预检侧 `holding_change_block` 与写侧附录；块空不进提示词也不进键（关态逐字节回退）；章内归因块另走 `holding_change_review_fingerprint` 内容寻址 | 由 `extract_purchase_constraint_block(pipeline_data)` **唯一提取点**取契约字段 `constraint_block`（report 构建期渲染一次），同一实例交预检侧 `purchase_block` 与写侧附录；块空不进提示词也不进键（接线前录制四模块基线，断言空块 == 引入前黄金值，防「空串+分隔符」换哈希）；新闻批量路径 `_batch_prompt` 拼块 + `_batch_preparer` 并入 `context_fp` 同源 |
 
 **两个结构性保证**：
 
 1. **覆盖以提示词为准，而非以「是否与持仓相关」为准**：每段只进「提示词确实含该段」的模块——`competitive_context` / `metrics` 不进 `health_check` / `penetration_deep`（其提示词不含这两段），`data_quality_text` 只进 `health_check`（仅它的提示词含数据质量段）。反向的 `history_data`/信号后缀也遵循同一判据：进提示词的进键，没进的不进键。
 2. **一次渲染、两侧共享同一实例**：`competitive_context` 与 `data_quality_text` 均由 `generate_all_llm()` 渲染**一次**，同一字符串实例同时交给预检侧（`_compute_module_cache_info`）与写侧（各生成函数）——两侧**不得各自渲染**。哈希「已渲染文本」而非哈希其输入 dict，使得「提示词内容变 ⇒ 键必变」由构造保证：将来改动渲染函数（增删字段、调整格式）不可能悄悄让键与提示词脱钩。若两侧各渲染一份，该保证就退化为靠纪律对齐的两次渲染一致性。
 
-**辩论三键（`debate_procon_fingerprint` / `debate_synthesis_fingerprint`）**：辩论模式绕过标准预检，其键族 `llm_debate_*` 与标准键不同，故**仅写侧**使用、不进 `MODULE_FINGERPRINT_BUILDERS`。其输入口径同样以辩论提示词实际包含的段落为准——含基础持仓 + 竞争语境块 + 量化指标 + 辩论增强后缀 + `pipeline_data` 派生的【环比变化】【数据质量降级】两段（白脸/黑脸复用 `_build_expert_review_prompt`，这两段随其进入提示词），**刻意不并入** `history_data` 与教训/信号摘要/结构化决策头后缀（辩论提示词不含这些段落，并入只会让白脸/黑脸/综合三次昂贵调用每份报告必 miss）。
+**辩论三键（`debate_procon_fingerprint` / `debate_synthesis_fingerprint`）**：辩论模式绕过标准预检，其键族 `llm_debate_*` 与标准键不同，故**仅写侧**使用、不进 `MODULE_FINGERPRINT_BUILDERS`。其输入口径同样以辩论提示词实际包含的段落为准——含基础持仓 + 竞争语境块 + 量化指标 + 辩论增强后缀 + `pipeline_data` 派生的【环比变化】【数据质量降级】两段（白脸/黑脸复用 `_build_expert_review_prompt`，这两段随其进入提示词）+ 统一 prompt 附录四块（申购限购 / 持仓变动复盘 / 事件窗分歧例 / 调仓纪律回放，非空才并入——白脸/黑脸经 `generate_llm_module` → skeleton 追加附录，仅附录内容变化时也须换键，否则回放带旧附录上下文的旧输出；空串不追加 part，键与引入前逐字节一致），**刻意不并入** `history_data` 与教训/信号摘要/结构化决策头后缀（辩论提示词不含这些段落，并入只会让白脸/黑脸/综合三次昂贵调用每份报告必 miss）。
 
 **辩论综合键（`debate_synthesis_fingerprint`）**：取「辩论基础指纹 + **综合提示词全文**」。综合提示词 = 白脸/黑脸**全文** + 条件推理情景段（`debate.conditional.scenarios` 驱动）+ 集中度问答段（`debate.concentration_qa.threshold` 驱动，内建段落），由 `_build_debate_synthesis_prompt()` 一次性渲染。既然提示词就是这三者的函数，键直接取该渲染结果，无需逐项枚举入哈希的来源、也就不会漏项。此前本键另起一套：截取 pro/con **前 200 字符**摘要 + 开关位字母后缀，两处后果——正文差异落在 200 字符之后时键不动，仅改 config（情景名/描述、集中度阈值）而开关位不变时键同样不动；两种情形都命中按旧正文/旧配置生成的综合结论且不报错。
 
@@ -1220,7 +1223,7 @@ reload_pricing() → 合并 llm_settings.json → pricing
 
 ### 12.2 注册表键名派生
 
-在 `core/registry.py` 中，每个 LLM 模块通过 `settings_suffix` 注册（`global_macro`、`expert_review`、`health_check`、`penetration_deep`、`news_correlation`、`self_review`（生成后自检，出厂默认关；生成后一遍执行、不经并行调度），外加 3 个辩论模块 `debate_pro`/`debate_con`/`debate_synthesis`），自动派生 `llm_settings.json` 的所有合法键名：
+在 `core/registry.py` 中，每个 LLM 模块通过 `settings_suffix` 注册（`global_macro`、`expert_review`、`health_check`、`penetration_deep`、`news_correlation`、`self_review`（生成后自检，出厂默认关；生成后一遍执行、不经并行调度）、`holding_change`（持仓变动复盘归因，`enabled_llm` 默认开；章本体由 feature `holding_change_review` 控制，不经并行调度），外加 3 个辩论模块 `debate_pro`/`debate_con`/`debate_synthesis`），自动派生 `llm_settings.json` 的所有合法键名：
 
 ```
 已知 LLM Settings 键名（每个模块 9 个）：
@@ -1250,7 +1253,7 @@ reload_pricing() → 合并 llm_settings.json → pricing
 
 所有键名由 `get_known_llm_settings_keys()` 统一校验。新增 LLM 模块只需在 registry.py 注册表中添加一行 `DataModuleDef`，无需修改 config 校验逻辑。
 
-> **辩论模块派生**：3 个辩论模块（`debate_pro`/`debate_con`/`debate_synthesis`，`settings_suffix` 同规则）同样按每模块 9 键派生（如 `model_debate_pro`、`system_prompt_debate_con`），使 `enabled_llm` 合法子键共 **9** 个（6 标准 + 3 辩论）。辩论开关实际由 `features.json` 的实验性 Flag（`llm_debate_procon`; 条件推理为常规开关 `llm_debate_conditional`）控制，集中度问答段内建于辩论流程，`enabled_llm` 辩论子键仅属校验层合法键，不在菜单 [S] 展示（由 `tui_menu.LLM_MENU_HIDDEN_KEYS` 隐藏），注册表保留以维持缓存 TTL/前缀清理。
+> **辩论模块派生**：3 个辩论模块（`debate_pro`/`debate_con`/`debate_synthesis`，`settings_suffix` 同规则）同样按每模块 9 键派生（如 `model_debate_pro`、`system_prompt_debate_con`），使 `enabled_llm` 合法子键共 **10** 个（7 标准 + 3 辩论）。辩论开关实际由 `features.json` 的实验性 Flag（`llm_debate_procon`; 条件推理为常规开关 `llm_debate_conditional`）控制，集中度问答段内建于辩论流程，`enabled_llm` 辩论子键仅属校验层合法键，不在菜单 [S] 展示（由 `tui_menu.LLM_MENU_HIDDEN_KEYS` 隐藏），注册表保留以维持缓存 TTL/前缀清理。
 
 ### 12.3 报告深度档位（`llm_report_depth`）
 

@@ -14,12 +14,12 @@ from unittest.mock import MagicMock, patch
 import pytest
 
 from src.python.fetcher.chain import (
-    _REASON_MAX_LEN,
     FailureDiagnostics,
     _brief_reason,
     fetch_with_fallback,
     reset_provider_skip,
 )
+from src.python.fetcher.chain_diagnostics import _REASON_MAX_LEN
 
 pytestmark = [pytest.mark.unit, pytest.mark.unit_fetcher]
 

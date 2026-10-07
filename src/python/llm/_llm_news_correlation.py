@@ -6,7 +6,7 @@
 **本模块不走 `generate_all_llm` 线程池**：新闻关联的返回类型是
 ``(list[dict], bool, dict)``（富化后的新闻列表），与其余四个 HTML 生成模块的
 ``(str, bool)`` 不同，故由报告侧 `report/news_correlation.py` 直接调用本入口，
-而不是注册进编排层的 `_MODULE_FNS`。编排层曾另有一条「预计算 + 模块级变量传递」
+而不是注册进 ``_llm_dispatch`` 的 `_MODULE_FNS`。编排层曾另有一条「预计算 + 模块级变量传递」
 的路径，但该路径的参数（news_data / holdings_data）没有任何调用方传入，分支永不
 执行——属误导性注册，已移除；模块显示名/设置键仍由 `core/registry` 单一登记
 （`get_llm_module_name`）。

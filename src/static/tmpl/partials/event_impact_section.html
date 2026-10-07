@@ -1,0 +1,76 @@
+{# ==============================================================
+   事件窗量化对照区块 partial（并入「财经新闻热点与持仓关联分析」章内，
+   经 report_template.html 在新闻章正文之后 include 引入）。
+
+   注册表不占独立条目、不消耗连续编号（连续编号/导航/页签均由注册表驱动，
+   本区块随父章）；区块标题用 block-title 级（与持仓基本面章内区块同构）。
+
+   依赖 context 变量：event_impact_view；
+   视图由 report/event_impact_panel.build_event_impact_view 生成——全部行是
+   预格式化字符串，与 Excel 财经新闻页签尾部区块消费同一份 view
+   （双端逐字节同文，不发散）。
+
+   「口径」标注（limitations_note：事件日映射 / ±5 窗口 / LOCF / 超额基准）
+   与事件表同现——两端渲染分支成对出现，缺失即红（由双端一致性测试锁定）。
+
+   可见性：实验开关 event_window_impact 关闭（默认）时 pipeline_data 键缺席
+   → 视图 None → 区块零渲染，新闻章逐字节回退既有输出；新闻板层关闭时随
+   父章一并隐藏（事件源自新闻，从属关系成立）。
+   ============================================================== #}
+{% if event_impact_view %}
+<!-- ═══════════════════════════════════════════════════════ -->
+<!--  事件窗量化对照（新闻事件 × 持仓行情窗口比对）          -->
+<!-- ═══════════════════════════════════════════════════════ -->
+{% set _ev = event_impact_view %}
+<div id="sec-event_impact" style="margin-top: 16px;">
+    <div class="block-title">
+        事件窗量化对照
+        <span style="font-size:12px;font-weight:400;opacity:0.8;margin-left:8px;">新闻事件 × 持仓行情窗口比对</span>
+    </div>
+    <details class="section-fold">
+        <summary class="section-fold-summary">
+            {% if _ev.get("available") %}{{ _ev.get("title_summary") }}{% else %}事件窗量化对照数据不足{% endif %} —— 点击展开/收起事件对照表
+        </summary>
+    {% if _ev.get("available") %}
+    <div class="section-content">
+        <div class="summary-tag" style="margin-bottom: 8px;">
+            {% for line in _ev.get("summary_lines", []) %}<div>{{ line }}</div>{% endfor %}
+        </div>
+
+        <!-- ① 事件窗对照表（文本判定 vs 量化方向） -->
+        <div style="font-weight: bold; font-size: 14px; margin: 10px 0 6px;">① 事件窗对照表</div>
+        <div style="overflow-x:auto;">
+        <table>
+            <thead>
+                <tr>{% for h in _ev.get("event_header", []) %}<th>{{ h }}</th>{% endfor %}</tr>
+            </thead>
+            <tbody>
+                {% for row in _ev.get("event_rows", []) %}
+                <tr>{% for cell in row %}<td{% if loop.index0 == 6 or loop.index0 == 7 %} style="text-align:right;"{% endif %}>{{ cell }}</td>{% endfor %}</tr>
+                {% endfor %}
+            </tbody>
+        </table>
+        </div>
+
+        <!-- ② 降级清单摘要（有降级时出现；缺席 = 分支隐藏） -->
+        {% if _ev.get("degraded_line") %}
+        <div class="notice-banner" style="margin: 8px 0 4px;">{{ _ev.get("degraded_line") }}</div>
+        {% endif %}
+        <div class="notice-banner" style="margin: 8px 0 4px;">{{ _ev.get("limitations_note") }}</div>
+    </div>
+    {% else %}
+    <div class="section-content">
+        <div class="empty-note placeholder-note">
+            <p><strong>事件窗量化对照数据暂不可用</strong></p>
+            <p style="margin-top:8px;font-size:13px;color:var(--text-muted);">
+                {{ _ev.get("reason") }}
+            </p>
+            <p style="margin-top:12px;font-size:12px;color:var(--text-faint);">
+                {{ _ev.get("hint_line") }}
+            </p>
+        </div>
+    </div>
+    {% endif %}
+    </details>
+</div>
+{% endif %}

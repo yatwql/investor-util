@@ -379,3 +379,88 @@ class TestIdempotenceAndFlag:
         records = sl.load_signals(ledger_path)
         assert records
         assert records[0]["report_date"] == datetime.now().strftime("%Y-%m-%d")
+
+
+class TestFactorCatalogSignals:
+    """因子目录信号（R-FCT-03 载体）：每日单条快照、关态无感。"""
+
+    @staticmethod
+    def _fc_data(**extra):
+        data = {
+            "available": True,
+            "reason": None,
+            "version": "2026.10.06.1",
+            "catalog_size": 2,
+            "computed": 2,
+            "neutral_above": 1,
+            "neutral_total": 1,
+            "rating": "1/1 中性上方",
+            "pool_size": 4,
+            "factors": [
+                {"slug": "qlib_rsi_14", "value": 61.2, "neutral": 50.0, "above": True, "computable": True},
+                {"slug": "amihud_20", "value": None, "neutral": None, "above": None, "computable": False},
+            ],
+        }
+        data.update(extra)
+        return data
+
+    @staticmethod
+    def _ctx():
+        return signal_record._QualityContext({})
+
+    def test_extract_single_snapshot_record(self):
+        """可用数据 → 单条组合级快照，values 仅含可算因子。"""
+        records = signal_record._factor_catalog_signals(
+            {"factor_catalog_data": self._fc_data()}, REPORT_DATE, self._ctx()
+        )
+        assert len(records) == 1
+        record = records[0]
+        assert record["signal_type"] == sl.SIGNAL_FACTOR_CATALOG
+        assert record["report_date"] == REPORT_DATE
+        assert record["rating"] == "1/1 中性上方"
+        assert record["value"] is None
+        assert record["subject"] == "portfolio"
+        assert record["direction"] == DIRECTION_FLAT
+        assert record["detail"]["version"] == "2026.10.06.1"
+        assert record["detail"]["values"] == {"qlib_rsi_14": 61.2}
+        assert record["detail"]["neutral_total"] == 1
+
+    @pytest.mark.parametrize(
+        "payload",
+        [
+            None,
+            {},
+            {"available": False, "computed": 3, "factors": []},
+            {"available": True, "computed": 0, "factors": []},
+        ],
+    )
+    def test_unavailable_or_missing_is_silent(self, payload):
+        """缺键 / 占位 / 无可算 → 静默无记录（关态与降级态一致）。"""
+        pipeline = {"factor_catalog_data": payload} if payload is not None else {}
+        assert signal_record._factor_catalog_signals(pipeline, REPORT_DATE, self._ctx()) == []
+
+    def test_label_and_order_registered(self):
+        """类型标签与稳定输出顺序已登记。"""
+        assert sl.SIGNAL_TYPE_LABELS[sl.SIGNAL_FACTOR_CATALOG] == "因子目录"
+        assert sl.SIGNAL_FACTOR_CATALOG in sl.SIGNAL_TYPE_ORDER
+
+    def test_register_end_to_end_writes_factor_record(self, ledger_path):
+        """端到端入账：by_type 计数 + 落盘可读。"""
+        result = signal_record.register_deterministic_signals(
+            _pipeline_data(factor_catalog_data=self._fc_data()),
+            report_date=REPORT_DATE,
+            path=ledger_path,
+        )
+        assert result["by_type"].get("factor_catalog") == 1
+        records = [r for r in sl.load_signals(ledger_path) if r["signal_type"] == sl.SIGNAL_FACTOR_CATALOG]
+        assert len(records) == 1
+        assert records[0]["rating"] == "1/1 中性上方"
+
+    @pytest.mark.parametrize("override", [None, {"factor_catalog_data": None}])
+    def test_switch_off_registers_nothing(self, override, ledger_path):
+        """关态（键缺失或为 None）→ 该类零记录。"""
+        base = _pipeline_data()
+        if override is not None:
+            base.update(override)
+        result = signal_record.register_deterministic_signals(base, report_date=REPORT_DATE, path=ledger_path)
+        assert "factor_catalog" not in result["by_type"]

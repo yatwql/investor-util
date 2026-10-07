@@ -52,6 +52,12 @@ _SOURCE_CATEGORIES: list[dict[str, Any]] = [
         "data_types": ["fund_purchase"],
     },
     {
+        "key": "fund_fee",
+        "name": "基金申赎费率",
+        "prefixes": ["fund_fee"],
+        "data_types": ["fund_fee"],
+    },
+    {
         "key": "industry",
         "name": "行业分类",
         "prefixes": ["industry_", "penetration_industry"],
@@ -311,6 +317,13 @@ _SOURCE_CATALOG: list[dict[str, Any]] = [
         "category": "基金持仓",
         "provider": "天天基金（基金主页面 + 季报 API）→ 同花顺金融数据（官方披露持仓兜底，需 key）",
         "usage": "基金底层持仓（含联接基金穿透目标 ETF）",
+        "auth": "无需（主源）",
+    },
+    {
+        "id": "fund_fee",
+        "category": "基金申赎费率",
+        "provider": "天天基金 F10 基金费用页 → akshare fund_fee_em 封装（同上游解析器冗余）→ 过期缓存兜底",
+        "usage": "What-if 调仓回放的申购/赎回费率阶梯（交易成本估算）",
         "auth": "无需（主源）",
     },
     {

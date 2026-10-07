@@ -131,7 +131,7 @@ class TestHistoryChainCredentialGate:
         reg = _fake_registry()
         diag = FailureDiagnostics()
         with patch(
-            "src.python.fetcher.chain._call_history_provider",
+            "src.python.fetcher.chain_incremental._call_history_provider",
             return_value=[{"date": "2026-09-10", "close": 1.0}],
         ) as mock_call:
             data = _try_providers(["tencent", "sina"], reg, "history_index", "sh000001", 30, None, diagnostics=diag)
@@ -148,7 +148,9 @@ class TestHistoryChainCredentialGate:
         register_credential_spec(CredentialSpec("tencent", "腾讯财经", _ENV_VAR))
 
         reg = _fake_registry()
-        with patch("src.python.fetcher.chain._call_history_provider", return_value=[{"close": 1.0}]) as mock_call:
+        with patch(
+            "src.python.fetcher.chain_incremental._call_history_provider", return_value=[{"close": 1.0}]
+        ) as mock_call:
             data = _try_providers(["tencent", "sina"], reg, "history_index", "sh000001", 30, None)
 
         assert data

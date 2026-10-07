@@ -12,6 +12,7 @@
 | 基金持仓数据 | 天天基金 `fund.eastmoney.com/{code}.html`（HTML 解析） | 天天基金 `fundf10.eastmoney.com`（季报 API `FundArchivesDatas.aspx`，回溯 4 个季度）→ **同花顺金融数据**（官方披露持仓，需 key；联接基金直返目标 ETF） | `fund_hold_` | 基础类 |
 | 基金经理数据 | 天天基金 `fund.eastmoney.com/{code}.html`（HTML 解析，与基金业绩排名同源） | 天天基金 `fundf10.eastmoney.com/jjjl_{code}.html`（档案页） | `fund_manager_` | 基础类 |
 | 基金申购状态总表（限购） | 天天基金 `fund.eastmoney.com`（`Fund_JJJZ_Data.aspx` 全量表，`purchase_schema` 载荷准入） | akshare `fund_purchase_em` 封装（同一上游端点，解析器冗余）→ 过期缓存兜底 | `fund_purchase_status_table`（单键全量） | — |
+| 基金申赎费率（What-if 交易成本，开关 `whatif_trade_cost`） | 天天基金 F10 基金费用页 `fundf10.eastmoney.com/f10/jjfl_{code}.html`（申购/赎回费率表解析，`FEE_SCHEMA` 载荷准入） | akshare `fund_fee_em` 封装（同上游页族，仅赎回表）→ 过期缓存 → `fund_fee_fallback` 配置兜底 → 费率未知标注 | `fund_fee_`（per-code，TTL 周档） | 基础类 |
 | 行业分类/概念板块 | 东方财富 `push2.eastmoney.com`（三级行业 + 概念板块归属） | 东方财富 REST 行情页（仅行业，无概念） | `industry_` | 基础类 |
 | 机构盈利预测 | akshare `stock_profit_forecast_em()` 全量获取 | — | `profit_forecast_` | 基础类 |
 | 行业资金流向 | akshare `stock_sector_fund_flow_rank()` 今日排名 | — | `sector_flow_` | 基础类 |

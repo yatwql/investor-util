@@ -1,0 +1,1033 @@
+"""HTML 报告结构测试 — 正文内容块（交互图表/主题/数据质量块/页脚/期间标注）。
+
+覆盖场景：
+  - 交互图表（Chart.js）容器、降级与开关下的渲染结构
+  - 亮暗主题 class 注入与图表容器主题一致性
+  - 摘要日期时间数值样式（含条件着色）
+  - 数据质量章节块（dqs）的可见性与内容结构
+  - 页脚试验性功能提示与报告期间标注
+
+运行：
+  pytest src/test/unit/report/test_html_report_structure_content.py -v
+"""
+
+from __future__ import annotations
+
+import unittest
+
+import pytest
+from bs4 import BeautifulSoup
+
+from .test_html_report_structure import (
+    _REPORT_SECTION_DEFAULT,
+    _build_minimal_render_data,
+    _render_template,
+)
+
+pytestmark = [pytest.mark.unit, pytest.mark.unit_report]
+
+
+# ═══════════════════════════════════════════════════════════════
+#  Test: Interactive Charts mode
+# ═══════════════════════════════════════════════════════════════
+
+
+class TestHtmlInteractiveCharts(unittest.TestCase):
+    """交互图表模式下模板结构测试。"""
+
+    _HISTORY = {
+        "status": "ok",
+        "bars": [{"date": "2026-01-01", "total_value": 100.0, "drawdown_pct": 0.0}],
+        "total_return_pct": 0.1,
+        "total_return": 1000.0,
+        "data_start": "2026-01-01",
+        "data_end": "2026-01-01",
+        "max_drawdown_pct": -0.05,
+        "max_drawdown": -500.0,
+        "drawdown_start": "2026-01-01",
+        "drawdown_end": "2026-01-01",
+        "annualized_volatility": 0.18,
+        "drawdown_available": True,  # 有效交易日 ≥ MIN_SPAN 才渲染回撤明细（上游计算）
+        "drawdown_events": [
+            {
+                "peak_date": "2026-01-01",
+                "trough_date": "2026-01-01",
+                "recovery_date": "",
+                "drawdown_pct": 5.0,
+                "duration_days": 0,
+                "recovery_days": None,
+                "recovered": False,
+            }
+        ],
+        "warnings": None,
+        "failed_holdings": None,
+        "successful_holdings": None,
+    }
+
+    _DATASET_KEYS = (
+        "portfolio_line",
+        "drawdown",
+        "category_doughnut",
+        "industry_bar",
+        "penetration_bar",
+        "radar",
+    )
+
+    # 最小穿透数据：触发 sec-penetration 渲染图表容器
+    _PENETRATION = {
+        "top10": [
+            {
+                "rank": 1,
+                "name": "贵州茅台",
+                "codes": ["600519"],
+                "mv": 10000.0,
+                "ratio_pct": 12.5,
+                "sector": "白酒",
+                "concepts": ["白酒"],
+                "eps_text": "58",
+                "dividend_text": "25.3",
+                "sources": ["基金A"],
+            },
+            {
+                "rank": 2,
+                "name": "宁德时代",
+                "codes": ["300750"],
+                "mv": 8000.0,
+                "ratio_pct": 10.0,
+                "sector": "电池",
+                "concepts": ["新能源"],
+                "eps_text": "--",
+                "dividend_text": "--",
+                "sources": ["基金B"],
+            },
+        ],
+        "summary": {
+            "total_mv": 18000.0,
+            "unknown_mv": 0,
+            "total_funds": 2,
+            "failed_funds": 0,
+            "fund_breakdown": "2/2",
+            "total_stocks": 0,
+            "merged_count": 2,
+            "top10_coverage_pct": 100.0,
+            "failed_fund_details": [],
+        },
+    }
+
+    def _render_interactive(
+        self,
+        chart_overrides: dict | None = None,
+        penetration: dict | None = None,
+    ) -> BeautifulSoup:
+        """渲染 enable_interactive_charts=True 的模板。
+
+        chart_overrides：覆盖默认空 dataset，用于验证各图 canvas 是否渲染。
+        penetration：传入时 sec-penetration 章节渲染图表容器。
+        """
+        order = [dict(sec) for sec in _REPORT_SECTION_DEFAULT]
+        numbers = {sec["key"]: sec["number"] for sec in order}
+        sv_dict = {sec["key"]: True for sec in order}
+        data = _build_minimal_render_data(order, numbers, sv_dict)
+        data["enable_interactive_charts"] = True
+        data["chart_datasets"] = {k: {"labels": [], "datasets": []} for k in self._DATASET_KEYS}
+        if chart_overrides:
+            data["chart_datasets"].update(chart_overrides)
+        if penetration is not None:
+            data["penetration"] = penetration
+        data["history_data"] = self._HISTORY
+        return _render_template(data)
+
+    def test_chart_box_wraps_canvases(self) -> None:
+        """各图 canvas 被 .chart-box 包裹（§4.5 打印不跨页）。
+
+        净值+回撤 + 资产构成 Doughnut 共 3 张图表。
+        无穿透数据时，sec-penetration 不渲染图表容器（占位）。
+        """
+        overrides = {
+            "category_doughnut": {"labels": ["股票"], "datasets": [{"data": [1.0]}]},
+        }
+        soup = self._render_interactive(chart_overrides=overrides)
+        boxes = soup.select(".chart-box")
+        # 净值+回撤+Doughnut+Radar 共 4 个 .chart-box（Radar 无 labels 时渲染占位容器）
+        self.assertEqual(len(boxes), 4, "应恰好 4 个 .chart-box（净值+回撤+Doughnut+Radar）")
+        canvas_ids = {c.get("id") for b in boxes for c in b.select("canvas")}
+        self.assertIn("chart_portfolio_line", canvas_ids)
+        self.assertIn("chart_drawdown", canvas_ids)
+        self.assertIn("chart_category_doughnut", canvas_ids)
+
+    def test_penetration_charts_rendered_when_data(self) -> None:
+        """穿透数据存在时渲染行业分布 + 穿透 TOP10 两图。
+
+        计划 §4.9：行业分布与穿透 TOP10 同属 sec-penetration 章节，
+        有数据时图表容器渲染 canvas；穿透章节共 2 个 .chart-box。
+        """
+        overrides = {
+            "category_doughnut": {"labels": ["股票"], "datasets": [{"data": [1.0]}]},
+            "industry_bar": {"labels": ["白酒", "电池"], "datasets": [{"data": [10000.0, 8000.0]}]},
+            "penetration_bar": {"labels": ["贵州茅台", "宁德时代"], "datasets": [{"data": [10000.0, 8000.0]}]},
+        }
+        soup = self._render_interactive(chart_overrides=overrides, penetration=self._PENETRATION)
+        boxes = soup.select(".chart-box")
+        # 净值+回撤+Doughnut+行业+穿透+Radar 共 6 个 .chart-box（Radar 无 labels 时渲染占位容器）
+        self.assertEqual(len(boxes), 6, "应恰好 6 个 .chart-box（净值+回撤+Doughnut+行业+穿透+Radar）")
+        canvas_ids = {c.get("id") for b in boxes for c in b.select("canvas")}
+        for key in (
+            "chart_portfolio_line",
+            "chart_drawdown",
+            "chart_category_doughnut",
+            "chart_industry_bar",
+            "chart_penetration_bar",
+        ):
+            self.assertIn(key, canvas_ids)
+        # 行业分布 Vertical Bar 与穿透 TOP10 容器处于同一章节
+        section = soup.find(id="sec-penetration")
+        self.assertIsNotNone(section)
+        section_canvases = {c.get("id") for c in section.select("canvas")}
+        self.assertIn("chart_industry_bar", section_canvases)
+        self.assertIn("chart_penetration_bar", section_canvases)
+
+    def test_industry_and_penetration_bars_both_vertical(self) -> None:
+        """行业分布与穿透 TOP10 柱状图风格统一为垂直（竖桩）。
+
+        穿透模块两图并排：行业分布原为 indexAxis:'y' 水平条，穿透 TOP10 为
+        垂直条，风格不一致。统一后两图 aria-label 均应描述"垂直柱状图"、
+        不含"水平"字样。
+        """
+        overrides = {
+            "industry_bar": {"labels": ["白酒", "电池"], "datasets": [{"data": [10000.0, 8000.0]}]},
+            "penetration_bar": {"labels": ["贵州茅台", "宁德时代"], "datasets": [{"data": [10000.0, 8000.0]}]},
+        }
+        soup = self._render_interactive(chart_overrides=overrides, penetration=self._PENETRATION)
+        for key in ("chart_industry_bar", "chart_penetration_bar"):
+            label = soup.find(id=key).get("aria-label")
+            self.assertIn("垂直柱状图", label, f"{key} aria-label 应描述垂直柱状图")
+            self.assertNotIn("水平", label, f"{key} aria-label 不应残留「水平柱状图」描述")
+
+    def test_industry_empty_note_when_no_data(self) -> None:
+        """行业数据全不可用时显示"行业数据暂不可用"。
+
+        §4.12 空值语义：dataset 无 labels 时模板渲染占位提示，不输出空 canvas。
+        """
+        overrides = {
+            "category_doughnut": {"labels": ["股票"], "datasets": [{"data": [1.0]}]},
+            "penetration_bar": {"labels": ["贵州茅台"], "datasets": [{"data": [10000.0]}]},
+        }
+        soup = self._render_interactive(chart_overrides=overrides, penetration=self._PENETRATION)
+        section = soup.find(id="sec-penetration")
+        note = section.select_one(".chart-empty-note")
+        self.assertIsNotNone(note, "行业数据为空时应渲染占位提示")
+        self.assertIn("行业数据暂不可用", note.get_text())
+        self.assertIsNone(section.find(id="chart_industry_bar"), "空数据时不应输出 industry canvas")
+
+    def test_penetration_none_shows_placeholder(self) -> None:
+        """penetration=None 时显示"暂无穿透数据"占位，不渲染图表容器。"""
+        soup = self._render_interactive()
+        section = soup.find(id="sec-penetration")
+        self.assertIsNotNone(section)
+        self.assertIsNotNone(section.select_one(".empty-note"))
+        self.assertIsNone(section.find(id="chart_industry_bar"))
+        self.assertIsNone(section.find(id="chart_penetration_bar"))
+
+    def test_all_charts_have_captions(self) -> None:
+        """6 张图均在下方渲染图下说明（.chart-caption），标注该图是什么图表。
+
+        用户需求：报告中每个图表下方标注图表说明（如「TOP 10 持仓资产」）。
+        说明置于 .chart-box 容器外（避免固定高度溢出），跟随 canvas 渲染分支。
+        """
+        overrides = {
+            "category_doughnut": {"labels": ["股票"], "datasets": [{"data": [1.0]}]},
+            "industry_bar": {"labels": ["白酒", "电池"], "datasets": [{"data": [10000.0, 8000.0]}]},
+            "penetration_bar": {"labels": ["贵州茅台", "宁德时代"], "datasets": [{"data": [10000.0, 8000.0]}]},
+            "radar": {"labels": ["夏普比率"], "datasets": [{"label": "量化指标", "data": [1.2]}]},
+        }
+        soup = self._render_interactive(chart_overrides=overrides, penetration=self._PENETRATION)
+        captions = soup.select(".chart-caption")
+        self.assertEqual(len(captions), 6, "6 张图应恰好渲染 6 个图下说明")
+        texts = [c.get_text(strip=True) for c in captions]
+        for expected in (
+            "组合净值走势",
+            "历史回撤走势",
+            "资产构成分布",
+            "持仓行业分布",
+            "TOP 10 持仓资产",
+            "组合量化指标画像",
+        ):
+            self.assertIn(expected, texts, f"图下说明应包含「{expected}」")
+        # 穿透 TOP10 图注位于其 canvas 之后
+        pen_caption = soup.find("div", class_="chart-caption", string="TOP 10 持仓资产")
+        self.assertIsNotNone(pen_caption)
+        pen_canvas = soup.find(id="chart_penetration_bar")
+        pen_box = pen_canvas.parent  # .chart-box
+        box_next = pen_box.find_next_sibling()
+        self.assertEqual(box_next, pen_caption, "穿透 TOP10 图注应紧跟其图表容器")
+
+    def test_caption_not_rendered_when_chart_empty(self) -> None:
+        """图表数据为空时对应图注不渲染（说明跟随 canvas 渲染分支）。
+
+        净值/回撤 canvas 无条件渲染（无 labels 守卫）→ 图注仍出现；
+        Doughnut/行业/穿透/Radar 空数据 → 渲染占位而非图注。
+        """
+        soup = self._render_interactive()  # chart_datasets 全空
+        captions = soup.select(".chart-caption")
+        texts = [c.get_text(strip=True) for c in captions]
+        self.assertEqual(len(captions), 2, "仅净值+回撤两图有图注（其余四图空数据）")
+        self.assertIn("组合净值走势", texts)
+        self.assertIn("历史回撤走势", texts)
+        for absent in ("资产构成分布", "持仓行业分布", "TOP 10 持仓资产", "组合量化指标画像"):
+            self.assertNotIn(absent, texts, f"空数据时不应渲染图注「{absent}」")
+
+    def test_radar_chart_rendered_when_labels(self) -> None:
+        """量化指标 radar 有 labels 时渲染 canvas。"""
+        overrides = {
+            "radar": {
+                "labels": ["夏普比率", "卡玛比率"],
+                "datasets": [{"label": "量化指标", "data": [1.2, 0.8]}],
+            },
+        }
+        soup = self._render_interactive(chart_overrides=overrides)
+        section = soup.find(id="sec-portfolio_history_drawdown")
+        self.assertIsNotNone(section)
+        radar_canvas = section.find(id="chart_radar")
+        self.assertIsNotNone(radar_canvas)
+        # canvas 的直接父级即 .chart-box 容器
+        self.assertIn("chart-box", radar_canvas.parent.get("class", []))
+
+    def test_radar_empty_note_when_no_labels(self) -> None:
+        """radar 无 labels 时显示"量化指标数据不足"占位，不渲染 canvas。"""
+        soup = self._render_interactive()
+        section = soup.find(id="sec-portfolio_history_drawdown")
+        note = section.select_one(".chart-empty-note")
+        self.assertIsNotNone(note)
+        self.assertIn("量化指标数据不足", note.get_text())
+        self.assertIsNone(section.find(id="chart_radar"))
+
+    def test_radar_data_unavailable_placeholder(self) -> None:
+        """data_unavailable=True 时显示"持仓市值数据不可用，量化指标暂停计算"。"""
+        overrides = {"radar": {"labels": ["夏普比率"], "datasets": [{"data": [1.2]}]}}
+        order = [dict(sec) for sec in _REPORT_SECTION_DEFAULT]
+        numbers = {sec["key"]: sec["number"] for sec in order}
+        sv_dict = {sec["key"]: True for sec in order}
+        data = _build_minimal_render_data(order, numbers, sv_dict)
+        data["enable_interactive_charts"] = True
+        data["data_unavailable"] = True  # 持仓有成本但市值全 0
+        data["chart_datasets"] = {k: {"labels": [], "datasets": []} for k in self._DATASET_KEYS}
+        data["chart_datasets"].update(overrides)
+        data["history_data"] = self._HISTORY
+        soup = _render_template(data)
+        section = soup.find(id="sec-portfolio_history_drawdown")
+        note = section.select_one(".chart-empty-note")
+        self.assertIsNotNone(note)
+        self.assertIn("持仓市值数据不可用，量化指标暂停计算", note.get_text())
+        self.assertIsNone(section.find(id="chart_radar"))
+
+    def test_all_chart_canvases_have_a11y_attrs(self) -> None:
+        """6 个 Chart.js canvas 均含可访问性属性（§4.8）。
+
+        模板 6 处 canvas 补 aria-label + role="img" + 内嵌 fallback 文本：
+        屏幕阅读器读出图表含义，降级环境（Canvas/JS 不可用）读 fallback
+        指引用户看明细表格——与 test-chart.html 示范写法对齐。
+        """
+        overrides = {
+            "category_doughnut": {"labels": ["股票"], "datasets": [{"data": [1.0]}]},
+            "industry_bar": {"labels": ["白酒"], "datasets": [{"data": [10000.0]}]},
+            "penetration_bar": {"labels": ["贵州茅台"], "datasets": [{"data": [10000.0]}]},
+            "radar": {"labels": ["夏普比率"], "datasets": [{"data": [1.2]}]},
+        }
+        soup = self._render_interactive(chart_overrides=overrides, penetration=self._PENETRATION)
+        for key in self._DATASET_KEYS:
+            canvas = soup.find(id=f"chart_{key}")
+            self.assertIsNotNone(canvas, f"{key} canvas 应渲染（Flag ON + 数据存在）")
+            label = canvas.get("aria-label")
+            self.assertTrue(label, f"{key} canvas 应含 aria-label")
+            self.assertIn("悬停查看", label, f"{key} aria-label 应描述图表含义")
+            self.assertEqual(canvas.get("role"), "img", f"{key} canvas role 应为 img")
+            self.assertTrue(
+                canvas.get_text().strip(),
+                f"{key} canvas 应含内嵌 fallback 文本（降级环境指引）",
+            )
+
+    def test_chart_scripts_loaded_in_order(self) -> None:
+        """加载顺序：chart-print → chart-config → chart-export → chart-common → chart-init（登记/导出/公共 helper 先于初始化）。"""
+        soup = self._render_interactive()
+        chart_scripts = [s.get("src") for s in soup.select("script[src]") if (s.get("src") or "").startswith("chart-")]
+        for fname in ("chart-print.js", "chart-config.js", "chart-export.js", "chart-common.js", "chart-init.js"):
+            self.assertIn(fname, chart_scripts, f"{fname} 应被模板引用")
+        self.assertLess(
+            chart_scripts.index("chart-print.js"),
+            chart_scripts.index("chart-config.js"),
+            "chart-print.js 必须在 chart-config.js 之前加载",
+        )
+        self.assertLess(
+            chart_scripts.index("chart-config.js"),
+            chart_scripts.index("chart-export.js"),
+            "chart-config.js 必须在 chart-export.js 之前加载",
+        )
+        self.assertLess(
+            chart_scripts.index("chart-export.js"),
+            chart_scripts.index("chart-common.js"),
+            "chart-export.js 必须在 chart-common.js 之前加载",
+        )
+        self.assertLess(
+            chart_scripts.index("chart-common.js"),
+            chart_scripts.index("chart-init.js"),
+            "chart-common.js 必须在 chart-init.js 之前加载（chart-init 依赖 ChartCommon）",
+        )
+
+    def test_print_css_forces_light_theme(self) -> None:
+        """/media print 覆盖 --chart-* 为浅色 + .chart-box break-inside（§4.5）。"""
+        soup = self._render_interactive()
+        style = soup.find("style").get_text()
+        # 打印覆盖只在 @media print 内出现（主 :root 是 #333333，这里是 #000）
+        self.assertIn("--chart-text: #000", style)
+        self.assertIn("--chart-grid", style)
+        self.assertIn(".chart-box", style)
+        self.assertIn("break-inside: avoid", style)
+
+    def test_old_canvas_path_absent(self) -> None:
+        """交互模式下旧 Canvas 兜底路径不输出。"""
+        soup = self._render_interactive()
+        self.assertIsNone(soup.find(id="portfolioChart"))
+        self.assertIsNone(soup.find(id="drawdownChart"))
+
+    def test_flag_off_legacy_canvas_regression(self) -> None:
+        """Flag OFF 时报告与基础版一致（Canvas + 表格）。
+
+        enable_interactive_charts=False（默认渲染路径）：
+          - 6 个 Chart.js canvas 均不输出（无空 div / 空 canvas 残留）
+          - Canvas（portfolioChart / drawdownChart）正常保留
+          - drawSimpleChart 定义保留（绘图函数可用）
+        """
+        order = [dict(sec) for sec in _REPORT_SECTION_DEFAULT]
+        numbers = {sec["key"]: sec["number"] for sec in order}
+        sv_dict = {sec["key"]: True for sec in order}
+        data = _build_minimal_render_data(order, numbers, sv_dict)
+        data["history_data"] = self._HISTORY
+        # 显式置 False（默认值即 False，此处防御性声明）
+        data["enable_interactive_charts"] = False
+        soup = _render_template(data)
+
+        for key in (
+            "chart_portfolio_line",
+            "chart_drawdown",
+            "chart_category_doughnut",
+            "chart_industry_bar",
+            "chart_penetration_bar",
+            "chart_radar",
+        ):
+            self.assertIsNone(soup.find(id=key), f"Flag OFF 时不应输出 {key} canvas")
+        self.assertIsNotNone(soup.find(id="portfolioChart"), "Flag OFF 时应保留旧净值 Canvas")
+        self.assertIsNotNone(soup.find(id="drawdownChart"), "Flag OFF 时应保留旧回撤 Canvas")
+        self.assertIn("drawSimpleChart", str(soup), "Flag OFF 时应保留旧绘图函数")
+
+
+# ═══════════════════════════════════════════════════════════════
+#  Test: 暗色模式（主题切换）
+# ═══════════════════════════════════════════════════════════════
+
+
+class TestHtmlTheme(unittest.TestCase):
+    """HTML 暗色模式（主题切换）结构测试 — 按钮/脚本/CSS 变量/打印隐藏。
+
+    主题元素为模板静态结构（不受章节可见性影响），用 _render_interactive
+    渲染完整页面后断言：
+      - 浮动切换按钮存在且带 aria-label
+      - theme.js 脚本被引用
+      - :root 页面级 CSS 变量（--bg/--surface/--text）
+      - [data-theme="dark"] 深色覆盖块
+      - @media print 隐藏切换按钮
+    """
+
+    def _render_theme_soup(self) -> BeautifulSoup:
+        """渲染完整交互模板（主题元素为静态结构，与章节可见性无关）。"""
+        order = [dict(sec) for sec in _REPORT_SECTION_DEFAULT]
+        numbers = {sec["key"]: sec["number"] for sec in order}
+        sv_dict = {sec["key"]: True for sec in order}
+        data = _build_minimal_render_data(order, numbers, sv_dict)
+        data["enable_interactive_charts"] = True
+        data["chart_datasets"] = {k: {"labels": [], "datasets": []} for k in TestHtmlInteractiveCharts._DATASET_KEYS}
+        return _render_template(data)
+
+    def test_theme_toggle_button_present(self) -> None:
+        """浮动右上角切换按钮存在，含 aria-label 与 title（可访问性）。"""
+        soup = self._render_theme_soup()
+        btn = soup.select_one("button.theme-toggle-btn")
+        self.assertIsNotNone(btn, "应存在 theme-toggle-btn 浮动切换按钮")
+        self.assertEqual(btn.get("aria-label"), "切换深色模式", "按钮 aria-label 应描述主题切换")
+        self.assertIsNotNone(btn.get("title"), "按钮应含 title 提示")
+        self.assertIn("🌙", btn.get_text(), "浅色默认态按钮应显示 🌙 图标（可切深色）")
+
+    def test_theme_js_loaded(self) -> None:
+        """模板引用 theme.js（主题切换 主题切换脚本）。"""
+        soup = self._render_theme_soup()
+        scripts = [s.get("src") for s in soup.select("script[src]")]
+        self.assertIn("theme.js", scripts, "模板应加载 theme.js")
+
+    def test_theme_js_loaded_after_toc(self) -> None:
+        """theme.js 在 toc.js 之后加载（保证按钮可访问性逻辑不与 toc 冲突）。"""
+        soup = self._render_theme_soup()
+        srcs = [s.get("src") for s in soup.select("script[src]")]
+        toc_idx = srcs.index("toc.js")
+        theme_idx = srcs.index("theme.js")
+        self.assertLess(toc_idx, theme_idx, "toc.js 应早于 theme.js 加载")
+
+    def test_root_css_variables(self) -> None:
+        """:root 定义页面级 CSS 变量（--bg/--surface/--text 等）。"""
+        soup = self._render_theme_soup()
+        style = soup.find("style").get_text()
+        for var_name in ("--bg:", "--surface:", "--text:", "--profit:", "--loss:"):
+            self.assertIn(var_name, style, f":root 应定义 {var_name} 页面级变量")
+
+    def test_dark_theme_override_block(self) -> None:
+        """存在 [data-theme="dark"] 深色覆盖块（含深色背景/提亮语义色）。"""
+        soup = self._render_theme_soup()
+        style = soup.find("style").get_text()
+        self.assertIn('[data-theme="dark"]', style, 'style 应含 [data-theme="dark"] 覆盖块')
+        self.assertIn("--bg: #121212", style, "深色块应定义深色背景")
+        self.assertIn("--surface: #1e1e1e", style, "深色块应定义深色卡片表面")
+
+    def test_theme_button_hidden_in_print(self) -> None:
+        """@media print 隐藏切换按钮（打印不出现浮动控件）。"""
+        soup = self._render_theme_soup()
+        style = soup.find("style").get_text()
+        self.assertIn("@media print", style, "模板应含打印媒体查询")
+        self.assertIn(".theme-toggle-btn { display: none", style, "打印时应隐藏主题切换按钮")
+
+    def test_css_variables_used_for_theme_aware_colors(self) -> None:
+        """语义色使用 var(--xxx) 而非硬编码（暗色下自动适配）。"""
+        soup = self._render_theme_soup()
+        html = str(soup)
+        # 盈利/亏损色应通过变量引用；不应再出现旧硬编码红绿
+        self.assertNotIn("color: #CC0000", html, "盈利色不应硬编码 #CC0000")
+        self.assertNotIn("color: #009900", html, "亏损色不应硬编码 #009900")
+
+
+class TestSummaryDateTimeValueStyles(unittest.TestCase):
+    """投资分析汇总：统计时间/所属交易日 值单元格样式（加粗 / 加粗+加大+蓝色）。"""
+
+    @classmethod
+    def setUpClass(cls):
+        cls.order = [dict(sec) for sec in _REPORT_SECTION_DEFAULT]
+        cls.numbers = {sec["key"]: sec["number"] for sec in cls.order}
+        cls.sv_dict = {sec["key"]: True for sec in cls.order}
+        cls.soup = _render_template(
+            _build_minimal_render_data(cls.order, cls.numbers, cls.sv_dict),
+        )
+
+    def _value_td_style(self, label: str) -> str:
+        """在投资分析汇总中按标签名找对应行的值单元格（第2列）内联 style。"""
+        summary = self.soup.find(id="sec-summary")
+        self.assertIsNotNone(summary, "未找到 #sec-summary")
+        for tr in summary.select("table.kv-table tr"):
+            tds = tr.find_all("td")
+            if len(tds) == 2 and tds[0].get_text(strip=True) == label:
+                return tds[1].get("style", "")
+        self.fail(f"未找到「{label}」行")
+
+    def test_stat_time_value_bold(self):
+        """统计时间值加粗。"""
+        style = self._value_td_style("统计时间")
+        self.assertRegex(
+            style,
+            r"font-weight:\s*(?:700|bold)",
+            f"统计时间值应加粗，style={style!r}",
+        )
+
+    def test_trading_day_value_bold_larger_blue(self):
+        """所属交易日值加粗+加大+蓝色。"""
+        style = self._value_td_style("所属交易日")
+        self.assertRegex(
+            style,
+            r"font-weight:\s*(?:700|bold)",
+            f"所属交易日值应加粗，style={style!r}",
+        )
+        self.assertRegex(
+            style,
+            r"font-size:\s*1[5-9]px",
+            f"所属交易日字号应加大，style={style!r}",
+        )
+        self.assertRegex(
+            style,
+            r"color:\s*#2E75B6",
+            f"所属交易日值应为蓝色 2E75B6，style={style!r}",
+        )
+
+    def test_kv_label_style_unaffected(self):
+        """标签列不新增内联样式（仅值列加样式）。"""
+        summary = self.soup.find(id="sec-summary")
+        for tr in summary.select("table.kv-table tr"):
+            tds = tr.find_all("td")
+            if len(tds) == 2 and tds[0].get_text(strip=True) in ("统计时间", "所属交易日"):
+                self.assertEqual(
+                    tds[0].get("style", ""),
+                    "",
+                    "标签列不应新增内联样式",
+                )
+
+
+class TestHtmlDataQualityBlocks(unittest.TestCase):
+    """数据质量仪表盘「品种覆盖/可信度」区块渲染回归测试。
+
+    回归场景：`position_status.items` / `data_freshness.items` 若在模板中按属性访问，
+    会命中 dict 内置 `items` 方法（bound method）而非契约键 `"items"`——
+    `data_quality` 子模块开启且契约有数据时迭代 bound method 崩溃
+    （TypeError: 'builtin_function_or_method' object is not iterable）。
+    修复采用 `.get("items")`（与生产代码一致）。本类回归断言正常渲染不再崩溃且行内容正确。
+    """
+
+    @classmethod
+    def setUpClass(cls):
+        cls.order = [dict(sec) for sec in _REPORT_SECTION_DEFAULT]
+        cls.numbers = {sec["key"]: sec["number"] for sec in cls.order}
+        cls.sv_dict = {sec["key"]: True for sec in cls.order}
+
+    def _render_dq(self, position_status, data_freshness, enabled=True):
+        render_data = _build_minimal_render_data(self.order, self.numbers, self.sv_dict)
+        # 数据质量区块嵌套于「数据源可用性矩阵」章节（registry 中 data_source_status
+        # 为 always 类型，number=18）——渲染需使其可见
+        render_data["section_visible_dict"] = {**self.sv_dict, "data_source_status": True}
+        render_data["section_numbers"] = {**self.numbers, "data_source_status": 18}
+        render_data["data_quality_enabled"] = enabled
+        render_data["position_status"] = position_status
+        render_data["data_freshness"] = data_freshness
+        return _render_template(render_data)
+
+    def test_position_status_items_rendered(self):
+        """品种覆盖区块 items 正常渲染（逐品种行输出，不崩溃）。"""
+        soup = self._render_dq(
+            {
+                "available": True,
+                "items": [
+                    {
+                        "code": "000001",
+                        "name": "平安银行",
+                        "account": "全部",
+                        "status": "ok",
+                        "status_label": "正常",
+                        "reason": "",
+                    },
+                    {
+                        "code": "510300",
+                        "name": "沪深300ETF",
+                        "account": "全部",
+                        "status": "stale",
+                        "status_label": "过期",
+                        "reason": "行情未更新",
+                    },
+                ],
+            },
+            None,
+        )
+        text = soup.get_text()
+        self.assertIn("品种覆盖（逐品种数据状态）", text)
+        self.assertIn("平安银行", text)
+        self.assertIn("沪深300ETF", text)
+        self.assertIn("过期", text)
+
+    def test_data_freshness_items_rendered(self):
+        """可信度区块 items 正常渲染（新鲜度 + 单日跳变列）。"""
+        soup = self._render_dq(
+            None,
+            {
+                "available": True,
+                "abnormal_count": 0,
+                "summary": "",
+                "items": [
+                    {
+                        "code": "600519",
+                        "name": "贵州茅台",
+                        "account": "全部",
+                        "freshness": "ok",
+                        "freshness_label": "新鲜",
+                        "change_pct": 0.5,
+                        "jump": False,
+                        "jump_label": None,
+                    },
+                    {
+                        "code": "601318",
+                        "name": "中国平安",
+                        "account": "全部",
+                        "freshness": "stale",
+                        "freshness_label": "过期",
+                        "change_pct": 23.4,
+                        "jump": True,
+                        "jump_label": "跳变",
+                    },
+                ],
+            },
+        )
+        text = soup.get_text()
+        self.assertIn("可信度（数据新鲜度 + 单日跳变）", text)
+        self.assertIn("贵州茅台", text)
+        self.assertIn("中国平安", text)
+        self.assertIn("跳变", text)
+
+    def test_empty_items_shows_fallback(self):
+        """available=True 但 items 为空列表 → 显示降级占位而非崩溃。"""
+        soup = self._render_dq(
+            {"available": True, "items": []},
+            {"available": True, "items": [], "abnormal_count": 0, "summary": ""},
+        )
+        text = soup.get_text()
+        self.assertIn("未获取行情数据，品种覆盖无法判定", text)
+
+    def test_data_quality_disabled_skips_blocks(self):
+        """data_quality_enabled=False → 两区块均不渲染。"""
+        soup = self._render_dq(
+            {
+                "available": True,
+                "items": [
+                    {
+                        "code": "000001",
+                        "name": "平安银行",
+                        "account": "全部",
+                        "status": "ok",
+                        "status_label": "正常",
+                        "reason": "",
+                    }
+                ],
+            },
+            {
+                "available": True,
+                "items": [
+                    {
+                        "code": "600519",
+                        "name": "贵州茅台",
+                        "account": "全部",
+                        "freshness": "ok",
+                        "freshness_label": "新鲜",
+                        "change_pct": 0.5,
+                        "jump": False,
+                        "jump_label": None,
+                    }
+                ],
+                "abnormal_count": 0,
+                "summary": "",
+            },
+            enabled=False,
+        )
+        text = soup.get_text()
+        self.assertNotIn("品种覆盖（逐品种数据状态）", text)
+        self.assertNotIn("可信度（数据新鲜度 + 单日跳变）", text)
+
+    def test_header_alert_shows_when_abnormal(self):
+        """数据异常时报告头部显示摘要告警行（summary + 详见第 N 章）。"""
+        soup = self._render_dq(
+            None,
+            {
+                "available": True,
+                "abnormal_count": 1,
+                "summary": "3 个品种，1 个数据异常",
+                "items": [
+                    {
+                        "code": "600519",
+                        "name": "贵州茅台",
+                        "account": "全部",
+                        "freshness": "stale",
+                        "freshness_label": "过期",
+                        "change_pct": 0.5,
+                        "jump": False,
+                        "jump_label": None,
+                    }
+                ],
+            },
+        )
+        alert = soup.select_one(".report-header .data-status")
+        self.assertIsNotNone(alert)
+        self.assertIn("3 个品种，1 个数据异常", alert.get_text())
+        self.assertIn("18", alert.get_text())  # 告警尾部引用 data_source_status 章节号
+
+    def test_header_alert_hidden_when_all_normal(self):
+        """无数据异常 → 头部不渲染摘要告警行。"""
+        soup = self._render_dq(
+            None,
+            {
+                "available": True,
+                "abnormal_count": 0,
+                "summary": "3 个品种，0 个数据异常",
+                "items": [
+                    {
+                        "code": "600519",
+                        "name": "贵州茅台",
+                        "account": "全部",
+                        "freshness": "fresh",
+                        "freshness_label": "实时",
+                        "change_pct": 0.5,
+                        "jump": False,
+                        "jump_label": None,
+                    }
+                ],
+            },
+        )
+        self.assertIsNone(soup.select_one(".report-header .data-status"))
+
+    def test_abnormal_rows_use_failed_class(self):
+        """异常品种行用 src-matrix-failed 高亮，正常行用 src-matrix-ok。"""
+        soup = self._render_dq(
+            {
+                "available": True,
+                "items": [
+                    {
+                        "code": "600519",
+                        "name": "贵州茅台",
+                        "account": "全部",
+                        "status": "ok",
+                        "status_label": "正常",
+                        "reason": "",
+                    },
+                    {
+                        "code": "600900",
+                        "name": "长江电力",
+                        "account": "全部",
+                        "status": "name_mismatch",
+                        "status_label": "名称不匹配",
+                        "reason": "名称不一致",
+                    },
+                ],
+            },
+            {
+                "available": True,
+                "abnormal_count": 1,
+                "summary": "",
+                "items": [
+                    {
+                        "code": "600519",
+                        "name": "贵州茅台",
+                        "account": "全部",
+                        "freshness": "fresh",
+                        "freshness_label": "实时",
+                        "change_pct": 0.5,
+                        "jump": False,
+                        "jump_label": None,
+                    },
+                    {
+                        "code": "600900",
+                        "name": "长江电力",
+                        "account": "全部",
+                        "freshness": "stale",
+                        "freshness_label": "过期",
+                        "change_pct": 0.0,
+                        "jump": False,
+                        "jump_label": None,
+                    },
+                ],
+            },
+        )
+        ok_texts = " ".join(s.get_text() for s in soup.select(".src-matrix-ok"))
+        failed_texts = " ".join(s.get_text() for s in soup.select(".src-matrix-failed"))
+        self.assertIn("正常", ok_texts)
+        self.assertIn("实时", ok_texts)
+        self.assertIn("名称不匹配", failed_texts)
+        self.assertIn("过期", failed_texts)
+
+
+# ═══════════════════════════════════════════════════════════════
+#  Test: Footer 实验功能清单
+# ═══════════════════════════════════════════════════════════════
+
+
+class TestFooterExperimentalNotice(unittest.TestCase):
+    """页脚须自述生成条件：本报告在哪些实验性功能开启下生成。
+
+    HTML 报告可脱离本机流转，读者既看不到 features.json，也看不到生成时的
+    控制台横幅；缺了这行，行动章「历史决策复盘」等实验产物会被误读为常驻功能。
+    """
+
+    def _render_footer(self, enabled_experiments=None) -> BeautifulSoup:
+        order = [dict(sec) for sec in _REPORT_SECTION_DEFAULT]
+        numbers = {sec["key"]: sec["number"] for sec in order}
+        sv_dict = {sec["key"]: True for sec in order}
+        data = _build_minimal_render_data(order, numbers, sv_dict)
+        if enabled_experiments is not None:
+            data["enabled_experiments"] = enabled_experiments
+        footer = _render_template(data).select_one(".report-footer")
+        self.assertIsNotNone(footer, "页脚容器应存在")
+        return footer
+
+    def test_lists_enabled_display_names(self):
+        """启用项按显示名顿号相连列出，并给出总项数与一致性提示。"""
+        text = self._render_footer(["辩论-正反辩论", "决策跨期反思闭环"]).get_text()
+
+        self.assertIn("⚗ 本报告在 2 项实验性功能开启下生成：辩论-正反辩论、决策跨期反思闭环", text)
+        self.assertIn("实验功能输出质量可能不稳定，结论请自行复核", text)
+
+    def test_no_line_when_none_enabled(self):
+        """零开关时页脚一字不提实验功能（既有输出不变）。"""
+        self.assertNotIn("⚗", self._render_footer([]).get_text())
+
+    def test_no_empty_shell_when_context_absent(self):
+        """上下文未注入该变量时同样不出现空壳行（模板须判空而非只判存在）。"""
+        self.assertNotIn("⚗", self._render_footer().get_text())
+
+    def test_wording_matches_excel_landing(self):
+        """HTML 页脚与 Excel 落点须同一句式——两处各写各的，措辞必然漂移。"""
+        from src.python.config.features import enabled_experimental_features, set_feature_enabled
+        from src.python.report.experimental_notice import enabled_notice_line
+
+        set_feature_enabled("decision_reflection", True)
+        line = enabled_notice_line()
+        self.assertIsNotNone(line)
+
+        text = self._render_footer([name for _flag, name in enabled_experimental_features()]).get_text()
+
+        self.assertIn(line, text, "HTML 页脚句式应与 Excel 落点一致")
+
+    def test_writer_injects_context_variable(self):
+        """渲染上下文须注入该变量——漏传时模板判空而静默不显示，无任何报错。"""
+        import inspect
+
+        from src.python.report import html_writer
+
+        source = inspect.getsource(html_writer._render_template)
+        self.assertIn("enabled_experiments=", source, "_render_template 应将 enabled_experiments 载入模板上下文")
+
+
+# ═══════════════════════════════════════════════════════════════
+#  Test: 报告期时效标注（重合度剔除 / 集中度环比 / 候选比较）
+# ═══════════════════════════════════════════════════════════════
+
+
+class TestHtmlReportPeriodAnnotations(unittest.TestCase):
+    """HTML 产物须与 Excel 同口径呈现报告期时效。
+
+    重合度按市值加权，陈旧基金剔除后必须在产物中留痕；集中度保留但标注报告期，
+    报告期未推进时标「无对比意义」而非报 0；候选比较标注其风格与重合度所依据的
+    报告期。缺了这些行，读者会把跨年快照当成当期持仓。
+    """
+
+    def _render(self, **overrides) -> BeautifulSoup:
+        order = [dict(sec) for sec in _REPORT_SECTION_DEFAULT]
+        numbers = {sec["key"]: sec["number"] for sec in order}
+        sv_dict = {sec["key"]: True for sec in order}
+        data = _build_minimal_render_data(order, numbers, sv_dict)
+        data.update(overrides)
+        return _render_template(data)
+
+    def _conc_result(self, **extra) -> dict:
+        base = {
+            "name": "易方达中小盘混合",
+            "code": "110011",
+            "report_period": "2026-06-30",
+            "report_stale": False,
+            "top3_pct": 24.5,
+            "top5_pct": 35.5,
+            "top10_pct": 35.5,
+            "prev_top10_pct": None,
+            "change_pct": None,
+            "alert_level": "正常",
+            "is_first_check": False,
+            "period_unchanged": False,
+        }
+        base.update(extra)
+        return base
+
+    # ── 重合度：剔除留痕 ────────────────────────────────────────
+
+    def test_stale_fund_exclusion_banner_rendered(self):
+        """陈旧基金被剔除出矩阵 → 区块顶部留痕（否则读者以为矩阵算错了）。"""
+        soup = self._render(
+            overlap_matrix={
+                "fund_names": {"a": "基金A", "b": "基金B"},
+                "funds": ["a", "b"],
+                "matrix": [[1.0, 0.5], [0.5, 1.0]],
+                "pairs": [],
+                "stale_fund_notes": ["陈年基金（报告期 2020-03-31，已过 20 个完整季度）"],
+            }
+        )
+        text = soup.select_one("#sec-position_structure").get_text()
+        self.assertIn("已从矩阵剔除", text)
+        self.assertIn("陈年基金", text)
+        self.assertIn("2020-03-31", text)
+
+    def test_no_banner_without_stale_funds(self):
+        """无陈旧基金 → 不出现剔除横幅（零噪声）。"""
+        soup = self._render(
+            overlap_matrix={"fund_names": {}, "funds": [], "matrix": [], "pairs": [], "stale_fund_notes": []}
+        )
+        text = soup.select_one("#sec-position_structure").get_text()
+        self.assertNotIn("已从矩阵剔除", text)
+
+    # ── 集中度：报告期列 + 环比语义 ─────────────────────────────
+
+    def test_concentration_period_column_rendered(self):
+        """「报告期」列随数据呈现，陈旧者带（陈旧）后缀。"""
+        soup = self._render(
+            concentration_analysis={"results": [self._conc_result(report_period="2020-03-31", report_stale=True)]}
+        )
+        text = soup.select_one("#sec-position_structure").get_text()
+        self.assertIn("报告期", text)
+        self.assertIn("2020-03-31（陈旧）", text)
+
+    def test_concentration_unchanged_period_marked(self):
+        """报告期未推进 → 环比「无对比意义」+ 标识「报告期未推进」。"""
+        soup = self._render(
+            concentration_analysis={"results": [self._conc_result(period_unchanged=True, prev_top10_pct=35.5)]}
+        )
+        text = soup.select_one("#sec-position_structure").get_text()
+        self.assertIn("无对比意义", text)
+        self.assertIn("报告期未推进", text)
+
+    def test_concentration_advanced_period_shows_change(self):
+        """报告期推进 → 照常呈现环比（闸门不可误伤正常对比）。"""
+        soup = self._render(
+            concentration_analysis={
+                "results": [self._conc_result(prev_top10_pct=30.0, change_pct=5.5, alert_level="正常")]
+            }
+        )
+        # 取表格内文本：区块脚注本就含「无对比意义」四字
+        text = soup.select_one("#sec-position_structure table").get_text()
+        self.assertIn("+5.50%", text)
+        self.assertNotIn("无对比意义", text)
+
+    # ── 候选比较：报告期标注 ────────────────────────────────────
+
+    def _candidate_data(self, **extra) -> dict:
+        row = {
+            "code": "000001",
+            "name": "候选基金A",
+            "available": True,
+            "rating": "优秀",
+            "syl_近1月": "1.23%",
+            "syl_近3月": "5.67%",
+            "syl_近6月": "11.01%",
+            "syl_近1年": "-2.01%",
+            "rank_text": "159/358",
+            "max_drawdown": "-18.50%",
+            "style": "大盘成长",
+            "overlap_name": "",
+            "overlap_jaccard": "--",
+            "report_label": "候选基金A（报告期 2026-06-30，已过 0 个完整季度）",
+        }
+        base = {"available": True, "exceed_limit": False, "invalid": [], "rows": [row]}
+        base.update(extra)
+        return base
+
+    def test_candidate_report_period_note_rendered(self):
+        """候选的风格与重合度基于定期报告快照 → 须标注报告期。"""
+        soup = self._render(candidate_data=self._candidate_data())
+        text = soup.select_one("#sec-fund_performance").get_text()
+        self.assertIn("持仓报告期", text)
+        self.assertIn("2026-06-30", text)
+
+    def test_candidate_stale_baseline_note_rendered(self):
+        """现有持仓陈旧未计入重合度基准 → 提示读者重合度分母不含它。"""
+        soup = self._render(
+            candidate_data=self._candidate_data(
+                stale_baseline_notes=["陈年基金（报告期 2020-03-31，已过 20 个完整季度）"]
+            )
+        )
+        text = soup.select_one("#sec-fund_performance").get_text()
+        self.assertIn("未计入重合度基准", text)
+        self.assertIn("陈年基金", text)
+
+    def test_no_notes_when_nothing_to_annotate(self):
+        """无可标注项 → 不写空壳备注行。"""
+        data = self._candidate_data()
+        data["rows"][0]["report_label"] = ""
+        soup = self._render(candidate_data=data)
+        text = soup.select_one("#sec-fund_performance").get_text()
+        self.assertNotIn("持仓报告期", text)
+        self.assertNotIn("未计入重合度基准", text)
+
+
+if __name__ == "__main__":
+    unittest.main()

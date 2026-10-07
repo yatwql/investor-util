@@ -331,3 +331,67 @@ class TestPurchaseRestrictedIndex(unittest.TestCase):
             )
         self.assertTrue(result.ok)
         self.assertIs(m_build.call_args.kwargs["restricted_index"], fake_index)
+
+
+class TestCostPanelSwitch(unittest.TestCase):
+    """whatif_trade_cost 开关接线：开 → cost 键挂载；关 → 键缺席；装配异常 → 降级。"""
+
+    def _run(self, enabled: bool, *, panel_return=None, panel_side_effect=None):
+        from src.python.report.whatif_operations import run_whatif_simulation
+
+        with (
+            patch(
+                "src.python.report.whatif_operations._purchase_restricted_index",
+                return_value={},
+            ),
+            patch(
+                "src.python.report.whatif_operations.build_whatif_data",
+                return_value={"available": True, "changes": []},
+            ),
+            patch(
+                "src.python.report.whatif_operations.is_feature_enabled",
+                return_value=enabled,
+            ) as m_feat,
+            patch(
+                "src.python.report.whatif_operations.build_whatif_cost_panel",
+                return_value=panel_return or {"available": True},
+            ) as m_panel,
+            patch(
+                "src.python.report.whatif_operations.write_whatif_report",
+                return_value={"excel": "/r/e.xlsx", "html": "/r/h.html"},
+            ) as m_write,
+        ):
+            if panel_side_effect is not None:
+                m_panel.side_effect = panel_side_effect
+            result = run_whatif_simulation(
+                [MagicMock()],
+                [MagicMock()],
+                base_file="/x/基准.xlsx",
+                candidate_file="/x/目标.xlsx",
+                output_dir="reports",
+            )
+        return result, m_feat, m_panel, m_write.call_args.args[0]
+
+    def test_switch_on_attaches_cost(self):
+        """开关开 → is_feature_enabled 读取该开关，面板结果挂载为 cost 键。"""
+        result, m_feat, m_panel, data = self._run(True, panel_return={"available": True, "trade_cost": {}})
+        self.assertTrue(result.ok)
+        m_feat.assert_called_once_with("whatif_trade_cost")
+        m_panel.assert_called_once()
+        self.assertIn("cost", data)
+        self.assertEqual(data["cost"]["trade_cost"], {})
+
+    def test_switch_off_cost_key_absent(self):
+        """开关关（出厂默认）→ 面板不调用、cost 键缺席，数据与开态前完全一致。"""
+        result, m_feat, m_panel, data = self._run(False)
+        self.assertTrue(result.ok)
+        m_feat.assert_called_once_with("whatif_trade_cost")
+        m_panel.assert_not_called()
+        self.assertNotIn("cost", data)
+        self.assertEqual(data, {"available": True, "changes": []})
+
+    def test_panel_exception_degrades_to_absent(self):
+        """面板装配抛异常 → 降级缺席（cost 键不出现），模拟照常成功。"""
+        result, _, _, data = self._run(True, panel_side_effect=RuntimeError("boom"))
+        self.assertTrue(result.ok)
+        self.assertNotIn("cost", data)

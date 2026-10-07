@@ -40,9 +40,9 @@ class TestEmptyHoldingsWithLlm(unittest.TestCase):
             },
         )
         cls._cfg_patcher.start()
-        cls._exec_patcher = patch("src.python.llm.generators_orchestrator.ThreadPoolExecutor", new=SynchronousExecutor)
+        cls._exec_patcher = patch("src.python.llm._llm_dispatch.ThreadPoolExecutor", new=SynchronousExecutor)
         cls._exec_patcher.start()
-        cls._httpx_patcher = patch("src.python.llm.generators_orchestrator.httpx.Client", new=MagicMock())
+        cls._httpx_patcher = patch("src.python.llm._llm_dispatch.httpx.Client", new=MagicMock())
         cls._httpx_patcher.start()
 
     @classmethod
@@ -51,10 +51,10 @@ class TestEmptyHoldingsWithLlm(unittest.TestCase):
         cls._exec_patcher.stop()
         cls._cfg_patcher.stop()
 
-    @patch("src.python.llm.generators_orchestrator.generate_penetration_deep_analysis")
-    @patch("src.python.llm.generators_orchestrator.generate_health_check")
-    @patch("src.python.llm.generators_orchestrator.generate_global_macro")
-    @patch("src.python.llm.generators_orchestrator.generate_expert_review")
+    @patch("src.python.llm._llm_dispatch.generate_penetration_deep_analysis")
+    @patch("src.python.llm._llm_dispatch.generate_health_check")
+    @patch("src.python.llm._llm_dispatch.generate_global_macro")
+    @patch("src.python.llm._llm_dispatch.generate_expert_review")
     def test_empty_holdings_no_crash(
         self,
         mock_expert,

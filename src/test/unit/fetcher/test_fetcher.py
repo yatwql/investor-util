@@ -45,7 +45,7 @@ class TestProviderChain(unittest.TestCase):
         self.assertIsInstance(chain, list)
         self.assertTrue(len(chain) > 0)
 
-    @patch("src.python.fetcher.chain.get_config")
+    @patch("src.python.fetcher.chain_config.get_config")
     def test_preferred_provider_respected(self, mock_get_config):
         """配置首选提供商 → 链路以配置的为先。"""
         mock_get_config.return_value = {"preferred_provider": {"price": "eastmoney"}}

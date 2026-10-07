@@ -321,3 +321,105 @@ class TestWhatifHtmlPage(unittest.TestCase):
         self.assertIn("--bg:", text, "whatif 页应定义页面级 --bg 变量")
         self.assertIn('[data-theme="dark"]', text, "whatif 页应含深色覆盖块")
         self.assertIn("display: none !important", text, "whatif 页打印时应隐藏主题按钮")
+
+
+class TestSwitchOffGoldenBaseline(unittest.TestCase):
+    """开关关态零改动断言（先决门槛红线回归）：固定 fixture 渲染哈希锁定基线。
+
+    ``whatif_trade_cost`` 出厂关：关态 what-if 输出与开关引入前逐字节一致。
+    本用例是长期驻留的零改动断言——模板/渲染层任何泄漏进关态输出的字节
+    （哪怕只是一行多余空行）都会改写 sha256 → 红。合法模板演进需显式复核
+    后更新基线常量（评审动作，不是自动豁免）。
+    """
+
+    _GOLDEN_BASE_SHA256 = "ce5f76b535da20b7a53f2c7996e8a541a504b8415a7158e21e5fddb4c1fdb771"
+    _GOLDEN_FULL_SHA256 = "550b910c6eabe40794f131673f7602361801e3a583478d40701ace5e657c959e"
+
+    def _render(self, **extra) -> str:
+        from unittest.mock import patch
+
+        from src.python.report.whatif_writer import render_whatif_html
+
+        with (
+            patch("src.python.report.whatif_writer.APP_NAME", "GOLDEN-APP"),
+            patch("src.python.report.whatif_writer.APP_VERSION", "v0.0.0-golden"),
+        ):
+            return render_whatif_html(_whatif_data(**extra), "2026-01-01 00:00:00")
+
+    @staticmethod
+    def _full_extra() -> dict:
+        """含回测与申购受限区段的完整分支 fixture（覆盖④/⑦区段字节面）。"""
+        return {
+            "effective_date": "2026-07-01",
+            "backtest": {
+                "available": True,
+                "status": "ok",
+                "reason": "",
+                "effective_date": "2026-07-01",
+                "metrics": [
+                    {
+                        "key": "total_return",
+                        "label": "区间收益",
+                        "unit": "pct",
+                        "base": 1.2,
+                        "candidate": 2.4,
+                        "delta": 1.2,
+                        "arrow": "↑",
+                    },
+                    {
+                        "key": "sharpe",
+                        "label": "夏普比率",
+                        "unit": "ratio",
+                        "base": 0.8,
+                        "candidate": 1.1,
+                        "delta": 0.3,
+                        "arrow": "↑",
+                    },
+                ],
+                "series": {
+                    "labels": ["2026-07-01", "2026-07-02", "2026-07-03"],
+                    "base": [100.0, 100.2, 100.4],
+                    "candidate": [100.0, 100.3, 100.55],
+                    "base_drawdown": [0.0, 0.0, 0.0],
+                    "candidate_drawdown": [0.0, 0.0, 0.0],
+                },
+            },
+            "feasibility": [
+                {
+                    "code": "002943",
+                    "name": "广发多因子",
+                    "action": "新增",
+                    "status": "限大额",
+                    "kind": "purchase_limit",
+                    "amount": 10000.0,
+                    "days": 3,
+                    "feasible": True,
+                    "limit_text": "单日限购 1 万元",
+                    "next_open_text": "",
+                    "note_text": "限大额 1 万元",
+                }
+            ],
+        }
+
+    def test_switch_off_render_matches_baseline_hash(self) -> None:
+        """关态渲染 sha256 == 基线常量（逐字节一致，主分支）。"""
+        import hashlib
+
+        digest = hashlib.sha256(self._render().encode("utf-8")).hexdigest()
+        self.assertEqual(digest, self._GOLDEN_BASE_SHA256)
+
+    def test_switch_off_full_branches_match_baseline_hash(self) -> None:
+        """关态渲染 sha256 == 基线常量（回测④ + 受限⑦ 分支同样零字节变化）。"""
+        import hashlib
+
+        digest = hashlib.sha256(self._render(**self._full_extra()).encode("utf-8")).hexdigest()
+        self.assertEqual(digest, self._GOLDEN_FULL_SHA256)
+
+    def test_switch_off_render_carries_no_cost_traces(self) -> None:
+        """关态渲染不含任何成本面板痕迹（区段/画布/数据段/说明编号不前移）。"""
+        html = self._render()
+        self.assertNotIn("交易成本对比", html)
+        self.assertNotIn("chart_whatif_cost_nav", html)
+        self.assertNotIn("whatif-cost-chart-data", html)
+        self.assertNotIn("⑨ 说明", html)
+        self.assertIn("⑧ 说明", html)

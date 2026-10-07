@@ -194,6 +194,20 @@ _MODULE_REGISTRY: tuple[DataModuleDef, ...] = (
         settings_suffix="self_review",
         cache_groups=("preload",),
     ),
+    # ── 持仓变动复盘归因（实验能力，章本体由 feature holding_change_review 控制；
+    #    章内 LLM 归因块，串行后置执行）──
+    # 登记目的同生成后自检：显示名/缓存前缀/TTL/用量统计/失败原因载体复用既有机制。
+    # **刻意不进 generators_orchestrator._MODULE_FNS**：输入是报告 seam 注入的契约
+    # （holding_change_data），必须在报告管线内串行取用，不属线程池并行调度
+    # （见 llm/holding_change_review.py 模块说明）。
+    DataModuleDef(
+        "持仓变动复盘归因",
+        "llm_holding_change",
+        cache_prefixes=("llm_holding_change_",),
+        cache_ttl=7200,
+        settings_suffix="holding_change",
+        cache_groups=("preload",),
+    ),
     # ── 辩论模式（preload 组，实验功能）──
     DataModuleDef(
         "辩论白脸",
@@ -275,6 +289,13 @@ _MODULE_REGISTRY: tuple[DataModuleDef, ...] = (
         exact_cache_keys=("fund_purchase_status_table",),
         cache_ttl=CACHE_DAILY,  # 与官方净值（price 数据类型）同档，显式声明而非回退巧合
     ),  # 无 cache_group：大表不随菜单刷新强抓，仅按 TTL 过期
+    DataModuleDef(
+        "基金申赎费率",
+        "fund_fee",
+        cache_prefixes=("fund_fee_",),
+        cache_ttl=CACHE_WEEKLY,  # 费率低频变动，周档 + TTL 抖动防同批过期
+        cache_groups=("refresh",),  # per-code 缓存，随菜单刷新按持仓代码更新（同基金持仓组）
+    ),
     # ── 组合历史走势（无 cache_group — per-code 缓存，不因切换持仓文件而清除）──
     DataModuleDef("历史股票日线", "history_stock", cache_prefixes=("history_stock_",), cache_ttl=CACHE_WEEKLY),
     DataModuleDef("历史基金净值", "history_fund_otc", cache_prefixes=("history_fund_otc_",), cache_ttl=CACHE_MONTHLY),
@@ -435,6 +456,8 @@ _REPORT_SHEET_NAMES: dict[str, str] = {
     "style_factor": "风格与因子分析",
     "portfolio_history_drawdown": "组合历史走势与回撤",
     "portfolio_evolution": "组合演进",
+    "holding_change": "持仓变动复盘",
+    "schedule_replay": "调仓纪律回放",
     "action": "行动建议",
     "data_source_status": "数据源可用性矩阵",
     "fundamental_snapshot": "持仓基本面",
@@ -587,6 +610,7 @@ _REPORT_SECTION_DEFAULT: list[dict] = [
     # ── 风格与因子分析（「基金风格表 + 风格因子回归」两区块 + 行业 Beta 子表） ──
     # 区块一：基金风格表（渲染期派生）· 区块二：风格因子回归（style_factor_data 子键）
     # · 区块三：行业 Beta 子表（style_factor_data.industry_beta，功能开关 industry_beta 默认关）
+    # · 区块四：因子目录（factor_catalog_data 主键，实验开关 factor_catalog 默认关）
     {
         "key": "style_factor",
         "name": "风格与因子分析",
@@ -637,21 +661,44 @@ _REPORT_SECTION_DEFAULT: list[dict] = [
         "type": "evolution",
         "data_flag": "evolution_data",
     },
+    # ── holding_change 类型（实验开关 holding_change_review 控制，经实验挂载点注入） ──
+    # 持仓变动复盘：快照差分事件级操作侧复盘（事件清单/频率/结构演变/意图对账 +
+    # LLM 归因块）。data_flag 控制双端可见性：开关关闭（默认）时
+    # pipeline_data 键缺席 → 标志 False → 整章隐藏，两条输出路径保持既有输出；
+    # 开关注入但数据不足时双端写占位
+    {
+        "key": "holding_change",
+        "name": "持仓变动复盘",
+        "number": 15,
+        "type": "holding_change",
+        "data_flag": "holding_change_data",
+    },
+    # 事件窗量化对照：并入「财经新闻热点与持仓关联分析」章内区块（partial 在新闻章内以
+    # block-title 渲染，可见性由契约 event_impact_view 决定），不占独立注册表条目、不消耗
+    # 连续编号；实验开关 event_window_impact 经实验挂载点注入 pipeline_data["event_impact_data"]。
+    # ── schedule_replay 类型（实验开关 rebalance_schedule_replay 控制，经实验挂载点注入）：调仓纪律回放——月度定期/阈值偏离纪律多期回放 vs 买入持有；data_flag 控制双端可见性（关态键缺席隐藏 / 开启但数据不足双端占位） ──
+    {
+        "key": "schedule_replay",
+        "name": "调仓纪律回放",
+        "number": 16,
+        "type": "schedule_replay",
+        "data_flag": "schedule_replay_data",
+    },
     # ── always 类型（始终显示） ──
-    {"key": "data_source_status", "name": "数据源可用性矩阵", "number": 15, "type": "always", "data_flag": None},
+    {"key": "data_source_status", "name": "数据源可用性矩阵", "number": 17, "type": "always", "data_flag": None},
     # ── fundamental_snapshot 类型（两功能开关各控一块，默认关）──
     # 持仓基本面 = 财务指标（financial_indicator）+ 持仓个股财报摘要（financial_report_digest）；
     # 两契约 OR 决定章节可见性（任一块就绪即显示，块级开关各控各的渲染）
     {
         "key": "fundamental_snapshot",
         "name": "持仓基本面",
-        "number": 16,
+        "number": 18,
         "type": "fundamental_snapshot",
         "data_flag": None,
         "data_flag_any": ("financial_indicator_data", "financial_report_digest_data"),
     },
     # ── llm_usage 强制末位（技术约束） ──
-    {"key": "llm_usage", "name": "LLM API 用量", "number": 17, "type": "llm", "data_flag": "llm_data_available"},
+    {"key": "llm_usage", "name": "LLM API 用量", "number": 19, "type": "llm", "data_flag": "llm_data_available"},
 ]
 
 
@@ -688,7 +735,7 @@ def get_report_section_order(config: dict | None = None) -> list[dict]:
     """合并用户配置与默认顺序，返回排序后的报告模块列表。
 
     处理逻辑：
-      1. 无配置或配置为空 → 返回完整 21 项默认顺序（与当前硬编码一致）
+      1. 无配置或配置为空 → 返回完整 19 项默认顺序（与当前硬编码一致）
       2. 用户配置的模块使用配置序号，其余保持默认序号
       3. 已配置模块排在前（按序号升序），未配置模块按默认顺序排后
       4. llm_usage 始终固定在最后一位
@@ -698,7 +745,7 @@ def get_report_section_order(config: dict | None = None) -> list[dict]:
                 为 None 时返回 _REPORT_SECTION_DEFAULT 深拷贝
 
     Returns:
-        [{key, name, number, type, data_flag}, ...] 共 17 项
+        [{key, name, number, type, data_flag}, ...] 共 19 项
     """
     if config is None:
         return [dict(sec) for sec in _REPORT_SECTION_DEFAULT]

@@ -11,8 +11,9 @@
 配置持久化：功能开关可通过 features.json 覆写默认值。
 全部开关在 :data:`feature_switch_registry` 一处登记（显示名/说明/分组/默认值/
 产物影响），TUI 面板、Web 配置面板、CLI 取值域与文档清单一律由它派生——渠道层
-不得另写开关清单。分组（实验组 / 常规组）决定面板可见性，「转正」即改分组与
-默认值两个字段，可见性随之延续。
+不得另写开关清单。分组（实验组 / 常规组 / 报告章节与增强组）决定面板可见性，
+「转正」即移出实验组——常驻读侧增强入常规组且默认值改 True、章节/页签类入
+报告章节与增强组且默认值保持 False，可见性随之延续。
 模块级 LLM 分析章节、新闻源、报告章节等**不在此登记**——它们各有归属文件，
 见 ``feature_switch_registry`` 上方说明。
 """
@@ -34,14 +35,14 @@ logger = logging.getLogger("invest")
 # ── 路径常量 ────────────────────────────────────────────────
 
 FEATURES_FILE = os.path.join(PROJECT_ROOT, "data/config/features.json")
-# 兼容别名：历史私有名（包内既有引用；渠道层一律用公开名 FEATURES_FILE）
-_FEATURES_FILE = FEATURES_FILE
 
 # ── 分组常量 ────────────────────────────────────────────────
 # 分组表达的是**生命周期的当前状态**，不是优先级、不是新旧：
 #   GROUP_EXPERIMENTAL —— 会改变产物、需真实数据验证后择机转正，出厂默认关
 #   GROUP_STANDARD     —— 常驻能力，出厂默认开、用户可关
-# 「转正」= 把一条声明从实验组改到常规组并把 default 改 True。此前「默认值」与
+# 「转正」= 把一条声明移出实验组，目标组按功能形态选——常驻读侧/诊断/接缝类
+# 入常规组并把 default 改 True；章节/页签类入报告章节与增强组且 default 保持
+# False（默认产物不变、按需开启）。此前「默认值」与
 # 「是否实验项」是同一件事的两个名字：转正会连带摘掉面板入口（doctor_check 转正
 # 后只剩手改 features.json 一条关闭途径），而从未被标为实验项的 metrics_* 则从来
 # 没有过任何界面入口。分组把这两件事拆开——可见性由分组决定、取值由 default 决定。
@@ -129,6 +130,48 @@ feature_switch_registry: dict[str, FeatureSwitchDef] = {
     "prosperity_framework": FeatureSwitchDef(
         "景气度框架诊断",
         "六维评分卡（景气方向/ROE 低位弹性/全球比较优势/流动性/集中度与周期拼接/业绩回撤印证）评估组合契合度，缺数据维度标记需核实",
+        GROUP_EXPERIMENTAL,
+        False,
+        True,
+    ),
+    # ── 实验性功能：持仓变动复盘（快照差分事件级，需结构级结论人工认可后择机转正） ──
+    "holding_change_review": FeatureSwitchDef(
+        "持仓变动复盘",
+        "快照差分出新增/加仓/减仓/清仓事件清单与频率/结构演变/意图对账（区间净额推断，结构级）+ LLM 归因块",
+        GROUP_EXPERIMENTAL,
+        False,
+        True,
+    ),
+    # ── 实验性功能：What-if 交易成本与基准对比（需费率/指数数据，先决门槛过审后择机转正） ──
+    "whatif_trade_cost": FeatureSwitchDef(
+        "What-if 交易成本对比",
+        "调仓回放计入申赎成本（FIFO 持有期阶梯）+ 成本前后收益差与业绩基准三线参照",
+        GROUP_EXPERIMENTAL,
+        False,
+        True,
+    ),
+    # ── 实验性功能：事件窗量化对照（新闻事件 × 持仓行情窗口比对，先决门槛过审后择机转正） ──
+    "event_window_impact": FeatureSwitchDef(
+        "事件窗量化对照",
+        "新闻事件映射交易日后 ±5 交易日窗口：品种收益/超额收益与文本极性同表对照，分歧例进 LLM 分析章",
+        GROUP_EXPERIMENTAL,
+        False,
+        True,
+    ),
+    # ── 实验性功能：因子目录信号源（门槛评测通过，25 因子五族横截面信号入账 +
+    # 风格与因子分析区「因子目录」区块；待真实报告验证后择机转正） ──
+    "factor_catalog": FeatureSwitchDef(
+        "因子目录",
+        "25 因子五来源族横截面信号入账与风格与因子分析区「因子目录」区块",
+        GROUP_EXPERIMENTAL,
+        False,
+        True,
+    ),
+    # ── 实验性功能：调仓纪律回放（先决门槛三项过审：指标原语复用 / 成本联动 /
+    # 2 个真实样例价值确认；验证通过后择机转正） ──
+    "rebalance_schedule_replay": FeatureSwitchDef(
+        "调仓纪律回放",
+        "月度定期/阈值偏离纪律多期回放 vs 买入持有（含成本），回放章双线与逐期成本表",
         GROUP_EXPERIMENTAL,
         False,
         True,
@@ -543,10 +586,10 @@ def load_feature_overrides() -> None:
         "metrics_hhi": true
       }
     """
-    if not os.path.exists(_FEATURES_FILE):
+    if not os.path.exists(FEATURES_FILE):
         return
     try:
-        with open(_FEATURES_FILE, encoding="utf-8") as f:
+        with open(FEATURES_FILE, encoding="utf-8") as f:
             overrides = json.load(f)
     except (json.JSONDecodeError, OSError) as e:
         logger.warning("[features] 加载覆写文件失败: %s", e)
@@ -602,9 +645,9 @@ def save_feature_overrides(overrides: dict[str, bool], merge: bool = True) -> No
         merge: True = 合并到现有覆写（覆盖同名键），False = 完全替换
     """
     existing: dict[str, Any] = {}
-    if merge and os.path.exists(_FEATURES_FILE):
+    if merge and os.path.exists(FEATURES_FILE):
         try:
-            with open(_FEATURES_FILE, encoding="utf-8") as f:
+            with open(FEATURES_FILE, encoding="utf-8") as f:
                 existing = json.load(f)
         except (json.JSONDecodeError, OSError):
             existing = {}
@@ -618,7 +661,7 @@ def save_feature_overrides(overrides: dict[str, bool], merge: bool = True) -> No
     # 并返回 False——开关覆写属尽力持久化：写不进盘不影响本次运行（内存态随后同步），
     # 也不应因此中断调用链。
     if write_json_atomic(
-        _FEATURES_FILE,
+        FEATURES_FILE,
         cleaned,
         prefix=".features_",
         log_tag="features",

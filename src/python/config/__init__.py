@@ -198,6 +198,35 @@ def resolve_holdings_path(config: dict | None = None) -> str:
     return os.path.join(holdings_dir, holdings_filename)
 
 
+def is_formal_holdings_source(config: dict | None = None) -> bool:
+    """持仓源是否为正式持仓目录（``data/holdings/``）下的持仓文件。
+
+    持仓快照是用户的长期历史状态（快照对比/组合演进/持仓变动复盘的数据底座），
+    只应由正式持仓源写入与比对。demo/试算/临时持仓（路径不在正式目录下，含
+    ``data/holdings/uploads/`` 上传暂存区）判定为非正式源——调用方据此跳过快照
+    捕获与历史对比，防止幻影持仓污染真实快照历史（症状：未持有品种被报成清仓）。
+
+    解析异常按非正式源处理（fail-closed：宁可少写、不误写用户历史）。
+
+    Args:
+        config: 配置字典；None 时读全局配置（与 ``resolve_holdings_path`` 同源解析）。
+    """
+    import os
+
+    from src.python.core.constants import PROJECT_ROOT
+
+    try:
+        source = os.path.abspath(resolve_holdings_path(config))
+        formal_dir = os.path.abspath(os.path.join(PROJECT_ROOT, "data", "holdings"))
+        if source != formal_dir and not source.startswith(formal_dir + os.sep):
+            return False
+        # 上传暂存区虽在正式目录下，但内容为外部上传的试算/覆盖文件，非正式存量
+        uploads_dir = os.path.abspath(os.path.join(formal_dir, "uploads"))
+        return source != uploads_dir and not source.startswith(uploads_dir + os.sep)
+    except Exception:
+        return False
+
+
 def get_local_flag(key: str) -> bool:
     """读取机器本地状态标记（公开 API，替代 ``config._local_state`` 私有模块直引）。"""
     from src.python.config._local_state import get_flag

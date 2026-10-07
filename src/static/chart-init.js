@@ -371,6 +371,29 @@
     }), 'evolution_top');
   }
 
+  function initScheduleReplayChart() {
+    var dataEl = document.getElementById('schedule-replay-chart-data');
+    var el = document.getElementById('chart_schedule_replay');
+    if (!dataEl || !el) return;
+    var d;
+    try {
+      d = JSON.parse(dataEl.textContent || '{}');
+    } catch (e) {
+      console.warn('[chart] schedule-replay-chart-data 解析失败，调仓纪律回放图表跳过');
+      return;
+    }
+    if (!d || !d.dates || !d.dates.length) return;
+    var datasets = [
+      { label: '纪律回放（月度定期）', data: d.replay || [], borderColor: theme.primary || '#2E75B6', borderWidth: 2, pointRadius: 0, fill: false, tension: 0.1 },
+      { label: '买入持有', data: d.buyhold || [], borderColor: '#E68A00', borderWidth: 2, pointRadius: 0, fill: false, tension: 0.1 }
+    ];
+    trackChart(new Chart(el, {
+      type: 'line',
+      data: { labels: d.dates, datasets: datasets },
+      options: lineOptions('净值 (期初=100)')
+    }), 'schedule_replay');
+  }
+
  /* ── 注册初始化函数（每个独立 try/catch）────────── */
   var inits = {
     portfolio_line: initPortfolioChart,
@@ -381,7 +404,8 @@
     radar: initRadarChart,
     evolution_total: initEvolutionTotalChart,
     evolution_hhi: initEvolutionHhiChart,
-    evolution_top: initEvolutionTopChart
+    evolution_top: initEvolutionTopChart,
+    schedule_replay: initScheduleReplayChart
   };
 
   Object.keys(inits).forEach(function (key) {

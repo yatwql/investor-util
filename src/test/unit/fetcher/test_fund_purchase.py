@@ -43,6 +43,7 @@ def _large_rows(n: int = MIN_ACCEPT_ROWS) -> dict[str, dict[str, Any]]:
             "next_open_date": "",
             "daily_limit": None,
             "min_purchase": 10.0,
+            "purchase_fee_rate": 0.0015,
         }
         for i in range(n)
     }

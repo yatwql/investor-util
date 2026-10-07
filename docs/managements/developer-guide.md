@@ -1,6 +1,6 @@
 # 开发者指南
 
-> 文档版本：0.12.3
+> 文档版本：0.12.4
 
 ## 概述
 
@@ -109,6 +109,7 @@ ln -sf "$PWD/.pi/models.json" ~/.pi/agent/models.json
 .venv/bin/python scripts/check-requirement-trace.py --ci   # 需求 ID ↔ 验证载体追溯（已补全域全覆盖 + 载体文件存在）
 .venv/bin/python scripts/check-version-consistency.py --ci   # 版本号全局一致性（APP_VERSION ↔ README/pyproject/管理文档 10 份）
 .venv/bin/python scripts/check-doc-links.py --ci              # 文档死链/死锚点/重复标题/层级/编号序列/§引用机检
+.venv/bin/python scripts/check-file-length.py --ci         # 单文件行数红线（主程序 >800 行 / 测试 >1200 行）
 ```
 
 > **`--sync` 统计快照口径（CI 分叉坑）**：`check-doc-drift --sync`（及 pre-commit 自动回写）按**工作区**实测写入 `folders.md` 行数，而 CI 的 `check-doc-drift` 按 **committed** 树实测——若受检目录存在**长期不提交的修改**（本地游离改动），本地已同步的数字会在 CI 上判「不一致」，连带 guards / test / portability 三个 job 同时红。提交前确认受检文件全部纳入本次提交；有长期游离修改时先提交它们、再 `--sync`。
@@ -128,11 +129,12 @@ ln -sf "$PWD/.pi/models.json" ~/.pi/agent/models.json
 .venv/bin/python scripts/check-requirement-trace.py --ci
 .venv/bin/python scripts/check-version-consistency.py --ci
 .venv/bin/python scripts/check-doc-links.py --ci
+.venv/bin/python scripts/check-file-length.py --ci
 ```
 
 **辅助（非阻塞）**：`.venv/bin/ruff check`（lint 基线，选择项与刻意豁免均在 `pyproject.toml` 显式声明）+ `.venv/bin/ruff format --check`（代码格式一致性）——问题可经 `.venv/bin/ruff check --fix` / `.venv/bin/ruff format` 自动修复，不阻止合并/发布。当前两者均为零告警基线，新增代码应在提交前保持干净。
 
-**CI 同步执行（`.github/workflows/ci.yml`）**：三档测试按分支/标签分流——`dev` 推送跑 P0（`dev-verify`）、`master` 推送或 PR 跑 P1（`verify`）、打 `v*` tag 跑 P2（`verify,regression`），矩阵覆盖 Python 3.11/3.12/3.13；另有三个独立 job：`guards`（**阻塞**，9 个 `--ci` 守护脚本，即上方 P0/P2 清单全量）、`portability`（**阻塞**，非 UTF-8 locale + 隐式编码双探针，见下方「编码/locale 自检」）与 `format`（非阻塞，`ruff format --check src/python/ scripts/` + `ruff check`）。
+**CI 同步执行（`.github/workflows/ci.yml`）**：三档测试按分支/标签分流——`dev` 推送跑 P0（`dev-verify`）、`master` 推送或 PR 跑 P1（`verify`）、打 `v*` tag 跑 P2（`verify,regression`），矩阵覆盖 Python 3.11/3.12/3.13；另有三个独立 job：`guards`（**阻塞**，10 个 `--ci` 守护脚本，即上方 P0/P2 清单全量）、`portability`（**阻塞**，非 UTF-8 locale + 隐式编码双探针，见下方「编码/locale 自检」）与 `format`（非阻塞，`ruff format --check src/python/ scripts/` + `ruff check`）。
 
 ### 编码/locale 自检（旧 pip 回退解码 / 隐式编码）
 
@@ -161,8 +163,31 @@ PYTHONWARNDEFAULTENCODING=1 .venv/bin/python -m pytest src/test/unit -q
 
 - **回显形态**：`<config_field>=<值>`、`（当前 X → 已试 Y）`、`provider[<条目>] pacing.max_concurrency=<值>、pacing.min_interval=<值>`；配置里**未声明**时标「未配置」而非留空（避免误读为 0/已配）。
 - **密钥/凭据类豁免**：涉及 `api_key` / `llm_key.json` / `data_key.json` / token / password 的提示只回显**文件名、条目名、路径**，绝不回显密钥本体或其片段（对齐 `scenario_security` 的「日志不记录完整密钥」基线）。
-- **已覆盖点**：429 诊断 `api_base._concurrency_hint`（两级并发 + 间隔）、截断提示 `api_base._check_*_truncation`、思考耗尽 `api_base._extract_content`（配置上下文由 `_process_success_response` 经线程局部注入）与 `_api_claude` 安全网日志、截断重试耗尽 `skeleton._handle_truncation`、worker 钳位 `fetcher/batch.py`、阈值超限 `providers/news_dedup.py`。
-- **回归用例**：`test_llm_api_base.py::TestThinkingExhaustedConfigEcho` + 同文件 429 回显组、`test_llm_api_base.py::test_rate_limit_429_log_echoes_min_interval_value_when_advised`、`test_skeleton.py::test_exhausted_retry_log_names_config_field_and_both_values`、`test_llm_api.py::test_thinking_exhausted_log_echoes_current_budget`。新增此类日志时按本节口径补回显与用例。
+- **已覆盖点**：429 诊断 `pacing._concurrency_hint`（两级并发 + 间隔，由 `api_base` 重试骨架复用）、截断提示 `api_base._check_*_truncation`、思考耗尽 `api_base._extract_content`（配置上下文由 `_process_success_response` 经线程局部注入）与 `_api_claude` 安全网日志、截断重试耗尽 `skeleton._handle_truncation`、worker 钳位 `fetcher/batch.py`、阈值超限 `providers/news_dedup.py`。
+- **回归用例**：`test_llm_api_base.py::TestThinkingExhaustedConfigEcho`、`test_llm_api_attempt.py::TestAttemptApiCall` 429 回显组（含 `test_rate_limit_429_log_echoes_min_interval_value_when_advised`）、`test_llm_api_retry_errors.py` 429 重试链、`test_skeleton.py::test_exhausted_retry_log_names_config_field_and_both_values`、`test_llm_api.py::test_thinking_exhausted_log_echoes_current_budget`。新增此类日志时按本节口径补回显与用例。
+
+### 计划收尾：文档触点清单与一次性枚举
+
+任务收尾的墙钟主因是「文档触点 × 往返轮次」——触点靠守护报错被动驱动时，每轮报错就是一次完整往返。按任务类型对照下表**主动扫一遍触点**，再按三步工作流收敛：
+
+**触点清单（按任务类型）**：
+
+| 任务类型 | 必同步触点 |
+|:---------|:-----------|
+| 新报告章节 | `registry.py` 注册表 → `reports-instruction.md`（目录/章节表/分组表/可见性总表/页签上限）→ `requirements.md` 章清单 → `technical.md`（结果区计数/`report_section_order`）→ `how-to-use-tui-menu.md`（报告块编号段）→ `folders.md`（新 partial/模板）→ `report_template.html` include |
+| 新功能开关 | `features.py` 注册表 → `how-to-config.md`（开关表+计数+实验/常规分列+Web 面板行）→ `how-to-use-tui-menu.md`（开关区行与编号）→ `technical.md`（语义命名表/开关计数）→ `testplan.md`（若涉门禁） |
+| 新文件/目录 | `folders.md` 目录树（`check-doc-drift --sync` 回写统计表）→ 若为 `scripts/*`：本文件「辅助脚本速查」一览与分类段 |
+| 新测试 | `conftest.py` marker 注册（若需）→ `.venv/bin/python scripts/collect-test-coverage.py` 刷新 `test-coverage.md` → 边缘用例入 `*_edge.py` |
+| 新 LLM 模块/seam | `registry.py` + 统一附录（`skeleton._build_prompt_appendix`）+ `technical.md`（语义命名表/seam 表/附录 H）→ 指纹条件并入用例 |
+| 每个计划收尾（通用） | `plan.md`（状态翻转+归档 note）→ 当期计划归档文档（归档段+设计文档索引，入 0.12 期归档）→ `review-findings.md`（rf 登记，rf-next 递增）→ `changelog.md`（含 rf token）→ `test-coverage.md`/`folders.md` 计数刷新 → 涉版本时 `check-version-consistency` |
+
+**三步工作流**：
+
+1. **一次枚举**：编辑全部完成后先跑 `check-doc-drift.py --sync`（回写统计/目录树），再一次跑齐十守护 `--ci`，收集**全量** finding（不边改边跑）。
+2. **批量修复**：按上表 + 守护 finding 一次性修完，同一文件多处改动合并为一次 edit。
+3. **单次复核**：再跑十守护复核 + `ruff` + 测试门禁；`git commit` 交给 pre-commit 钩子（内含 `--sync` + 十守护，失败即中止）。
+
+**红线**：编辑批次与 `--sync`/检查类脚本**永不同批**（sync 写文件，与编辑并行会竞态）；`ruff` / `check-file-length` 随每批代码改动跑，不留到收尾才爆。
 
 ## 任务编号规范与自动保障
 
@@ -203,11 +228,11 @@ PYTHONWARNDEFAULTENCODING=1 .venv/bin/python -m pytest src/test/unit -q
 
 | 机制 | 触发 | 跨机器 |
 |:-----|:-----|:------|
-| **P0/P2 门禁** | 提交/发布前 9 个 `--ci` 守护脚本全量（清单见 P0/P2 门禁条款） | ✅ 零配置 |
+| **P0/P2 门禁** | 提交/发布前 10 个 `--ci` 守护脚本全量（清单见 P0/P2 门禁条款） | ✅ 零配置 |
 | **dev-verify preflight** | `test-runner.py --mode dev-verify` 自动运行 | ✅ 零配置 |
 | **Claude Code hook** | 编辑 `plan.md`/`review-findings.md` 后实时校验 | ⚠️ clone 后运行 `.venv/bin/python scripts/install-claude-hook.py` |
-| **git pre-commit** | `git commit` 全量执行 9 个守护脚本（与 P0/CI guards 同源，约 5~6 秒）；提交涉及 `docs/managements/` 或 `src/test/` 时 `check-doc-drift --sync` 自动回写统计快照 | ⚠️ clone 后运行 `sh .githooks/install-hooks.sh` |
-| **CI guards job** | push / PR / tag 时自动校验（9 个 `--ci` 脚本之一） | ✅ 零配置 |
+| **git pre-commit** | `git commit` 全量执行 10 个守护脚本（与 P0/CI guards 同源，约 5~6 秒）；提交涉及 `docs/managements/` 或 `src/test/` 时 `check-doc-drift --sync` 自动回写统计快照 | ⚠️ clone 后运行 `sh .githooks/install-hooks.sh` |
+| **CI guards job** | push / PR / tag 时自动校验（10 个 `--ci` 脚本之一） | ✅ 零配置 |
 
 > `core.hooksPath` 与 `.claude/settings.json` 均为本地配置、不随仓库同步，新机器 clone 后运行上方激活命令一次即可；hook 脚本本体（`.githooks/`、`scripts/`）随仓库同步。
 
@@ -616,6 +641,23 @@ test-reports/latest/
 
 > 脚本自动定位 `test-reports/latest/all/report.html` 等常用路径，无需每次指定路径。
 
+### 定位顺序依赖失败 — `find-order-dependent-test.py`
+
+当某个用例**单跑通过、与全套一起跑却失败**（典型：fixture / 模块级 patch 泄漏到后续用例，如日历注入与离线桩的装配栈序错误），手工二分需要 10+ 轮 pytest 往返。本脚本自动完成：单跑确认 → 收集参考顺序 → 复现门（前置合跑必须让目标失败，含无关失败即中止）→ 最小失败前缀二分 → 单文件配对确认（不成立则预算内精简）→ 输出污染源与最小复现命令。
+
+```bash
+# 默认在 src/test 收集顺序，对目标之前的全部文件做二分
+.venv/bin/python scripts/find-order-dependent-test.py "src/test/unit/report/test_market_value.py::TestClass::test_name"
+
+# 已知大概范围时限定候选（大幅提速，推荐）
+.venv/bin/python scripts/find-order-dependent-test.py "<目标>" --candidates "src/test/unit/report/test_event_impact_wiring.py"
+
+# 只做单跑确认与候选枚举（不执行二分）
+.venv/bin/python scripts/find-order-dependent-test.py "<目标>" --dry-run
+```
+
+退出码：0 = 已定位；1 = 目标单跑即失败（非顺序依赖，请直接调试该用例）；2 = 无法复现/前置含无关失败/用法错误。前置条件：全套除目标外全绿；`--max-runs`（默认 40）限制 pytest 运行次数硬上限。定位后优先修**泄漏方**（fixture 栈序 / 未恢复的 patch），而非给受害用例加隔离。
+
 ### 标记选择运行速查
 
 以 `.venv/bin/python -m pytest -m "<表达式>"` 形式快速选取特定标记组合，适合开发调试中定向验证。
@@ -792,6 +834,8 @@ def test_qdii_nav_date_delayed_t2(self):
 | 单类方法数 | > 15 项 | > 25 项 | 拆为多个 Test 类或拆分文件 |
 | 单方法 mock 数 | > 5 个 patch | > 8 个 patch | 重构被测函数以降低耦合 |
 
+> **门禁**：红线列由 `scripts/check-file-length.py --ci` 强制——**主程序 >800 行**（硬上限，review-findings 文件过长登记区）与**测试 >1200 行**即 finding 退出 2；豁免路径须与 review-findings 挂账同步（拆分后自动提示移除豁免）。`-v` 另输出可选优化区间清单（主程序 >500 / 测试 >800），review-findings「文件过长」登记表以该清单为派生源。
+
 ### 常见问题
 
 **Q: 运行报错 `no tests collected`？**
@@ -822,6 +866,7 @@ A: 运行 `.venv/bin/python scripts/check-test-markers.py`，脚本会静态扫�
 |:-----|:-----|:-------|
 | `test-runner.py` | 测试 | pytest 标记模式封装驱动，支持 17 种 `--mode` |
 | `extract-test-failures.py` | 测试 | 从 pytest-html 报告提取失败用例详情 |
+| `find-order-dependent-test.py` | 测试 | 单跑绿合跑红的顺序依赖污染源二分定位 |
 | `check-code-traces.py` | 测试 | 代码注释/文档字符串中历史变更痕迹检查 |
 | `check-doc-traces.py` | 测试 | 面向读者文档（.md）中历史变更痕迹检查 |
 | `check-test-markers.py` | 测试 | AST 静态扫描验证测试标记合规性 |
@@ -830,6 +875,7 @@ A: 运行 `.venv/bin/python scripts/check-test-markers.py`，脚本会静态扫�
 | `check-semantic-index.py` | 测试 | 功能语义命名表正反向一致性校验（功能开关注册表表外键 / 僵尸条目 / 合并章 key 缺失） |
 | `check-doc-drift.py` | 测试 | 文档与实现一致性校验（章节表/章节数量、开关表/分组计数/默认值断言、配置与 LLM 默认值表、TUI 面板编号、目录树、项目统计表；`--sync` 自动回写统计快照） |
 | `check-doc-links.py` | 测试 | 文档链接与结构一致性校验（死链/死锚点/重复标题/层级/编号序列/§引用） |
+| `check-file-length.py` | 测试 | 单文件行数红线守护（主程序 >800 行 / 测试 >1200 行；豁免登记与 review-findings 挂账同步，`-v` 输出可选优化区间清单供登记表派生） |
 | `check-test-redundancy.py` | 测试 | 测试用例冗余与无效检查（死用例 / 无断言 / 完全重复 / 自证用例 / 硬编码演进总数） |
 | `check-requirement-trace.py` | 测试 | 需求 ID ↔ 验证载体追溯（单段 ID 全域覆盖 / 载体文件存在 / ID 双向一致） |
 | `install-claude-hook.py` | 测试 | 安装/卸载 Claude Code PostToolUse hook（任务编号一致性自动校验） |
@@ -883,6 +929,10 @@ pytest 的 `-m` 标记表达式封装层，按 `--mode` 选择预定义组合。
 **`extract-test-failures.py` — 失败用例提取**
 
 见上文「快速定位失败用例」章节。
+
+**`find-order-dependent-test.py` — 顺序依赖污染源二分**
+
+见上文「定位顺序依赖失败」章节。
 
 **`smoke-web.py` — Web 模式 HTTP 冒烟脚本**
 
@@ -1033,7 +1083,7 @@ AST 静态扫描所有 `test_*.py` 文件，检查：
     plan 未完成区不得含 ✅/已归档项；现行 changelog 只允许一个 `-dev` 段头
 14. Extended Thinking 支持矩阵：手册对比表须覆盖代码支持的全部厂商族、「仅」式预算枚举句须列全、
     默认开思考族须有提示（权威源为 `llm/api_base.py` 的前缀名单）
-15. Provider Chain 降级表：`fetcher/chain.py::_DEFAULT_CHAINS` 的 13 条链 ↔
+15. Provider Chain 降级表：`fetcher/chain_config.py::_DEFAULT_CHAINS` 的 15 条链 ↔
     `datasource-reliability.md` §4.2 表逐链**双向**比对（漏链 → 「缺少链路」；幽灵行 → 「无此链」）
 16. 守护清单同源：developer-guide 的 P0/P2 门禁代码块、`ci.yml` guards steps、CLAUDE.md P0/P2 条款、
     testplan P0/P2 清单行与 `.githooks/pre-commit` 执行体，五处的 `scripts/check-*.py --ci` 引用集合两两一致（新增守护脚本漏改任一处即报）
@@ -1119,7 +1169,7 @@ Claude Code 编辑 `plan.md` / `review-findings.md` 后自动运行编号校验�
 
 **`install-hooks.sh` — git pre-commit hook 激活脚本（`.githooks/`）**
 
-`.githooks/` 的 git pre-commit hook（9 个守护脚本全量校验 + 统计快照自动同步）默认**休眠**——`core.hooksPath` 是本机 git 配置、不随仓库同步。clone 后运行一次激活：
+`.githooks/` 的 git pre-commit hook（10 个守护脚本全量校验 + 统计快照自动同步）默认**休眠**——`core.hooksPath` 是本机 git 配置、不随仓库同步。clone 后运行一次激活：
 
 ```bash
 sh .githooks/install-hooks.sh          # 启用（写入本机 core.hooksPath）
@@ -1569,7 +1619,7 @@ from src.python.core.registry import (
 - `get_report_sheet_name("summary")` → `"投资分析汇总"`
 - `get_report_section_order(config)` → 解析 `report_section_order` 配置，返回有序键列表
 - `get_report_section_number("position_structure")` → 当前配置下该模块的序号（被基金深度分析各页签写入器调用）
-- `get_report_section_keys()` → 全部 17 个模块键名（键名→中文标题对照见 [配置指南 → report_section_order](../manuals/how-to-config.md#report_section_order-报告序号配置)）
+- `get_report_section_keys()` → 全部 18 个模块键名（键名→中文标题对照见 [配置指南 → report_section_order](../manuals/how-to-config.md#report_section_order-报告序号配置)）
 
 **计算模块查询**：
 
@@ -1617,7 +1667,7 @@ DataModuleDef("我的 LLM 分析", "llm_my_analysis",
 | ① | **注册模块定义** | `core/registry.py` → `_MODULE_REGISTRY` | 添加 `DataModuleDef` 实例，含 `settings_suffix` |
 | ② | **配置 JSON 键组** | `llm_settings.json` | 新增 9~10 个 `{key}_{suffix}` 配置键（`news_correlation` 不含 `output_brief`） |
 | ③ | **实现生成函数** | `llm/generators.py` | 新增生成函数，通过 `_call_llm()` 调用 LLM |
-| ④ | **注册调度入口** | `llm/generators_orchestrator.py` + `llm/module_fingerprint.py` | 在 `_MODULE_FNS` 字典中添加新模块条目（键=settings_suffix，值=lambda 调用新函数）；在 `_compute_module_cache_info()` 中添加对应的 `info` 条目。**指纹不进 orchestrator**：在 `module_fingerprint.py` 的 `MODULE_FINGERPRINT_BUILDERS` 登记该模块的构造器（输入闭包 `ModuleFingerprintInputs`），预检侧按键取指纹、写侧闭包调用同一函数——两侧都不得自行拼接指纹片段 |
+| ④ | **注册调度入口** | `llm/_llm_dispatch.py` + `llm/generators_orchestrator.py` + `llm/module_fingerprint.py` | 在 `_llm_dispatch._build_module_fns()` 返回的 `_MODULE_FNS` 字典中添加新模块条目（键=settings_suffix，值=lambda 调用新函数）；在 orchestrator 的 `_compute_module_cache_info()` 中添加对应的 `info` 条目。**指纹不进 orchestrator**：在 `module_fingerprint.py` 的 `MODULE_FINGERPRINT_BUILDERS` 登记该模块的构造器（输入闭包 `ModuleFingerprintInputs`），预检侧按键取指纹、写侧闭包调用同一函数——两侧都不得自行拼接指纹片段 |
 | ⑤ | **添加报告页签** | `report/llm_content.py` | 在 `write_llm_sheets()` 的 `_module_keys` 和 `_module_contents` 列表中添加新模块键名 |
 | ⑥ | **暴露导出接口** | `llm/__init__.py` | 将新生成函数加入 `__all__` |
 | ⑦ | **运行注册表测试** | 终端 | `.venv/bin/python -m pytest src/test/unit/core/test_registry.py -v` — 验证 TTL/前缀/键名完整性 |
@@ -1662,6 +1712,8 @@ DataModuleDef("我的 LLM 分析", "llm_my_analysis",
 > **内部接缝类开关也应转正（第二类首例：`datasource_adapter`）**：判据与上一条同源但落在另一面——**开关两种取值下报告产物是否等价**。若等价（新实现只是把既有路径换成结构更清晰的等价实现，差异经等价性回归测试逐项锁定且不影响下游取值语义），则它既不是用户可感知的功能、也不是用户能做的选择，摆在用户面前只会让人误以为「开了有好处」，而默认关的实际代价是**生产路径从不执行新实现**、新数据源/新字段接入时才第一次实跑。此类开关转正为常规组、**默认开**：① 声明改到 `GROUP_STANDARD` 且 `default` 置 `True`；② 开关本身保留为**回退杠杆**（`features.json` 置 false 即回退既有实现）；③ 测试补四向——默认值、不在实验组、显式关闭仍走既有实现、默认配置下走新实现（见 `test_features.py::TestDatasourceAdapterPromotion`）。数据源适配契约（`datasource_adapter`）是此模式的首例。
 
 > **读侧增强类开关也应转正（第三类首例：`deterministic_signal` / `module_quality_gate` / `decision_header_parse` / `llm_debate_conditional` / `datasource_credential_ready`）**：判据落在「**开启的代价是否只在读侧**」——只在既有提示词或既有产物流水线上追加一段由**已算出的**数据派生的内容，不新增 LLM 调用次数、不写新的持久化文件、无隐式网络与耗时；且该段内容有确定的收益（方向性结论替代裸数值、结构化契约替代表格猜测、质量分级提示读者降级参考、缺凭据时给可读指引）。此类开关默认关的实际代价是**机制在生产路径从不执行**，用户手上的产物看不到这层增强；用户若逐项去 `features.json` 里打开它，等于用配置承担了本该由默认值表达的取舍（转正判据的可观测量：见 core/experiment_stats.py 的启用次数统计与 doctor 账本概览）。转正口径：① 声明改到 `GROUP_STANDARD` 且 `default` 置 `True`；② `affects_report` **照实答 `True`**——它们确实改变产物内容（`deterministic_signal` 注入信号块、`module_quality_gate` 注入质量横幅、`decision_header_parse` 追加契约行、`llm_debate_conditional` 追加情景段、`datasource_credential_ready` 改变数据源就绪行为），故 Web 面板照常带「（影响报告）」标记；③ 开关保留为关闭杠杆，`features.json` 置 false 即回到「未引入本机制」的行为；④ 凡开关改变提示词者，其缓存后缀函数（`structured_header_cache_suffix()` → `_dh`、`debate_feature_cache_suffix()` → `_c`、`prompts_signals._signal_digest_cache_suffix()`、`core.signal_ledger.summary_cache_suffix()` → `_sg`）随之由「默认返回空」变为「默认返回非空」——**升级后首次运行会换键重生成一次**，属预期行为，须在变更记录中写明；⑤ 测试补四向——默认值、不在实验组、显式关闭仍走未引入前的路径（关闭基线必须**显式**置 false，不能再依赖 `reset_feature_flags()`，它现在返回的是已转正的默认值）、默认配置下走增强路径（见 `test_features.py::TestReadSidePromotion`）。
+>
+> **章节/页签类开关转正目标是报告组（第四类，首例待定：`holding_change_review` / `whatif_trade_cost` / `event_window_impact` 经真实启用验证后按此执行）**：判据落在「产物形态」——独立章节/页签类能力验证通过后的归宿是「报告章节与增强」组而非常规组：`default` 保持 `False`（默认产物字节不因转正变化，读者拿到的报告不因转正多出章节），面板入口随分组自动延续（实验块 → 报告块，`--experiment` 取值域随实验组身份同步退出），产物自述与启用统计随实验组身份移除（「质量可能不稳定」警示只属于未验证功能，统计的观测使命随转正完成）。转正定义因此为「**移出实验组、目标组按功能形态选**」。
 >
 > **刻意不转正的两类（判据的反面）**：**写盘积累型**——`decision_reflection` 仍留在实验组（账本结算样本尚不足以判转正，撤销死线见 plan.md）。`signal_ledger`（确定性信号沉淀）不再单独设开关：其真实积累已验证（账本有存量数据、写盘幂等开销可忽略），并入 `deterministic_signal` 转正为常规开关；**调用次数放大型**——`llm_debate_procon` 把一次 `expert_review` 调用换成最多三次（pro → con → synthesis），默认开启直接改变费用与耗时量级，留实验组由用户按需开启。集中度问答不再受开关控制（原 `llm_debate_qa_concentration` 已撤销），改为辩论流程内建段落（阈值触发）。实验功能的真实使用情况可用 `core/experiment_stats.py`（启用计数）加 `doctor` 账本概览观测，作为转正/撤销的客观数据。
 

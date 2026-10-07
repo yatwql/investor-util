@@ -33,7 +33,7 @@ _DATA_TYPE = "price_stock"  # 默认链：tencent → sina → hithink
 
 def _no_config_preferred():
     """隔离配置层 preferred_provider（本用例只测调用级）。"""
-    return patch("src.python.fetcher.chain.get_config", return_value={})
+    return patch("src.python.fetcher.chain_config.get_config", return_value={})
 
 
 # ── known_provider_names ──────────────────────────────────────
@@ -127,7 +127,7 @@ def test_reset_clears_overrides():
 def test_call_level_overrides_config_level():
     """两层同时存在时调用级优先；两者都只是排序，不改变链上源集合。"""
     with patch(
-        "src.python.fetcher.chain.get_config",
+        "src.python.fetcher.chain_config.get_config",
         return_value={"preferred_provider": {_DATA_TYPE: "hithink"}},
     ):
         assert _get_chain(_DATA_TYPE)[0] == "hithink"
@@ -188,7 +188,7 @@ def test_cli_handle_report_applies_overrides(monkeypatch):
     """_handle_report 把解析结果落到覆盖作用域，退出后即恢复。"""
     from types import SimpleNamespace
 
-    from src.python.cli import cli as cli_module
+    from src.python.cli import _handlers as cli_handlers
     from src.python.cli.cli import _handle_report
 
     captured: dict[str, object] = {}
@@ -199,7 +199,7 @@ def test_cli_handle_report_applies_overrides(monkeypatch):
 
     monkeypatch.setattr("src.python.report.orchestrator.generate_report", _fake_generate_report)
     monkeypatch.setattr(
-        cli_module,
+        cli_handlers,
         "_cli_read_holdings_with_flows",
         lambda config: ([], [], []),
     )

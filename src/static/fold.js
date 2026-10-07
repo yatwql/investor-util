@@ -1,7 +1,9 @@
 /* 正文大块折叠（details.section-fold）交互增强。
  *
  * 纯原生 JS，离线自包含，无外部依赖。功能：
- *   1. 锚点定位（hashchange / 初始 hash）→ 自动展开目标章节内的折叠块
+ *   1. 锚点定位（会话内 hashchange）→ 自动展开目标章节内的折叠块；
+ *      **初始 load 一律不展开**——打开报告（含地址带 #锚点/浏览器恢复会话）
+ *      所有折叠块缺省收起，由模板无 open 属性保证，不依赖 JS
  *   2. 打印前（beforeprint，捕获阶段先于 chart-print 快照）展开全部折叠块，
  *      并同步 resize 内部 Chart.js 图表（收起态下 canvas 为 0 尺寸）；
  *      打印后（afterprint）恢复用户原折叠状态
@@ -15,12 +17,6 @@
 
     function allFolds() {
         return document.querySelectorAll('details.section-fold');
-    }
-
-    /* 展开某章节（或全局）内的折叠块 */
-    function unfoldIn(root) {
-        var nodes = (root || document).querySelectorAll('details.section-fold');
-        for (var i = 0; i < nodes.length; i++) nodes[i].open = true;
     }
 
     /* 展开后对折叠块内部 canvas 图表做同步 resize（收起态初始化为 0 尺寸的兜底） */
@@ -49,7 +45,9 @@
             for (var i = 0; i < inner.length; i++) inner[i].open = true;
         }
         window.addEventListener('hashchange', handleHash);
-        handleHash();
+        /* 初始 load 故意不执行锚点展开：打开报告时所有折叠块缺省收起
+         * （浏览器恢复会话/深链带 #sec-… 打开也不例外）；会话内点击目录
+         * 原生锚点链接触发 hashchange 时仍自动展开，跳转后可见性不受影响。 */
 
         /* ── 3. 手动展开 → 图表同步 resize（details 的 toggle 事件不冒泡，逐个绑定） ── */
         for (var i = 0; i < folds.length; i++) {

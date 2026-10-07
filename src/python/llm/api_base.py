@@ -22,6 +22,7 @@ from src.python.llm.circuit_breaker import (
     _cb_record_failure,
     _cb_record_success,
 )
+from src.python.llm.pacing import _concurrency_hint
 from src.python.llm.pricing import estimate_cost
 from src.python.llm.prompts import (
     FAIL_REASON_API_ERROR,
@@ -30,7 +31,7 @@ from src.python.llm.prompts import (
     FAIL_REASON_QUOTA_EXCEEDED,
     FAIL_REASON_TIMEOUT,
 )
-from src.python.llm.session import record_per_module, track_session_usage
+from src.python.llm.session import _normalize_usage_tokens, record_per_module, track_session_usage
 
 logger = logging.getLogger("invest")
 
@@ -63,7 +64,6 @@ __all__ = [
     "_log_token_usage",
     "_get_retry_max",
     "_sanitize_endpoint",
-    "_concurrency_hint",
     "_check_circuit_breaker",
     "_process_success_response",
     "_attempt_api_call",
@@ -484,14 +484,7 @@ def _log_token_usage(provider: str, usage: dict | None, label: str, model_name: 
     """
     if not usage:
         return
-    if provider == "claude":
-        inp = usage.get("input_tokens", 0)
-        out = usage.get("output_tokens", 0)
-        cache_hit = usage.get("cache_read_input_tokens", 0)
-    else:
-        inp = usage.get("prompt_tokens", 0)
-        out = usage.get("completion_tokens", 0)
-        cache_hit = 0
+    inp, out, cache_hit = _normalize_usage_tokens(provider, usage)
     total = inp + out
     msg = f"  [LLM] {label}: 输入 {inp:,} + 输出 {out:,} = {total:,} tokens"
     if model_name:
@@ -572,74 +565,6 @@ def _process_success_response(
     return (content, usage)
 
 
-def _concurrency_hint(endpoint_key: str = "") -> str:
-    """429 诊断：回显当前两级并发配置，并按「还有没有下降空间」给可执行建议。
-
-    单纯建议「调低并发」在端点已配到 ``pacing.max_concurrency=1`` 时是无法执行的空话，
-    故这里先回显全局 ``llm_max_concurrency`` 与该 provider 条目的 ``pacing.max_concurrency``
-    、``pacing.min_interval`` 现值（凡建议「加大 min_interval」处都带当前值，读者不用翻配置），
-    再按三种情形分别给建议：未声明端点约束 / 端点仍有下降空间 / 两级并发均已到底
-    （此时 429 更可能来自配额或风控，应转向请求间隔与调用批次）。
-
-    Args:
-        endpoint_key: provider 条目名（端点策略键）；空串表示本次调用未绑定条目。
-
-    Returns:
-        拼接好的日志片段（配置回显 + 建议）；读取配置失败时回退为默认文案。
-    """
-    try:
-        from src.python.config import get_llm_config
-
-        global_limit = int((get_llm_config() or {}).get("llm_max_concurrency", 3))
-    except Exception:  # 配置层不可用不应阻断诊断日志
-        global_limit = 3
-
-    endpoint_limit = 0
-    min_interval = 0.0
-    policy = None
-    if endpoint_key:
-        try:
-            from src.python.llm.pacing import get_policy
-
-            policy = get_policy(endpoint_key)
-            if policy is not None:
-                endpoint_limit = policy.max_concurrency
-                min_interval = policy.min_interval
-        except Exception:  # 策略装载失败按「无约束」提示，不影响重试链路
-            endpoint_limit = 0
-
-    if endpoint_limit > 0:
-        endpoint_text = str(endpoint_limit)
-    else:
-        endpoint_text = "未配置（不限流）"
-    interval_text = f"{min_interval:g}s" if policy is not None else "未配置"
-    shown = f"当前配置：全局 llm_max_concurrency={global_limit}"
-    if endpoint_key:
-        shown += (
-            f"；provider[{endpoint_key}] pacing.max_concurrency={endpoint_text}、pacing.min_interval={interval_text}"
-        )
-
-    if endpoint_limit <= 0:
-        advice = "建议调低 llm_max_concurrency（当前并发可能过高），或为该 provider 条目配置 pacing.max_concurrency 按端点限流"
-    elif endpoint_limit > 1:
-        advice = (
-            f"建议调低 provider[{endpoint_key}] 的 pacing.max_concurrency（当前 {endpoint_limit}，最低 1），"
-            f"或调低全局 llm_max_concurrency（当前 {global_limit}）"
-        )
-    elif global_limit > 1:
-        advice = (
-            f"该端点 pacing.max_concurrency 已为最低 1、无可再降；建议调低全局 llm_max_concurrency（当前 {global_limit}），"
-            f"或加大 pacing.min_interval（当前 {min_interval:g}s）"
-        )
-    else:
-        advice = (
-            f"两级并发均已到底（全局 {global_limit} / 端点 {endpoint_limit}），再调低并发已无益——"
-            f"429 更可能来自配额（RPM/TPM）或风控而非并发：建议加大 pacing.min_interval（当前 {min_interval:g}s）、"
-            "减少同时发起的生成任务，或切换 provider（退避重试会自动生效）"
-        )
-    return f"{shown}；{advice}"
-
-
 def _attempt_api_call(
     client: httpx.Client,
     url: str,
@@ -652,7 +577,7 @@ def _attempt_api_call(
 
     Args:
         endpoint_key: provider 条目名，仅用于 429 时回显该端点的并发配置（见
-            :func:`_concurrency_hint`）；不影响调用行为。
+            :func:`pacing._concurrency_hint`）；不影响调用行为。
 
     Returns:
         ("success", data) — 调用成功，data 为解析后的 JSON

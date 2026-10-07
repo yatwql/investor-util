@@ -14,7 +14,7 @@
 高风险改动而收益仅为一个附加区块。
 
 **注册纪律（LLM 模块注册）**：本模块在 ``core/registry.py`` 登记（显示名/缓存前缀/TTL/用量统计/
-失败原因载体随之自动获得），但**故意不出现在 ``generators_orchestrator._MODULE_FNS``**：
+失败原因载体随之自动获得），但**故意不出现在 ``_llm_dispatch._MODULE_FNS``**：
 其输入是其余模块的产出，天然必须在它们之后串行执行，不属线程池并行调度模块——
 模块注册纪律明文允许该形态（「无人调用或无独立调度语义的注册分支属注册漂移」不适用于本项，
 本项有真实调用方：编排层的生成后一遍）。
@@ -80,6 +80,9 @@ def run_self_review(
     llm_config: dict | None,
     force: bool = False,
     purchase_constraint_block: str = "",
+    holding_change_block: str = "",
+    event_impact_block: str = "",
+    schedule_replay_block: str = "",
 ) -> bool:
     """生成后一遍：按开关执行自检，产出写入运行作用域载体。
 
@@ -115,6 +118,9 @@ def run_self_review(
             force=force,
             llm_config=llm_config,
             purchase_constraint_block=purchase_constraint_block,
+            holding_change_block=holding_change_block,
+            event_impact_block=event_impact_block,
+            schedule_replay_block=schedule_replay_block,
         )
     except Exception as e:  # noqa: BLE001 — 自检失败不得影响主内容（报告照常产出）
         logger.warning("生成后自检调用异常（不影响主内容）: %s", e)

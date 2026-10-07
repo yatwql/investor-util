@@ -87,6 +87,7 @@ STATUS_MESSAGES: dict[str, str] = {
     "industry_beta_unavailable": "行业 Beta 数据不足（行业分类或指数 K 线缺失），子表不渲染",
     "correlation_unavailable": "持仓相关性数据暂不可用",
     "evolution_unavailable": "组合演进数据暂不可用（快照不足，趋势待积累）",
+    "holding_change_unavailable": "持仓变动复盘数据暂不可用（有效快照不足，变动事件待积累）",
     "whatif_unavailable": "调仓对比数据暂不可用（基准或目标持仓为空）",
     "whatif_backtest_unavailable": "时序回测不可用（未指定生效日或生效日后数据不足）",
     # 新闻 / 预警

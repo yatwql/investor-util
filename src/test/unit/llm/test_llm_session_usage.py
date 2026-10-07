@@ -339,3 +339,78 @@ class TestRecordPerModule(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class TestNormalizeUsageTokens(unittest.TestCase):
+    """_normalize_usage_tokens — 跨协议 usage 归一（计量口径单源回归）。"""
+
+    def test_claude_fields(self):
+        """claude 协议读三件套 input/output/cache_read。"""
+        from src.python.llm.session import _normalize_usage_tokens
+
+        self.assertEqual(
+            _normalize_usage_tokens(
+                "claude",
+                {"input_tokens": 10, "output_tokens": 5, "cache_read_input_tokens": 3},
+            ),
+            (10, 5, 3),
+        )
+
+    def test_openai_reads_cached_tokens(self):
+        """openai 协议读 prompt_tokens_details.cached_tokens（计量口径）。"""
+        from src.python.llm.session import _normalize_usage_tokens
+
+        self.assertEqual(
+            _normalize_usage_tokens(
+                "openai",
+                {
+                    "prompt_tokens": 200,
+                    "completion_tokens": 100,
+                    "prompt_tokens_details": {"cached_tokens": 60},
+                },
+            ),
+            (200, 100, 60),
+        )
+
+    def test_openai_without_details_is_zero(self):
+        """details 字段缺失 / 为 None → 缓存命中 0（含 Gemini 归一形）。"""
+        from src.python.llm.session import _normalize_usage_tokens
+
+        cases = [
+            {"prompt_tokens": 50, "completion_tokens": 20},
+            {"prompt_tokens": 50, "completion_tokens": 20, "prompt_tokens_details": None},
+        ]
+        for usage in cases:
+            with self.subTest(usage=usage):
+                self.assertEqual(_normalize_usage_tokens("openai", usage), (50, 20, 0))
+
+    def test_empty_inputs(self):
+        """None / 空 dict → (0, 0, 0)。"""
+        from src.python.llm.session import _normalize_usage_tokens
+
+        self.assertEqual(_normalize_usage_tokens("claude", None), (0, 0, 0))
+        self.assertEqual(_normalize_usage_tokens("openai", {}), (0, 0, 0))
+
+
+class TestTrackOpenAiCacheHit(unittest.TestCase):
+    """track_session_usage — openai 分支缓存命中累计（会话统计口径）。"""
+
+    def setUp(self):
+        _reset_safe()
+
+    def test_cache_hit_accumulates(self):
+        """openai 带 details → cache_hit_tokens 累计命中值。"""
+        track_session_usage(
+            "openai",
+            {
+                "prompt_tokens": 100,
+                "completion_tokens": 20,
+                "prompt_tokens_details": {"cached_tokens": 40},
+            },
+            model_name="test-model",
+        )
+        usage = get_session_usage()
+        self.assertEqual(usage["input_tokens"], 100)
+        self.assertEqual(usage["output_tokens"], 20)
+        self.assertEqual(usage["cache_hit_tokens"], 40)
+        self.assertEqual(usage["call_count"], 1)

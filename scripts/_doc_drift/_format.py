@@ -141,16 +141,27 @@ def _group_counts() -> dict[str, int]:
 _TRIPLE_COUNT = re.compile(r"⚗实验\s*(\d+)\s*/\s*常规\s*(\d+)\s*/\s*报告章节与增强\s*(\d+)")
 
 
-_GROUPED_COUNT = re.compile(r"(实验组|常规组|报告组)[（(](?:前|次|后)?\s*(\d+)\s*项")
+_GROUPED_COUNT = re.compile(r"(?:\*\*)?(实验组|常规组|报告组|报告章节与增强组)(?:\*\*)?[（(](?:前|次|后)?\s*(\d+)\s*项")
 
 
-_GROUP_NAME_TO_KIND = {"实验组": "experimental", "常规组": "standard", "报告组": "report"}
+_GROUP_NAME_TO_KIND = {
+    "实验组": "experimental",
+    "常规组": "standard",
+    "报告组": "report",
+    "报告章节与增强组": "report",
+}
 
 
 _REPORT_BLOCK_COUNT = re.compile(r"报告章节与增强[（(](\d+)\s*项")
 
 
-_TOTAL_COUNT = re.compile(r"(?:共|全部)\s*(\d+)\s*项(?:功能)?开关|\*\*(\d+)\s*项功能开关\*\*")
+# 三种合计写法：带前缀未加粗（共/全部/提供 N 项开关，如 requirements §11.5「提供 N 项功能开关」）/
+# 加粗无前缀（**N 项功能开关**）/ 清单指引式（完整 N 项与分组清单）；前缀与加粗写法互斥不重复命中
+_TOTAL_COUNT = re.compile(
+    r"(?:共|全部|提供)\s*(\d+)\s*项(?:功能)?开关"
+    r"|\*\*(\d+)\s*项功能开关\*\*"
+    r"|完整\s*\*{0,2}(\d+)\s*\*{0,2}项与分组清单"
+)
 
 
 def _count_finding(path: Path, line_no: int, shown: str, expected: int) -> str:
@@ -180,7 +191,7 @@ def check_switch_counts(docs: dict[Path, str]) -> list[str]:
                 if int(m.group(1)) != counts["report"]:
                     findings.append(_count_finding(path, line_no, m.group(0), counts["report"]))
             for m in _TOTAL_COUNT.finditer(line):
-                if int(m.group(1) or m.group(2)) != total:
+                if int(m.group(1) or m.group(2) or m.group(3)) != total:
                     findings.append(_count_finding(path, line_no, m.group(0), total))
     return findings
 

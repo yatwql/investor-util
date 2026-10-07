@@ -285,7 +285,7 @@ class TestReportSectionDefault:
             assert "data_flag" in sec, f"缺少 data_flag: {sec}"
 
     def test_type_values_are_valid(self):
-        """type 只能是 always/history/fund_deep_analysis/news/llm/evolution/action/financial_report 之一。"""
+        """type 只能是 always/history/fund_deep_analysis/news/llm/evolution/holding_change/event_impact/schedule_replay/action/fundamental_snapshot 之一。"""
         valid_types = {
             "always",
             "history",
@@ -293,6 +293,9 @@ class TestReportSectionDefault:
             "news",
             "llm",
             "evolution",
+            "holding_change",
+            "event_impact",
+            "schedule_replay",
             "action",
             "fundamental_snapshot",
         }

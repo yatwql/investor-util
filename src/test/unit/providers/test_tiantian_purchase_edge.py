@@ -111,6 +111,31 @@ class TestParseFailure:
         assert payload is not None
         assert payload["rows"]["000001"]["min_purchase"] is None
 
+    def test_empty_fee_col_is_unknown(self):
+        """手续费列为空/不可解析/--- → purchase_fee_rate=None（未知，绝不冒充 0）。"""
+        for raw in ("", "面议", "---", "abc"):
+            row = _well_formed_row()
+            row[12] = raw
+            payload = parse_purchase_table(_response_body([row]))
+            assert payload is not None, raw
+            assert payload["rows"]["000001"]["purchase_fee_rate"] is None, raw
+
+    def test_absurd_fee_over_100_percent_is_unknown(self):
+        """手续费 ≥100%（单位错位/录入错误）→ 判未知，不带进成本计算。"""
+        row = _well_formed_row()
+        row[12] = "150%"
+        payload = parse_purchase_table(_response_body([row]))
+        assert payload is not None
+        assert payload["rows"]["000001"]["purchase_fee_rate"] is None
+
+    def test_known_zero_fee_parses_to_zero(self):
+        """ "0.00%" → 0.0：来源明确的已知 0，与未知 None 严格区分。"""
+        row = _well_formed_row()
+        row[12] = "0.00%"
+        payload = parse_purchase_table(_response_body([row]))
+        assert payload is not None
+        assert payload["rows"]["000001"]["purchase_fee_rate"] == 0.0
+
 
 # ============================================================
 #  载荷准入：purchase_status_payload_is_valid
@@ -126,6 +151,7 @@ def _large_rows(n: int = MIN_ACCEPT_ROWS) -> dict[str, dict[str, Any]]:
             "next_open_date": "",
             "daily_limit": None,
             "min_purchase": 10.0,
+            "purchase_fee_rate": 0.0015,
         }
         for i in range(n)
     }
@@ -214,8 +240,26 @@ class TestPayloadAdmission:
         payload = {**_valid_payload, "rows": rows}
         assert purchase_status_payload_is_valid(payload) is False
 
+    def test_fee_rate_out_of_range_rejected(self, _valid_payload):
+        """值域体检：purchase_fee_rate 越界（≥1 / 负数）→ 拒绝（防单位错位漏过）。"""
+        rows = dict(_valid_payload["rows"])
+        rows["000000"] = {**rows["000000"], "purchase_fee_rate": 1.5}
+        assert purchase_status_payload_is_valid({**_valid_payload, "rows": rows}) is False
+        rows["000000"] = {**rows["000000"], "purchase_fee_rate": -0.01}
+        assert purchase_status_payload_is_valid({**_valid_payload, "rows": rows}) is False
+        rows["000000"] = {**rows["000000"], "purchase_fee_rate": "0.15"}
+        assert purchase_status_payload_is_valid({**_valid_payload, "rows": rows}) is False
+
+    def test_missing_fee_key_rejected(self, _valid_payload):
+        """必需字段缺失（purchase_fee_rate 摘除）→ 拒绝（六键契约破坏）。"""
+        rows = dict(_valid_payload["rows"])
+        broken = dict(rows["000000"])
+        del broken["purchase_fee_rate"]
+        rows["000000"] = broken
+        assert purchase_status_payload_is_valid({**_valid_payload, "rows": rows}) is False
+
     def test_missing_required_key_rejected(self, _valid_payload):
-        """必需字段缺失（五键契约破坏）→ 拒绝。"""
+        """必需字段缺失（六键契约破坏）→ 拒绝。"""
         rows = dict(_valid_payload["rows"])
         broken = dict(rows["000000"])
         del broken["daily_limit"]

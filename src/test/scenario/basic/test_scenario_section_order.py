@@ -120,7 +120,7 @@ class TestScenarioSectionOrder(unittest.TestCase):
             self.assertEqual(s1["number"], s2["number"])
 
     def test_all_visibility_types_present(self):
-        """7 种 type 都有对应模块（含组合演进专属 evolution、行动建议专属 action、持仓基本面专属 fundamental_snapshot 类型）。"""
+        """注册表全部 type 都有对应模块（含组合演进专属 evolution、行动建议专属 action、持仓基本面专属 fundamental_snapshot、持仓变动复盘专属 holding_change、调仓纪律回放专属 schedule_replay 类型）。"""
         type_counts: dict[str, int] = {}
         for sec in self._default:
             type_counts[sec["type"]] = type_counts.get(sec["type"], 0) + 1
@@ -135,6 +135,8 @@ class TestScenarioSectionOrder(unittest.TestCase):
                 "evolution",
                 "action",
                 "fundamental_snapshot",
+                "holding_change",
+                "schedule_replay",
             },
         )
         self.assertEqual(type_counts["always"], 5)
@@ -145,6 +147,8 @@ class TestScenarioSectionOrder(unittest.TestCase):
         self.assertEqual(type_counts["evolution"], 1)
         self.assertEqual(type_counts["action"], 1)
         self.assertEqual(type_counts["fundamental_snapshot"], 1)
+        self.assertEqual(type_counts["holding_change"], 1)
+        self.assertEqual(type_counts["schedule_replay"], 1)
 
 
 class TestScenarioCustomSectionOrder(unittest.TestCase):

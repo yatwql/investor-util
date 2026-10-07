@@ -1632,6 +1632,10 @@ window.drawSimpleChart = function(canvasId, a, b, c) {
     {% set _corr_pairs = _corr_data.get("pairs", []) %}
     <div class="section" id="sec-position_structure" style="order: {{ section_numbers['position_structure'] }};">
         <div class="section-title">{{ section_numbers['position_structure'] }}、持仓结构与集中度</div>
+        <details class="section-fold">
+            <summary class="section-fold-summary">
+                {{ _funds | length }} 只基金、{{ _pairs | length }} 对组合 —— 点击展开/收起重合度矩阵、相关性矩阵与集中度监控
+            </summary>
         <div class="section-content">
             <!-- 区块一：持仓重合度矩阵 -->
             <div class="block-title">一、持仓重合度矩阵</div>
@@ -1930,6 +1934,7 @@ window.drawSimpleChart = function(canvasId, a, b, c) {
             <div class="empty-section">📭 暂无持仓集中度数据（未检测到基金持仓或 API 返回为空）</div>
             {% endif %}
         </div>
+        </details>
         {{ render_back_to_top() }}
     </div>
     {% endif %}
@@ -1941,8 +1946,13 @@ window.drawSimpleChart = function(canvasId, a, b, c) {
     {% set style_results = style_analysis["results"] %}
     {% set sf_data = style_factor_data %}
     {% set ind_beta = sf_data.get("industry_beta") if sf_data else none %}
+    {% set fc_data = factor_catalog_data %}
     <div class="section" id="sec-style_factor" style="order: {{ section_numbers['style_factor'] }};">
         <div class="section-title">{{ section_numbers['style_factor'] }}、风格与因子分析</div>
+        <details class="section-fold">
+            <summary class="section-fold-summary">
+                {{ (style_results or []) | length }} 只基金风格 —— 点击展开/收起基金风格表、风格因子回归与行业 Beta
+            </summary>
         <div class="section-content">
             <!-- 区块一：基金风格表 -->
             <div class="block-title">一、基金风格表</div>
@@ -2109,7 +2119,51 @@ window.drawSimpleChart = function(canvasId, a, b, c) {
             <div class="empty-section">📭 行业 Beta 数据不足（行业分类或指数 K 线缺失），子表不渲染</div>
             {% endif %}
             {% endif %}
+
+            <!-- 区块四：因子目录（实验开关 factor_catalog；fc_data 为 none → 不渲染） -->
+            {% if fc_data and fc_data.get("available") %}
+            <div class="block-title">四、因子目录（25 因子五来源族横截面）</div>
+            <div class="summary-tag" style="margin-bottom: 8px;">
+                池内 <strong>{{ fc_data.get("pool_size", 0) }}</strong> 只 · 可算
+                <strong>{{ fc_data.get("computed", 0) }}</strong>/{{ fc_data.get("catalog_size", 0) }} ·
+                {{ fc_data.get("rating", "--") }}
+                <span style="color:var(--warn-text);"> · 实验功能（输出质量可能不稳定）</span>
+            </div>
+            <table>
+                <thead>
+                    <tr>
+                        <th>因子</th><th>来源族</th><th>最新横截面</th><th>中性点</th><th>相对中性</th><th>可算码数</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for f in fc_data.get("factors", []) %}
+                    <tr>
+                        <td class="text-left">{{ f.get("label", f.get("slug")) }}</td>
+                        <td>{{ f.get("family_label", f.get("family", "--")) }}</td>
+                        <td>{{ f.get("value") if f.get("value") is not none else "--" }}</td>
+                        <td>{{ f.get("neutral") if f.get("neutral") is not none else "—" }}</td>
+                        <td>
+                            {% if not f.get("computable") %}（{{ f.get("reason") or "不可算" }}）
+                            {% elif f.get("neutral") is none %}—
+                            {% elif f.get("above") %}▲ 中性上方
+                            {% else %}▼ 中性下方{% endif %}
+                        </td>
+                        <td>{{ f.get("codes_ok", 0) }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+            <div class="penetration-notes">
+                <div>* 横截面 = 池内各码最新有效因子值的均值（有效码数 &lt; 3 当期不出值）</div>
+                <div>* 中性点为技术指标经典中枢（0 轴 / 50 轴等）；「—」= 该因子无中性语义（恒正强度类 / 量纲类）</div>
+                <div>* 实验功能 · 目录版本 {{ fc_data.get("version", "--") }}（与门槛判定书冻结清单同源）</div>
+            </div>
+            {% elif fc_data %}
+            <div class="block-title">四、因子目录</div>
+            <div class="empty-section">📭 因子目录数据不足（{{ fc_data.get("reason", "池内有效成分数不足") }}），明细不渲染</div>
+            {% endif %}
         </div>
+        </details>
         {{ render_back_to_top() }}
     </div>
     {% endif %}
@@ -2226,6 +2280,9 @@ window.drawSimpleChart = function(canvasId, a, b, c) {
         {% endif %}
         {% endif %}
         </details>
+
+        {% include "partials/event_impact_section.html" with context %}
+
         {{ render_back_to_top() }}
     </div>
 
@@ -2739,6 +2796,10 @@ window.drawSimpleChart = function(canvasId, a, b, c) {
 
     {% include "partials/evolution_section.html" with context %}
 
+    {% include "partials/holding_change_section.html" with context %}
+
+    {% include "partials/schedule_replay_section.html" with context %}
+
     {% include "partials/fundamental_snapshot_section.html" with context %}
 
     {% include "partials/action_section.html" with context %}
@@ -2749,6 +2810,10 @@ window.drawSimpleChart = function(canvasId, a, b, c) {
     <!-- ═══════════════════════════════════════════════════════ -->
     <div class="section" id="sec-data_source_status" style="order: {{ section_numbers['data_source_status'] }};">
         <div class="section-title">{{ section_numbers['data_source_status'] }}、数据源可用性矩阵</div>
+        <details class="section-fold">
+            <summary class="section-fold-summary">
+                {{ (data_source_matrix or []) | length }} 个数据源 · 状态/命中源/降级明细 —— 点击展开/收起数据源可用性矩阵与降级明细
+            </summary>
         <div class="section-content">
             {% if data_source_matrix %}
             <table>
@@ -2918,6 +2983,7 @@ window.drawSimpleChart = function(canvasId, a, b, c) {
             </div>
             {% endif %}
         </div>
+        </details>
         {{ render_back_to_top() }}
     </div>
     {% endif %}

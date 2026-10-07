@@ -2,7 +2,7 @@
 
 编排双产物输出：
   - Excel 调仓模拟工作簿（调仓摘要 / 分类配置对比 / 持仓变动明细
-    + 指定生效日时的「时序回测」页签）
+    + 指定生效日时的「时序回测」页签 + whatif_trade_cost 开启时的「交易成本对比」页签）
   - HTML 双栏对比页（含资产配置对比环形图 + 回测折线图，复用 Chart.js 本地 bundle）
 
 报告按主报告归档惯例输出到 output_dir（与主报告分离）：
@@ -26,6 +26,7 @@ from src.python.report.whatif_sheet import (
     write_whatif_backtest_sheet,
     write_whatif_category_sheet,
     write_whatif_changes_sheet,
+    write_whatif_cost_sheet,
     write_whatif_summary_sheet,
 )
 
@@ -57,6 +58,10 @@ def write_whatif_excel(whatif_data: dict[str, Any], output_dir: str = "reports")
     write_whatif_changes_sheet(ws_chg, whatif_data)
     ws_bt = wb.create_sheet("时序回测")
     write_whatif_backtest_sheet(ws_bt, whatif_data)
+    # 条件页签：开关 whatif_trade_cost 开启且面板装配成功时追加（关闭 → 页签集不变）
+    if whatif_data.get("cost"):
+        ws_cost = wb.create_sheet("交易成本对比")
+        write_whatif_cost_sheet(ws_cost, whatif_data)
 
     now = datetime.now()
     date_str = now.strftime("%Y%m%d")
@@ -114,6 +119,25 @@ def _trim_whatif_backtest_chart_data(whatif_data: dict[str, Any] | None) -> dict
     }
 
 
+def _trim_whatif_cost_chart_data(whatif_data: dict[str, Any] | None) -> dict[str, Any] | None:
+    """交易成本对比图表数据专用裁剪（数据最小化，只透传三线所需字段）。"""
+    cost = (whatif_data or {}).get("cost") if whatif_data else None
+    if not cost or not cost.get("chart"):
+        return None
+    chart = cost["chart"]
+    if not chart.get("labels"):
+        return None
+    return {
+        "labels": chart.get("labels"),
+        "base": chart.get("base"),
+        "candidate_after": chart.get("candidate_after"),
+        "candidate_before": chart.get("candidate_before"),
+        "benchmark": chart.get("benchmark"),
+        "benchmark_name": ((cost.get("benchmark") or {}).get("name")),
+        "impact": cost.get("impact"),
+    }
+
+
 def render_whatif_html(whatif_data: dict[str, Any], now_str: str) -> str:
     """渲染 whatif_template.html，返回完整 HTML 字符串。
 
@@ -133,6 +157,7 @@ def render_whatif_html(whatif_data: dict[str, Any], now_str: str) -> str:
         app_version=APP_VERSION,
         whatif_chart_data=_trim_whatif_chart_data(whatif_data),
         whatif_backtest_chart_data=_trim_whatif_backtest_chart_data(whatif_data),
+        whatif_cost_chart_data=_trim_whatif_cost_chart_data(whatif_data),
     )
 
 

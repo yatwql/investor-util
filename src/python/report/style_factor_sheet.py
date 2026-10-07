@@ -1,15 +1,17 @@
-"""风格与因子分析 Excel 写入模块 — 一章三区块。
+"""风格与因子分析 Excel 写入模块 — 一章四区块。
 
 「风格与因子分析」一章分「基金风格表 + 风格因子回归」两区块
-（sheet key `style_factor`），另含可选「行业 Beta」子表：
+（sheet key `style_factor`），另含可选「行业 Beta」与「因子目录」子表：
 
   一、基金风格表 —— 基金名称/当前风格/漂移等级等（数据不足写占位）
   二、风格因子回归 —— 价值/成长/质量 3 因子 OLS 暴露 + 基准对照（数据不足写占位）
   三、行业 Beta 子表 —— 穿透行业暴露占比 + 各行业指数 β/相关性
       （由编排层 `style_factor_data.industry_beta` 提供；None/available=False 时该区块不渲染）
+  四、因子目录 —— 25 因子五来源族横截面（实验性功能 factor_catalog；
+      由编排层 `factor_catalog_data` 提供；None/available=False 时该区块不渲染）
 
 任一区块数据不足时该区块独立降级（§1.4.5），互不影响；
-三区块均无数据时整页写占位。
+四区块均无数据时整页写占位。
 """
 
 from __future__ import annotations
@@ -67,6 +69,9 @@ _FONT_RED = Font(color="CC0000")
 
 _IND_NCOLS = 7
 _IND_HEADERS = ["行业", "暴露占比", "指数代码", "β", "t 值", "显著（95%）", "相关性 r"]
+
+# ── 因子目录区块 ────────────────────────────────────────
+_CATALOG_HEADERS = ["因子", "来源族", "最新横截面", "中性点", "相对中性", "可算码数"]
 
 
 # ── 区块工具 ─────────────────────────────────────────────────
@@ -310,6 +315,72 @@ def _write_industry_beta_block(
     return row
 
 
+def _write_catalog_block(
+    ws: Worksheet,
+    row: int,
+    factor_catalog_data: dict[str, Any] | None,
+    ncols: int,
+) -> int:
+    """写入四、因子目录区块，返回下一行起始行号。
+
+    实验性功能 factor_catalog（数据契约 factor_catalog_data）：
+      - None（开关关闭）→ 区块不渲染；
+      - available=False → 标题 + 原因占位，不阻塞该章其余内容；
+      - available=True → 池/可算/评级摘要 + 逐因子明细（不可算因子带原因）。
+    """
+    if factor_catalog_data is None:
+        logger.info("风格与因子分析·因子目录：开关关闭，区块不渲染")
+        return row
+    write_title_row(ws, row, "四、因子目录（25 因子五来源族横截面）", ncols=ncols)
+    row += 1
+    if not factor_catalog_data.get("available"):
+        reason = factor_catalog_data.get("reason") or "池内有效成分数不足"
+        row = _write_placeholder(ws, f"因子目录数据不足（{reason}），明细不渲染", row=row, max_cols=ncols)
+        row += 1
+        return row
+    row = write_header_row(ws, row, _CATALOG_HEADERS)
+    row += 1
+    for factor_row in factor_catalog_data.get("factors") or []:
+        if not factor_row.get("computable") or factor_row.get("value") is None:
+            relative = f"（{factor_row.get('reason') or '不可算'}）"
+        elif factor_row.get("neutral") is None:
+            relative = "—"
+        else:
+            relative = "▲ 中性上方" if factor_row.get("above") else "▼ 中性下方"
+        row_data = [
+            factor_row.get("label") or factor_row.get("slug"),
+            factor_row.get("family_label") or factor_row.get("family"),
+            factor_row.get("value") if factor_row.get("value") is not None else "--",
+            factor_row.get("neutral") if factor_row.get("neutral") is not None else "—",
+            relative,
+            factor_row.get("codes_ok", 0),
+        ]
+        write_data_row(ws, row, row_data)
+        row += 1
+
+    # 说明区
+    row += 1
+    row = write_title_row(ws, row, "说明", ncols=ncols)
+    notes = [
+        (
+            f"池内 {factor_catalog_data.get('pool_size', 0)} 只；可算 "
+            f"{factor_catalog_data.get('computed', 0)}/{factor_catalog_data.get('catalog_size', 0)} 因子；"
+            f"评级：{factor_catalog_data.get('rating', '--')}"
+        ),
+        "横截面 = 池内各码最新有效因子值的均值（有效码数 < 3 不出值）；「—」= 该因子无中性语义",
+        (
+            f"目录版本 {factor_catalog_data.get('version', '--')}（与门槛判定书冻结清单同源）；"
+            "实验功能（开关 factor_catalog，默认关）"
+        ),
+    ]
+    for n in notes:
+        write_data_row(ws, row, [n] + [""] * (ncols - 1))
+        row += 1
+
+    row += 1  # 区块间隔空行
+    return row
+
+
 # ── 页签入口 ─────────────────────────────────────────────────
 
 
@@ -319,8 +390,9 @@ def write_style_factor_sheet(
     factor_exposure: dict[str, Any] | None = None,
     factor_names: dict | None = None,
     industry_beta: dict[str, Any] | None = None,
+    factor_catalog_data: dict[str, Any] | None = None,
 ) -> None:
-    """写入风格与因子分析页签（一章三区块：风格表 + 因子回归 + 行业 Beta）。
+    """写入风格与因子分析页签（一章四区块：风格表 + 因子回归 + 行业 Beta + 因子目录）。
 
     Args:
         ws: openpyxl Worksheet 对象
@@ -330,6 +402,8 @@ def write_style_factor_sheet(
         factor_names: 因子 key → 中文名映射（缺省回退 key 本身）。
         industry_beta: `style_factor_data.industry_beta` 子键（行业 Beta 区块数据源）；
             None 或 available=False 时该区块不渲染（开关关/数据不可用）。
+        factor_catalog_data: 因子目录数据契约（实验性功能 factor_catalog）；
+            None（开关关闭）或 available=False 时该区块不渲染/写占位。
     """
     _name = get_report_sheet_name("style_factor")
     ncols = _compute_ncols(style_data, factor_exposure, industry_beta)
@@ -339,6 +413,7 @@ def write_style_factor_sheet(
     row = _write_style_block(ws, row, style_data, ncols)
     row = _write_factor_block(ws, row, factor_exposure, factor_names, ncols)
     row = _write_industry_beta_block(ws, row, industry_beta, ncols)
+    row = _write_catalog_block(ws, row, factor_catalog_data, ncols)
 
     freeze_header(ws, row=2)
     auto_width(ws, min_width=10, max_width=30)

@@ -32,6 +32,8 @@ _PIPELINE_DATA_KNOWN_KEYS: set[str] = {
     "risk_metrics",
     # 风格与因子分析（数据契约 style_factor_data，内嵌 industry_beta 子键）
     "style_factor_data",
+    # 因子目录（实验性功能 factor_catalog；关态为 None → 区块/信号全链无感）
+    "factor_catalog_data",
     "position_relationship_data",
     "evolution_data",
     # 品种覆盖诊断：数据质量仪表盘品种覆盖区块数据源
@@ -66,6 +68,18 @@ _PIPELINE_DATA_KNOWN_KEYS: set[str] = {
     # report/_experimental_seams.record_llm_decisions_and_review_block 注入；
     # 实验功能关闭或区块为空时键缺席，两条输出路径保持既有输出）
     "decision_review_data",
+    # 持仓变动复盘：快照差分事件清单/频率/结构演变/意图对账（实验开关
+    # `holding_change_review`，由 report/_experimental_seams.inject_holding_change_data
+    # 注入；开关关闭时键缺席，整章隐藏）
+    "holding_change_data",
+    # 事件窗量化对照：新闻事件窗口收益与文本极性对照表（实验开关
+    # `event_window_impact`，由 report/_experimental_seams.inject_event_impact_data
+    # 注入；开关关闭时键缺席，整章隐藏）
+    "event_impact_data",
+    # 调仓纪律回放：多期规则回放 vs 买入持有（实验开关
+    # `rebalance_schedule_replay`，由 report/_experimental_seams.inject_schedule_replay_data
+    # 注入；开关关闭时键缺席，整章隐藏）
+    "schedule_replay_data",
     # 持仓个股财报摘要：A 股标的的财报章节摘要（功能开关 `financial_report_digest`，
     # 由 report/financial_report_digest.build_financial_report_digest 组装；开关关闭时为 None）
     "financial_report_digest_data",
@@ -128,6 +142,7 @@ _PIPELINE_DATA_TYPE_MAP: dict[str, type | tuple[type, ...]] = {
     "data_degradation": list,
     "risk_metrics": dict,
     "style_factor_data": (dict, type(None)),
+    "factor_catalog_data": (dict, type(None)),
     "position_relationship_data": (dict, type(None)),
     "evolution_data": (dict, type(None)),
     "position_status": (dict, type(None)),
@@ -140,6 +155,9 @@ _PIPELINE_DATA_TYPE_MAP: dict[str, type | tuple[type, ...]] = {
     "tail_risk_data": (dict, type(None)),
     "snapshot_diff_data": (dict, type(None)),
     "decision_review_data": (dict, type(None)),
+    "holding_change_data": (dict, type(None)),
+    "event_impact_data": (dict, type(None)),
+    "schedule_replay_data": (dict, type(None)),
     "financial_report_digest_data": (dict, type(None)),
     "financial_indicator_data": (dict, type(None)),
     "purchase_status_data": (dict, type(None)),

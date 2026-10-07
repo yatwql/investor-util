@@ -306,6 +306,50 @@ def _overflow_signals(pipeline_data: dict[str, Any], report_date: str, ctx: _Qua
 # ── 入口 ────────────────────────────────────────────────
 
 
+def _factor_catalog_signals(
+    pipeline_data: dict[str, Any],
+    report_date: str,
+    ctx: _QualityContext,
+) -> list[dict[str, Any]]:
+    """因子目录：每日单条快照入账（开关关闭时键为 None → 静默无记录）。
+
+    横截面评级作为 rating 摘要；detail 保留目录版本、可算计数与全部
+    可算因子的横截面值，供后续判定书对账。
+    """
+    data = pipeline_data.get("factor_catalog_data")
+    if not isinstance(data, dict) or not data.get("available") or not data.get("computed"):
+        return []
+    signal_type = sl.SIGNAL_FACTOR_CATALOG
+    data_source, reason = _source_for(signal_type, ctx)
+    values = {
+        str(f.get("slug")): f.get("value")
+        for f in (data.get("factors") or [])
+        if isinstance(f, dict) and f.get("computable") and f.get("value") is not None
+    }
+    return [
+        sl.build_signal(
+            signal_type=signal_type,
+            report_date=report_date,
+            rating=str(data.get("rating") or ""),
+            value=None,
+            subject="portfolio",
+            name="因子目录",
+            direction=DIRECTION_FLAT,
+            data_source=data_source,
+            source_reason=reason,
+            detail={
+                "version": data.get("version"),
+                "catalog_size": data.get("catalog_size"),
+                "computed": data.get("computed"),
+                "neutral_above": data.get("neutral_above"),
+                "neutral_total": data.get("neutral_total"),
+                "pool_size": data.get("pool_size"),
+                "values": values,
+            },
+        )
+    ]
+
+
 def register_deterministic_signals(
     pipeline_data: dict[str, Any] | None,
     *,
@@ -334,6 +378,7 @@ def register_deterministic_signals(
         _tail_risk_signals,
         _style_factor_signals,
         _overflow_signals,
+        _factor_catalog_signals,
     ):
         records.extend(extractor(pipeline_data, date_str, ctx))
 

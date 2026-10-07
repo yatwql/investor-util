@@ -278,6 +278,8 @@ def generate_excel_report(
         financial_report_digest_data=financial_report_digest_data,
         financial_indicator_data=financial_indicator_data,
         position_relationship_data=(pipeline_data or {}).get("position_relationship_data"),
+        holding_change_data=(pipeline_data or {}).get("holding_change_data"),
+        schedule_replay_data=(pipeline_data or {}).get("schedule_replay_data"),
     )
 
     # 章级：enabled_llm 模块禁用的 LLM 分析章不创建页签（与 HTML 端同函数同配置推导）
@@ -393,7 +395,7 @@ def generate_excel_report(
             pipeline_data = {**(pipeline_data or {})}
             pipeline_data["prosperity_framework_data"] = _pf
     # 风格与因子分析：数据契约 数据在编排层注入 pipeline_data（style_factor_data 主键），
-    # 此处透传页签写入（一章三区块：风格表 + 因子回归 + 行业 Beta 子表）
+    # 此处透传页签写入（一章四区块：风格表 + 因子回归 + 行业 Beta 子表 + 因子目录）
     write_fund_deep_analysis_sheets(
         sheets,
         holdings,
@@ -402,6 +404,7 @@ def generate_excel_report(
         modules,
         prog,
         style_factor_data=(pipeline_data or {}).get("style_factor_data"),
+        factor_catalog_data=(pipeline_data or {}).get("factor_catalog_data"),
         position_relationship_data=(pipeline_data or {}).get("position_relationship_data"),
     )
     # 辩论模式标签（从 debate_info 提取或从 feature flag 检测）
@@ -444,6 +447,43 @@ def generate_excel_report(
             )
         except Exception:
             logger.debug("[excel] 组合演进页签写入失败（非关键）", exc_info=True)
+
+    # ── 持仓变动复盘页签（快照事件级，holding_change_data；实验开关默认关，
+    #      键缺席时页签不创建，此处自然不触发） ──
+    ws_hc = sheets.get("holding_change")
+    if ws_hc is not None:
+        prog.info("正在写入持仓变动复盘页签...")
+        try:
+            from src.python.report.holding_change_panel import write_holding_change_sheet
+
+            write_holding_change_sheet(ws_hc, (pipeline_data or {}).get("holding_change_data"))
+        except Exception:
+            logger.debug("[excel] 持仓变动复盘页签写入失败（非关键）", exc_info=True)
+
+    # ── 事件窗量化对照区块（并入财经新闻页签尾部；实验开关 event_window_impact
+    #      默认关，键缺席时区块不渲染，此处自然不触发） ──
+    ws_news = sheets.get("news_correlation")
+    event_data = (pipeline_data or {}).get("event_impact_data")
+    if ws_news is not None and event_data is not None:
+        prog.info("正在写入事件窗量化对照区块（财经新闻页签尾部）...")
+        try:
+            from src.python.report.event_impact_panel import write_event_impact_footer
+
+            write_event_impact_footer(ws_news, event_data, start_row=ws_news.max_row + 2)
+        except Exception:
+            logger.debug("[excel] 事件窗量化对照区块写入失败（非关键）", exc_info=True)
+
+    # ── 调仓纪律回放页签（多期规则回放 vs 买入持有；实验开关
+    #      rebalance_schedule_replay 默认关，键缺席时页签不创建，此处自然不触发） ──
+    ws_sr = sheets.get("schedule_replay")
+    if ws_sr is not None:
+        prog.info("正在写入调仓纪律回放页签...")
+        try:
+            from src.python.report.schedule_replay_panel import write_schedule_replay_sheet
+
+            write_schedule_replay_sheet(ws_sr, (pipeline_data or {}).get("schedule_replay_data"))
+        except Exception:
+            logger.debug("[excel] 调仓纪律回放页签写入失败（非关键）", exc_info=True)
 
     # ── 持仓基本面页签（财务指标 + 财报摘要，一章两区块） ──
     ws_fs = sheets.get("fundamental_snapshot")

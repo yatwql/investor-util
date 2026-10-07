@@ -88,6 +88,7 @@ def write_fund_deep_analysis_sheets(
     modules: dict[str, Any],
     prog: ProgressReporter,
     style_factor_data: dict[str, Any] | None = None,
+    factor_catalog_data: dict[str, Any] | None = None,
     position_relationship_data: dict[str, Any] | None = None,
 ) -> None:
     """写入基金深度分析页签。
@@ -222,6 +223,7 @@ def write_fund_deep_analysis_sheets(
                 factor_exposure=style_factor_data,
                 factor_names=_factor_names,
                 industry_beta=(style_factor_data or {}).get("industry_beta"),
+                factor_catalog_data=factor_catalog_data,
             )
             prog.ok("风格与因子分析页签写入完成")
         except Exception as e:

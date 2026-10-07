@@ -168,7 +168,7 @@ class TestApplyFeaturesWrite:
 
     def test_debate_flag_write_takes_effect(self, app_client):
         """llm_debate_conditional 写：features.json 含覆写，运行时开关生效。"""
-        from src.python.config.features import _FEATURES_FILE, is_feature_enabled
+        from src.python.config.features import FEATURES_FILE, is_feature_enabled
 
         assert is_feature_enabled("llm_debate_conditional") is True  # 转正后默认开
 
@@ -180,12 +180,12 @@ class TestApplyFeaturesWrite:
         assert resp.get_json()["data"]["value"] is False
         assert is_feature_enabled("llm_debate_conditional") is False
 
-        raw = open(_FEATURES_FILE, encoding="utf-8").read()
+        raw = open(FEATURES_FILE, encoding="utf-8").read()
         assert '"llm_debate_conditional": false' in raw
 
     def test_decision_reflection_flag_write_takes_effect(self, app_client):
         """decision_reflection 写：features.json 含覆写，运行时开关生效。"""
-        from src.python.config.features import _FEATURES_FILE, is_feature_enabled
+        from src.python.config.features import FEATURES_FILE, is_feature_enabled
 
         assert is_feature_enabled("decision_reflection") is False  # 默认关
 
@@ -197,12 +197,12 @@ class TestApplyFeaturesWrite:
         assert resp.get_json()["data"]["value"] is True
         assert is_feature_enabled("decision_reflection") is True
 
-        raw = open(_FEATURES_FILE, encoding="utf-8").read()
+        raw = open(FEATURES_FILE, encoding="utf-8").read()
         assert '"decision_reflection": true' in raw
 
     def test_deterministic_signal_flag_write_takes_effect(self, app_client):
         """deterministic_signal 写：features.json 含覆写，运行时开关生效。"""
-        from src.python.config.features import _FEATURES_FILE, is_feature_enabled
+        from src.python.config.features import FEATURES_FILE, is_feature_enabled
 
         assert is_feature_enabled("deterministic_signal") is True  # 转正后默认开
 
@@ -214,7 +214,7 @@ class TestApplyFeaturesWrite:
         assert resp.get_json()["data"]["value"] is False
         assert is_feature_enabled("deterministic_signal") is False
 
-        raw = open(_FEATURES_FILE, encoding="utf-8").read()
+        raw = open(FEATURES_FILE, encoding="utf-8").read()
         assert '"deterministic_signal": false' in raw
 
     def test_standard_switch_write_takes_effect(self, app_client):
@@ -224,7 +224,7 @@ class TestApplyFeaturesWrite:
         界面通道内，用户只能手改 features.json 才能关掉一项指标；本用例锁定
         Web 面板对常规组的写入路径与实验组同源可用。
         """
-        from src.python.config.features import _FEATURES_FILE, is_feature_enabled
+        from src.python.config.features import FEATURES_FILE, is_feature_enabled
 
         assert is_feature_enabled("metrics_hhi") is True  # 默认开
 
@@ -233,12 +233,12 @@ class TestApplyFeaturesWrite:
         assert resp.get_json()["data"]["value"] is False
         assert is_feature_enabled("metrics_hhi") is False
 
-        raw = open(_FEATURES_FILE, encoding="utf-8").read()
+        raw = open(FEATURES_FILE, encoding="utf-8").read()
         assert '"metrics_hhi": false' in raw
 
     def test_doctor_check_can_be_disabled_from_panel(self, app_client):
         """系统自检转正后仍可从面板关闭——转正不再连入口一起摘掉（回归）。"""
-        from src.python.config.features import _FEATURES_FILE, is_feature_enabled
+        from src.python.config.features import FEATURES_FILE, is_feature_enabled
 
         assert is_feature_enabled("doctor_check") is True  # 默认开
 
@@ -246,7 +246,7 @@ class TestApplyFeaturesWrite:
         assert resp.status_code == 200
         assert is_feature_enabled("doctor_check") is False
 
-        raw = open(_FEATURES_FILE, encoding="utf-8").read()
+        raw = open(FEATURES_FILE, encoding="utf-8").read()
         assert '"doctor_check": false' in raw
 
 

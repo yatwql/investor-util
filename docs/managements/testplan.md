@@ -1,5 +1,5 @@
 # 投资复盘助手 — 质量控制与测试标准
-> 文档版本：0.12.3
+> 文档版本：0.12.4
 
 ---
 
@@ -55,7 +55,7 @@
 | `report/whatif_operations.py` | whatif 共享层编排 | build_whatif_data→校验→写报告；未指定生效日不调用回测且无 backtest 键；指定生效日合并进 data；回测异常→ok=True 且 available=False；返回 None 不加键；受限索引单点挂载（透传至 build、取契约异常兜底空索引） |
 | `report/whatif_sheet.py` | 调仓 What-if Excel 页签呈现 | 摘要(文件对比+变动统计+汇总+箭头)、分类配置权重%、变动明细行底色（新增绿/清仓红/加仓黄/减仓蓝/不变灰）、时序回测页签（指标表+净值/回撤序列+占位）、受限提示块（命中渲染/不可行标红/缺席不写）、available=False/None 占位 |
 | `report/whatif_writer.py` + `whatif_template.html` | 调仓 What-if 独立 HTML 页 | ①~⑧ 段齐全（含⑦申购受限提示条件节，缺席整节不出现；未指定生效日④时序回测隐藏）、双环形图+回测 2 折线图各带 .chart-caption（图下说明）+#whatif-chart-data/#whatif-backtest-chart-data JSON（R9 最小化）、行动作行 class + badge、箭头类、available=False 占位 |
-| `cli/cli.py`（whatif 子命令） | whatif argparse + 处理器 | --candidate 必填、--base 可选、--effective-date 解析并透传、_handle_whatif 委托（显式 base/config 默认/读取失败/目标失败/不可用数据不写报告）、main 透传 |
+| `cli/_parser.py` + `cli/_handlers.py`（whatif 子命令） | whatif argparse + 处理器 | --candidate 必填、--base 可选、--effective-date 解析并透传、_handle_whatif 委托（显式 base/config 默认/读取失败/目标失败/不可用数据不写报告）、main 透传 |
 
 ### 1.2 数据边界 Edge Case 强制清单（通用规范）
 
@@ -192,7 +192,7 @@
 | **TUI → Handler 路由集成**：菜单按键 → handler dispatch → 正确模块被调用 | ✅ | `test_tui_routing.py` |
 | **辩论管线集成**：orchestrator 辩论路由 _debate_wrapper → _debate_info_container → 8/9 元组返回 → HTML/Excel 渲染 | ✅ | `test_debate_pipeline.py` |
 | **Provider 降级链路**：断网/超时/异常响应 → 回退/熔断/降级占位（真实联通性由运行时治理，非门禁） | ✅ | `test_scenario_resilience_flows.py`（S7）/ T15/T16 / provider edge |
-| **联接基金穿透跨接缝**：取数层解析目标 ETF → fetcher 层以目标持仓代理 → 报告层登记来源并标注报告期 | ✅ | `test_fund.py` `TestWithFeederPenetration` + `test_penetration.py` / `test_penetration_sheet.py` |
+| **联接基金穿透跨接缝**：取数层解析目标 ETF → fetcher 层以目标持仓代理 → 报告层登记来源并标注报告期 | ✅ | `test_fund.py` `TestWithFeederPenetration` + `test_penetration_report_periods.py` / `test_penetration_sheet.py` |
 | **缓存预检接缝**：批量取数缓存命中时任务不执行，穿透仍须生效（幂等后处理在两处接缝调用） | ✅ | `test_fund.py` `TestFetchFundHoldingsBatch.test_penetration_applied_on_cache_hit` |
 
 ### 1.6 异常场景全覆盖
@@ -320,7 +320,7 @@
 | **三维度分类聚合一致**：资产属性/投资分类/账户的小计各自 = 总计 | 三类分类各自独立聚合，交叉验证无遗漏/无重复 | ✅ `test_data_integrity.py` |
 | **穿透行业占比归一化**：各行业占比之和 ≤ 100% | 穿透行业分布验证 | ✅ `test_data_integrity.py` |
 | **指数行情数值合理**：上证≈3000、沪深300≈4000、恒指≈20000、标普≈5000 | 数量级确认，非精确值 | ✅ `test_data_integrity.py` |
-| **非人民币计价品种市值核算**：按数据源价格 × 份额直接计市值（程序不做汇率折算） | 构造 QDII / 港股通持仓，验证市值与币种敞口分类 | ✅ `test_data_integrity.py` + `test_market_value.py` |
+| **非人民币计价品种市值核算**：按数据源价格 × 份额直接计市值（程序不做汇率折算） | 构造 QDII / 港股通持仓，验证市值与币种敞口分类 | ✅ `test_data_integrity.py` + `test_market_value.py` + `test_market_value_premium.py` |
 | **QDII 估值净值 vs 官方净值关系**：估值净值 ≥ 0，官方净值延迟 T-2 | 双列数值关系合理性断言 | ✅ `test_data_integrity.py` |
 | **基金业绩排名数据合理性**：排名/收益率在 0-100% 范围内 | 天天基金排名数值验证 | ✅ `test_data_integrity.py` |
 
@@ -328,7 +328,7 @@
 
 ### 2.1 需求 ID ↔ 验证载体映射
 
-`requirements.md` 的**每条单段需求 ID**（34 域 / 283 条）在测试侧均有确定载体，**全量已补全**。由 `scripts/check-requirement-trace.py --ci` 断言：映射表格式齐备 + ID 均存在于需求侧 + ID 唯一 + **全域全覆盖** + 载体文件真实存在。新增需求条目时须同步在表内补行（门禁会拦截漏映射）。**口径说明**：本表覆盖 `R-<域>-<序号>` 形式的单段 ID（脚本按此正则提取）；`requirements.md` §7.2–§7.8.4 另有一批双段子域 ID（如 `R-LLM-GM-01`、`R-LLM-DB-PROCON-01`，共 60 条），按现有约定不在本追溯表范围内、亦不参与门禁断言。
+`requirements.md` 的**每条单段需求 ID**（35 域 / 289 条）在测试侧均有确定载体，**全量已补全**。由 `scripts/check-requirement-trace.py --ci` 断言：映射表格式齐备 + ID 均存在于需求侧 + ID 唯一 + **全域全覆盖** + 载体文件真实存在。新增需求条目时须同步在表内补行（门禁会拦截漏映射）。**口径说明**：本表覆盖 `R-<域>-<序号>` 形式的单段 ID（脚本按此正则提取）；`requirements.md` §7.2–§7.8.4 另有一批双段子域 ID（如 `R-LLM-GM-01`、`R-LLM-DB-PROCON-01`，共 60 条），按现有约定不在本追溯表范围内、亦不参与门禁断言。
 
 | 需求 ID | 验证载体（`测试文件::用例`，粗粒度时仅列文件） | 补全批次 |
 |:--|:--|:--:|
@@ -387,10 +387,10 @@
 | R-ERR-14 | `src/test/unit/report/test_portfolio_history.py` + `src/test/unit/config/test_config.py` | 批 2 |
 | R-ERR-15 | `src/test/unit/analysis/test_snapshot_diff_edge.py` | 批 2 |
 | R-ERR-16 | `src/test/unit/analysis/test_snapshot_diff_edge.py` | 批 2 |
-| R-DIAG-01 | `src/test/unit/cli/test_cli.py` + `src/test/unit/core/test_log_reader.py` | 批 2 |
+| R-DIAG-01 | `src/test/unit/cli/test_cli.py` + `src/test/unit/cli/test_cli_subcommands.py` + `src/test/unit/core/test_log_reader.py` | 批 2 |
 | R-DIAG-02 | `src/test/unit/ui/test_handlers_log.py` + `src/test/unit/ui/test_tui_menu.py` | 批 2 |
 | R-DIAG-03 | `src/test/unit/web/test_handlers.py` + `src/test/unit/web/test_health_credential.py` | 批 2 |
-| R-DIAG-04 | `src/test/unit/cli/test_cli.py` + `src/test/unit/core/test_doctor.py` | 批 2 |
+| R-DIAG-04 | `src/test/unit/cli/test_cli_subcommands.py` + `src/test/unit/core/test_doctor.py` | 批 2 |
 | R-DIAG-05 | `src/test/unit/ui/test_tui_menu.py` + `src/test/unit/config/test_features.py` | 批 2 |
 | R-DIAG-06 | `src/test/unit/web/test_handlers.py` + `src/test/unit/core/test_doctor.py` | 批 2 |
 | R-DIAG-07 | `src/test/unit/core/test_doctor.py` + `src/test/unit/config/test_features.py` | 批 2 |
@@ -444,21 +444,22 @@
 | R-DATA-04 | `src/test/unit/core/test_cache_edge.py::test_market_open_uses_short_ttl` / `::test_market_closed_uses_static_ttl` | 批 3 |
 | R-DATA-05 | `src/test/unit/core/test_data_freshness.py` | 批 3 |
 | R-DATA-06 | `src/test/unit/core/test_code_utils.py`（`TestIsOtcFundByName` + `TestIsAShareStock`） + `src/test/unit/core/test_code_utils_classification.py` + `src/test/unit/fetcher/test_fund.py` + `src/test/unit/fetcher/test_fetcher_price.py`（价格缓存按路由分域 / 名称消歧 / 降级首跳键） + `src/test/unit/report/test_portfolio_history.py`（OTC 名称直接走净值链路） + `src/test/integration/test_cache_consistency.py` | 批 3 |
-| R-DATA-07 | `src/test/unit/core/test_retry.py` + `src/test/unit/core/test_throttle.py` + `src/test/unit/providers/test_provider_utils.py` + `src/test/unit/providers/test_cninfo.py` + `src/test/unit/providers/test_datasink.py` + `src/test/unit/providers/test_hithink.py` + `src/test/unit/providers/test_akshare_financial.py` + `src/test/unit/fetcher/test_financial_report.py` + `src/test/unit/fetcher/test_financial_indicator.py` + `src/test/unit/fetcher/test_financial_indicator_hithink.py` + `src/test/unit/llm/test_llm_api_base.py` | 批 4 |
+| R-DATA-07 | `src/test/unit/core/test_retry.py` + `src/test/unit/core/test_throttle.py` + `src/test/unit/providers/test_provider_utils.py` + `src/test/unit/providers/test_cninfo.py` + `src/test/unit/providers/test_datasink.py` + `src/test/unit/providers/test_hithink.py` + `src/test/unit/providers/test_akshare_financial.py` + `src/test/unit/fetcher/test_financial_report.py` + `src/test/unit/fetcher/test_financial_indicator.py` + `src/test/unit/fetcher/test_financial_indicator_hithink.py` + `src/test/unit/llm/test_llm_api_base.py` + `src/test/unit/llm/test_llm_api_attempt.py` + `src/test/unit/llm/test_llm_api_retry_errors.py` | 批 4 |
 | R-IDX-01 | `src/test/unit/fetcher/test_fetcher_index.py` + `src/test/unit/providers/test_tencent.py` | 批 3 |
 | R-IDX-02 | `src/test/unit/fetcher/test_fetcher_index.py` + `src/test/unit/providers/test_sina.py` | 批 3 |
 | R-IDX-03 | `src/test/unit/fetcher/test_fetcher_index.py` + `src/test/unit/fetcher/test_chain.py` | 批 3 |
-| R-OUT-01 | `src/test/unit/report/test_orchestrator.py` | 批 4 |
+| R-OUT-01 | `src/test/unit/report/test_orchestrator.py` + `src/test/unit/report/test_orchestrator_generate_report.py` | 批 4 |
 | R-OUT-02 | `src/test/unit/report/test_excel_writer.py` | 批 4 |
 | R-OUT-03 | `src/test/unit/report/test_excel_generator.py` | 批 4 |
-| R-OUT-04 | `src/test/unit/report/test_html_writer.py` | 批 4 |
+| R-OUT-04 | `src/test/unit/report/test_html_writer.py` + `src/test/unit/report/test_html_writer_contents.py` | 批 4 |
 | R-OUT-05 | `src/test/unit/report/test_excel_report_structure.py` | 批 4 |
 | R-OUT-06 | `src/test/unit/report/test_html_report_structure.py` | 批 4 |
-| R-OUT-07 | `src/test/unit/report/test_orchestrator.py` + `src/test/unit/config/test_config.py` | 批 4 |
+| R-OUT-07 | `src/test/unit/report/test_orchestrator.py` + `src/test/unit/config/test_config_consistency.py` + `src/test/unit/config/test_config_feature_gates.py` | 批 4 |
 | R-OUT-08 | `src/test/unit/report/test_excel_report_structure.py` | 批 4 |
 | R-OUT-09 | `src/test/unit/report/test_section_visibility.py` | 批 4 |
 | R-OUT-10 | `src/test/unit/report/test_html_report_structure.py` + `src/test/unit/report/test_feature_interactive.py` | 批 4 |
 | R-OUT-11 | `src/test/unit/report/test_theme_js.py` + `src/test/unit/report/test_feature_interactive.py` | 批 4 |
+| R-OUT-12 | `src/test/unit/report/test_html_report_structure.py` | 批 4 |
 | R-PERF-01 | `src/test/unit/news/test_news_aggregator.py` | 批 4 |
 | R-PERF-02 | `src/test/unit/llm/test_generate_all_llm.py` | 批 4 |
 | R-PERF-03 | `src/test/unit/fetcher/test_batch.py` | 批 4 |
@@ -480,6 +481,9 @@
 | R-WIF-09 | `src/test/unit/analysis/test_whatif_backtest.py` | 批 4 |
 | R-WIF-10 | `src/test/unit/analysis/test_whatif_backtest.py` | 批 4 |
 | R-WIF-11 | `src/test/unit/analysis/test_whatif_backtest_edge.py` + `src/test/unit/report/test_whatif_sheet.py` | 批 4 |
+| R-WIF-12 | `src/test/unit/analysis/test_trade_cost_model.py` + `src/test/unit/analysis/test_trade_cost_model_edge.py` + `src/test/unit/fetcher/test_fund_fee.py` + `src/test/unit/providers/test_tiantian_fund_fee.py` + `src/test/unit/providers/test_tiantian_fund_fee_edge.py` | 批 8 |
+| R-WIF-13 | `src/test/unit/report/test_whatif_cost_panel.py` + `src/test/unit/report/test_whatif_cost_panel_edge.py` + `src/test/unit/report/test_whatif_sheet.py` + `src/test/unit/report/test_whatif_writer.py` + `src/test/unit/report/test_whatif_html.py` + `src/test/unit/report/test_whatif_operations.py` | 批 8 |
+| R-WIF-14 | `src/test/unit/analysis/test_benchmark_index_resolver.py` + `src/test/unit/report/test_whatif_cost_panel.py` + `src/test/unit/report/test_whatif_cost_panel_edge.py` | 批 8 |
 | R-ACT-01 | `src/test/unit/report/test_action_sheet.py` + `src/test/unit/config/test_features.py` | 批 4 |
 | R-ACT-02 | `src/test/unit/report/test_action_sheet.py` + `src/test/integration/test_module_contract.py` | 批 4 |
 | R-ACT-03 | `src/test/unit/analysis/test_rebalance.py` | 批 4 |
@@ -527,7 +531,7 @@
 | R-LLM-06 | `src/test/unit/llm/test_llm_chain_strategies.py` + `src/test/unit/llm/test_strategy.py` | 批 5 |
 | R-LLM-07 | `src/test/unit/config/test_llm_settings.py` + `src/test/unit/config/test_config_llm_multi.py` | 批 5 |
 | R-LLM-09 | `src/test/unit/llm/test_prompts_signals.py` | 批 5 |
-| R-LLM-11 | `src/test/unit/llm/test_depth_profile.py` + `src/test/unit/report/test_summary.py` | 批 5 |
+| R-LLM-11 | `src/test/unit/llm/test_depth_profile.py` + `src/test/unit/report/test_summary.py` + `src/test/unit/report/test_summary_module_rows.py` | 批 5 |
 | R-LLM-12 | `src/test/unit/llm/test_self_review.py` + `src/test/unit/report/test_llm_module_info.py` | 批 5 |
 | R-DATA-08 | `src/test/unit/fetcher/test_chain_overrides.py` | 批 5 |
 | R-LLM-10 | `src/test/unit/llm/test_llm_pacing.py`（策略解析/容错/注册/惰性装载兜底/零开销直通/间隔/抖动/并发上限/异常释放/403 不重试）+ `src/test/unit/config/test_config_llm_multi.py`（pacing 透传/缺省不注入/非对象忽略）+ `src/test/unit/llm/test_llm_api_multi.py`（`endpoint_key` 逐层下传并到达重试骨架——漏传则 `PacingGate` 拿空键、端点节流空转） | 批 5 |
@@ -616,6 +620,22 @@
 | R-HST-05 | `src/test/unit/config/test_config.py` + `src/test/unit/report/test_portfolio_history.py` | 批 6 |
 | R-HST-06 | `src/test/unit/fetcher/test_fund.py` | 批 6 |
 | R-HST-07 | `src/test/unit/fetcher/test_fetcher_index.py` | 批 6 |
+| R-HCR-01 | `src/test/unit/analysis/test_holding_change_events.py` + `src/test/unit/analysis/test_holding_change_events_edge.py` | 批 7 |
+| R-HCR-02 | `src/test/unit/report/test_holding_change_panel.py` + `src/test/unit/report/test_holding_change_panel_edge.py` | 批 7 |
+| R-HCR-03 | `src/test/unit/report/test_holding_change_panel.py` + `src/test/integration/test_report_chapter_consistency.py` | 批 7 |
+| R-HCR-04 | `src/test/unit/analysis/test_holding_change_metrics.py` + `src/test/unit/report/test_holding_change_panel.py` | 批 7 |
+| R-HCR-05 | `src/test/unit/llm/test_holding_change_injection.py` | 批 7 |
+| R-HCR-06 | `src/test/unit/analysis/test_holding_change_metrics.py` + `src/test/unit/report/test_holding_change_panel.py` | 批 7 |
+| R-FCT-01 | `src/test/unit/fetcher/test_factor_catalog_loader.py` + `src/test/unit/analysis/test_factor_evaluator.py` | 批 9 |
+| R-FCT-02 | `src/test/unit/analysis/test_factor_evaluator.py` + `src/test/unit/analysis/test_factor_evaluator_edge.py` + `src/test/unit/fetcher/test_factor_catalog_loader.py` | 批 9 |
+| R-FCT-03 | `src/test/unit/report/test_signal_record.py` | 批 9 |
+| R-FCT-04 | `src/test/unit/report/test_style_factor_sheet.py` + `src/test/unit/report/test_html_report_structure.py` | 批 9 |
+| R-FCT-05 | `src/test/unit/config/test_features.py` + `src/test/unit/analysis/test_factor_evaluator.py` | 批 9 |
+| R-SR-01 | `src/test/unit/analysis/test_schedule_replay.py` + `src/test/unit/analysis/test_schedule_replay_edge.py` | 批 10 |
+| R-SR-02 | `src/test/unit/analysis/test_schedule_replay.py` | 批 10 |
+| R-SR-03 | `src/test/unit/report/test_schedule_replay_wiring.py` + `src/test/integration/test_report_chapter_consistency.py` + `src/test/scenario/basic/test_scenario_section_order.py` | 批 10 |
+| R-SR-04 | `src/test/unit/llm/test_schedule_replay_injection.py` | 批 10 |
+| R-SR-05 | `src/test/unit/report/test_schedule_replay_wiring.py` + `src/test/unit/report/test_experimental_seams.py` | 批 10 |
 <!-- requirement-trace:end -->
 ---
 
@@ -664,20 +684,20 @@
 | **P0** | 测试隔离验证：`.venv/bin/python -m pytest --co` 无冲突 | 新增/修改 test_*.py | 避免 patch 残留污染 |
 | **P1** | 报告生成完整性（菜单 E/B/L 全链路） | config / report / html / llm 变更 | `scenario_basic` 管线冒烟/指标注入 + 场景测试（Excel 页签完整、不崩溃） |
 | **P1** | Excel 报告视觉质量 | 颜色/格式/样式相关变更 | `test_excel_writer.py` / `test_summary.py`（盈亏着色、评级色、LLM 状态色、冻结首行） |
-| **P1** | 报告章节合并（同页签多区块 + 多契约 OR 可见性 + 块级开关） | 注册表条目 / 章节键 / 页签写入器 / HTML 模板或 partial / board_flags 变更 | `test_holdings_detail_sheet.py` / `test_position_structure_sheet.py` / `test_fundamental_snapshot_sheet.py`（各合并章：章名与区块小节标题同页签、区块行值与独立写入**逐格等价**、契约 None 的块级门控）+ `test_section_visibility.py`（`data_flag_any` 多契约 OR：单契约就绪即可见、两者皆无隐藏）+ `test_section_type_flag_consistency.py`（注册表 type ↔ 两侧 board_flags ↔ 写入器装配键一致，防旧 type/旧模块键残留）+ `test_report_chapter_consistency.py`（Excel 页签与 HTML 章节两侧可见集合一致）+ `test_fund_performance_manager_block.py`（经理变更块随基金深度分析门控）。**回归防线**：合并章若漏改任一侧可见性、装配键或 board_flags，两侧一致性/一致性守卫用例立刻失败（实施期即由此捕获 `rf-367`） |
+| **P1** | 报告章节合并（同页签多区块 + 多契约 OR 可见性 + 块级开关） | 注册表条目 / 章节键 / 页签写入器 / HTML 模板或 partial / board_flags 变更 | `test_holdings_detail_sheet.py` / `test_holdings_detail_categories.py` / `test_position_structure_sheet.py` / `test_fundamental_snapshot_sheet.py`（各合并章：章名与区块小节标题同页签、区块行值与独立写入**逐格等价**、契约 None 的块级门控）+ `test_section_visibility.py`（`data_flag_any` 多契约 OR：单契约就绪即可见、两者皆无隐藏）+ `test_section_type_flag_consistency.py`（注册表 type ↔ 两侧 board_flags ↔ 写入器装配键一致，防旧 type/旧模块键残留）+ `test_report_chapter_consistency.py`（Excel 页签与 HTML 章节两侧可见集合一致）+ `test_fund_performance_manager_block.py`（经理变更块随基金深度分析门控）。**回归防线**：合并章若漏改任一侧可见性、装配键或 board_flags，两侧一致性/一致性守卫用例立刻失败（实施期即由此捕获 `rf-367`） |
 | **P1** | 景气度框架诊断（实验性功能） | 分析框架/评分口径/关键词配置/行动建议章渲染变更 | `test_prosperity_framework.py`（六维计分、缺数据降级为未验证且不计分、总分口径与评级边界、配置覆盖）+ `test_prosperity_framework_edge.py`（空/None/零/异常类型/全防御/未知板块/极端集中度/负收益）+ `test_prosperity_framework_wiring.py`（开关关 → 契约缺席且双端无块；开 → 契约注入、Excel/HTML 块与契约一致）+ `test_fund_roe_estimate.py`（②维基金层扩展：重仓股 ROE 加权推演、报告期陈旧闸门、非 A 股过滤、known_roe 免重取）+ `test_liquidity_otc.py` 与 `test_code_utils.py::TestOtcRedemptionDaysDefault`（④维场外类型默认档：货币/短债 T+1、纯债 T+2、其他 T+3、QDII T+7，非实测标注与配置口径优先）。**回归防线**：开关关闭时报告必须逐字节不变；缺数据维度若被算成得分（臆造）立即失败 |
-| **P1** | HTML 报告渲染结构 | html_writer / template 变更 | `test_html_report_structure.py`（中文不乱码、章节锚点、LLM 条件消失/出现） |
+| **P1** | HTML 报告渲染结构 | html_writer / template 变更 | `test_html_report_structure.py`（中文不乱码、章节锚点、LLM 条件消失/出现）+ `test_html_report_structure_toc.py`（返回顶部与目录）+ `test_html_report_structure_content.py`（交互图表/主题/数据质量块/页脚/期间标注） |
 | **P1** | 缓存刷新/清理/统计（菜单 [1][2][3][4]） | cache / handlers / registry 变更 | `test_handlers_cache.py` / `test_tui_handlers.py`（刷新/清理/统计不崩溃） |
 | **P1** | Web 标签页工作台 / 调仓 What-if / 缓存卡 | `src/python/web/handlers.py`、`src/static/web/` 变更 | `test_whatif_api.py` / `test_whatif_api_edge.py` / `test_cache_api.py` / `test_web_static_serving.py`（页签配对、What-if 与缓存控件齐备、main.js 接线） |
 | **P1** | Provider 降级链路 | providers / fetcher 变更 | 熔断/回退/断网降级测试（S7/T15/T16 + provider edge 用例）；实际联通性由运行时 Provider Chain 回退 + 熔断治理，非门禁 |
-| **P1** | 基金持仓取数阶梯次序与联接基金穿透 | providers / fetcher / report 的持仓取数路径变更 | `test_tiantian.py` `TestFetchFundHoldingsLadder`（次序不变量：第 1 跳命中不发主页面请求、联接基金不可达第 3 跳）+ `test_fund_edge.py`（批量接缝幂等/异常不外抛）+ `test_penetration.py`（穿透来源登记）。**次序回归防线**：把无年份兜底提回与年份域并列，联接基金会被最早可得报告遮蔽，本组用例立刻失败 |
+| **P1** | 基金持仓取数阶梯次序与联接基金穿透 | providers / fetcher / report 的持仓取数路径变更 | `test_tiantian.py` `TestFetchFundHoldingsLadder`（次序不变量：第 1 跳命中不发主页面请求、联接基金不可达第 3 跳）+ `test_fund_edge.py`（批量接缝幂等/异常不外抛）+ `test_penetration_report_periods.py`（穿透来源登记）。**次序回归防线**：把无年份兜底提回与年份域并列，联接基金会被最早可得报告遮蔽，本组用例立刻失败 |
 | **P1** | 数据源**真实响应体**解析路径（cassette 离线回放） | providers / fetcher 的解析或归一路径变更 | `test_cassette_replay.py`（对上仓库录制的真实响应体做精确值断言，离线）；人工核验入口 `cassettes --verify`（解析器吃不下已录制响应体即报 `[ERR]` 并退出码 2）。上游字段改名/加前后缀/返回 HTML 错误页这类回归**只有真实响应体测得出**，手工构造的假响应测不出 |
 | **P1** | 真实历史估值分位（TTM 口径） | `analysis/valuation_percentile`（`compute_real_valuation`/`ttm_eps_by_period`/`disclosure_date`）、`report/orchestrator`（`_fetch_valuation_for_code`）、`report/penetration_sheet` 估值文案变更 | `test_valuation_percentile.py`（TTM 四类差分/披露生效日/落盘对齐**无前视**/PB 时点/亏损剔除/分位与档位/各类降级）+ `test_valuation_percentile_edge.py`（脏值/非正与不可解析价格/生效日边界/空序列）+ `test_valuation_temperature_wiring.py`（真实分位优先与口径标注、无基本面回落代理、取数异常收敛）。**关键回归**：生效日之前的历史价格**不得**参与估值序列（前视偏差是本口径最大的正确性风险）；数据底座未就绪时估值列文案与免责语须**逐字回原样**且不取数。另有提示词侧 `test_prompts_signals.py`（五路信号：基本面分布与方向、叙事-数字背离双向命中与「无背离不得出现要求行」、信号块指纹随内容变化） |
-| **P1** | 财务指标取数（主源 + 全文解析备用支路） | `providers/akshare_financial`、`analysis/financial_indicator_extract`、`fetcher/financial_indicator_adapters`、`fetcher/chain`（`financial_indicator` 链）变更 | `test_akshare_financial.py`（宽表归一/百分数换算/同名指标优先/降级）+ `test_financial_indicator_extract.py`（真实年报夹具逐字段复现：营收 862.42 亿、归母净利 345.03 亿、经营现金流 605.63 亿、EPS 1.4101、ROE 15.90%、同比 2.07%/6.17%；另有行文变体/单位换算/精度切分/扣非排除）+ `test_financial_indicator_extract_edge.py`（取值窗口边界/异常幅度/越界比率/零基数同比/截断正文）+ `test_financial_indicator.py`（链路顺序与降级、解析适配器逐章节试取与源身份注入、多期序列主源/退化单期/缓存/非 A 股不发请求/价格映射）+ 报告消费层 `test_financial_indicator.py`（契约键与 C19 登记、降级保留失败清单、质量档/趋势/PE·PB 装配、开关访问器、C7 注册与导航分组与模板 include、编排接缝开关关闭返 None 与现价贯通、穿透代码透传）+ `test_fundamental_snapshot_sheet.py`（页签数值格式与「—」占位、不可用原因与失败清单）+ 派生层 `test_financial_indicator.py`/`test_financial_indicator_edge.py`（四维阈值阶梯/缺维跳过/脏值不计分/分档边界/零基数与期数不足趋势/非正现价）。**隔离防线**：akshare 接口与 `financial_report.fetch_symbol_report` 均 mock，禁真实网络与真实密钥 |
+| **P1** | 财务指标取数（主源 + 全文解析备用支路） | `providers/akshare_financial`、`analysis/financial_indicator_extract`、`fetcher/financial_indicator_adapters`、`fetcher/chain_config`（`financial_indicator` 链）变更 | `test_akshare_financial.py`（宽表归一/百分数换算/同名指标优先/降级）+ `test_financial_indicator_extract.py`（真实年报夹具逐字段复现：营收 862.42 亿、归母净利 345.03 亿、经营现金流 605.63 亿、EPS 1.4101、ROE 15.90%、同比 2.07%/6.17%；另有行文变体/单位换算/精度切分/扣非排除）+ `test_financial_indicator_extract_edge.py`（取值窗口边界/异常幅度/越界比率/零基数同比/截断正文）+ `test_financial_indicator.py`（链路顺序与降级、解析适配器逐章节试取与源身份注入、多期序列主源/退化单期/缓存/非 A 股不发请求/价格映射）+ 报告消费层 `test_financial_indicator.py`（契约键与 C19 登记、降级保留失败清单、质量档/趋势/PE·PB 装配、开关访问器、C7 注册与导航分组与模板 include、编排接缝开关关闭返 None 与现价贯通、穿透代码透传）+ `test_fundamental_snapshot_sheet.py`（页签数值格式与「—」占位、不可用原因与失败清单）+ 派生层 `test_financial_indicator.py`/`test_financial_indicator_edge.py`（四维阈值阶梯/缺维跳过/脏值不计分/分档边界/零基数与期数不足趋势/非正现价）。**隔离防线**：akshare 接口与 `financial_report.fetch_symbol_report` 均 mock，禁真实网络与真实密钥 |
 | **P1** | 市场情绪章内区块（纯装配只按代码命中/零命中仍出契约/开关门禁与异常兜底/双端渲染载体） | `analysis/market_sentiment.py`、`report/market_sentiment.py`、`report/action_sheet.py`、`report/_report_aux_metrics.py` | `unit/analysis/test_market_sentiment.py`、`unit/report/test_market_sentiment.py`、`unit/report/test_market_sentiment_wiring.py` | — |
-| **P1** | 行情/历史日 K 第三链路 + 交易日历官方兜底（适配器别名归一、`date_ms` 解析、增量起点、链路顺序、akshare 失败后官方序列兜底） | `providers/hithink.py`、`fetcher/quote_adapters.py`、`fetcher/chain.py`、`core/trading_calendar.py` | `unit/providers/test_hithink.py`（行情/K线）、`unit/fetcher/test_quote_adapter_hithink.py`、`unit/core/test_trading_calendar.py` | — |
+| **P1** | 行情/历史日 K 第三链路 + 交易日历官方兜底（适配器别名归一、`date_ms` 解析、增量起点、链路顺序、akshare 失败后官方序列兜底） | `providers/hithink.py`、`fetcher/quote_adapters.py`、`fetcher/chain_config.py`、`fetcher/chain_incremental.py`、`core/trading_calendar.py` | `unit/providers/test_hithink.py`（行情/K线）、`unit/fetcher/test_quote_adapter_hithink.py`、`unit/core/test_trading_calendar.py` | — |
 | **P1** | 财务指标第三链路（同花顺官方报表派生：口径与报告期归一、多期回退与主源优先、凭据跳过） | `analysis/financial_statement_derive.py`、`fetcher/financial_indicator_adapters.py`、`fetcher/financial_indicator.py` | `unit/analysis/test_financial_statement_derive.py`、`unit/fetcher/test_financial_indicator_hithink.py` | — |
-| **P1** | 基金持仓两源链（天天基金主 → 同花顺官方备；载荷归一 + 联接基金目标 ETF 信号，需 key 源由凭据预检跳过） | `fetcher/fund.py`、`providers/hithink.py`、`fetcher/chain.py` | `unit/fetcher/test_fund.py`（归一/链路顺序/备源接管）、`unit/providers/test_hithink.py`（候选解析/联接信号/取数入口） | — |
+| **P1** | 基金持仓两源链（天天基金主 → 同花顺官方备；载荷归一 + 联接基金目标 ETF 信号，需 key 源由凭据预检跳过） | `fetcher/fund.py`、`providers/hithink.py`、`fetcher/chain_config.py` | `unit/fetcher/test_fund.py`（归一/链路顺序/备源接管）、`unit/providers/test_hithink.py`（候选解析/联接信号/取数入口） | — |
 | **P1** | 财报摘要取数（DataSinking 密钥/限速/配额/降级） | `providers/datasink`、`fetcher/financial_report`、`report/financial_report_digest`、`core/datasource_credential` 变更 | `test_datasink.py`（符号映射/套餐限速派生/日配额护栏/HTTP 401·429·非 200/取数原语）+ `test_financial_report.py`（标的收集/年报优先/多章节拼接/截断）+ `test_financial_report_digest.py`（降级契约/失败清单）+ `test_datasource_credential.py`（密钥文件节结构/就绪判定/环境变量优先）。**隔离防线**：密钥文件与 `data/state/datasink_quota.json` 均由 conftest 重定向到 tmp；免费档无批量端点、限速落在 provider 逐请求前 |
 | **P2** | 断网环境下自动降级 | 网络/超时/重试相关变更 | `test_scenario_resilience_flows.py::TestScenarioNetworkDown`（S7）+ T15/T16 |
 | **P2** | 清理缓存后全新运行 | provider / fetcher / cache 变更 | `test_scenario_basic_flows.py::TestScenarioNewHoldings`（S4） |
@@ -826,9 +846,9 @@ def test_get_ttl_closed(self, mock_open):
 
 > 详细回归项定义（含触发条件和备注）见 **§4 回归测试清单**，此处仅列门禁约束。
 
-9. **P0 全通** — 不可提交代码：`.venv/bin/python scripts/test-runner.py --mode dev-verify`（项数见 [`test-coverage.md`](./test-coverage.md) → 模式对应测试量；其 preflight 已内置 `check-task-numbering.py --ci`）+ `.venv/bin/python scripts/check-code-traces.py --ci`（代码注释历史痕迹检查）+ `.venv/bin/python scripts/check-doc-traces.py --ci`（文档历史痕迹检查）+ `.venv/bin/python scripts/check-task-numbering.py --ci`（任务编号全局一致性检查）+ `.venv/bin/python scripts/check-semantic-index.py --ci`（语义命名索引正反向校验）+ `.venv/bin/python scripts/check-doc-drift.py --ci`（文档与实现一致性：章节/开关/默认值/面板编号/目录树/统计表/归档索引/管理文档分区纪律/Thinking 支持矩阵）+ `.venv/bin/python scripts/check-test-redundancy.py --ci`（测试用例冗余与无效：死用例/无断言/完全重复/自证用例）+ `.venv/bin/python scripts/check-requirement-trace.py --ci`（需求 ID ↔ 验证载体追溯）+ `.venv/bin/python scripts/check-version-consistency.py --ci`（版本号全局一致性）+ `.venv/bin/python scripts/check-doc-links.py --ci`（文档死链/死锚点/重复标题/层级/编号序列/§引用机检）+ Bug 回归用例 + 测试隔离验证（`.venv/bin/python -m pytest --co`）
+9. **P0 全通** — 不可提交代码：`.venv/bin/python scripts/test-runner.py --mode dev-verify`（项数见 [`test-coverage.md`](./test-coverage.md) → 模式对应测试量；其 preflight 已内置 `check-task-numbering.py --ci`）+ `.venv/bin/python scripts/check-code-traces.py --ci`（代码注释历史痕迹检查）+ `.venv/bin/python scripts/check-doc-traces.py --ci`（文档历史痕迹检查）+ `.venv/bin/python scripts/check-task-numbering.py --ci`（任务编号全局一致性检查）+ `.venv/bin/python scripts/check-semantic-index.py --ci`（语义命名索引正反向校验）+ `.venv/bin/python scripts/check-doc-drift.py --ci`（文档与实现一致性：章节/开关/默认值/面板编号/目录树/统计表/归档索引/管理文档分区纪律/Thinking 支持矩阵）+ `.venv/bin/python scripts/check-test-redundancy.py --ci`（测试用例冗余与无效：死用例/无断言/完全重复/自证用例）+ `.venv/bin/python scripts/check-requirement-trace.py --ci`（需求 ID ↔ 验证载体追溯）+ `.venv/bin/python scripts/check-version-consistency.py --ci`（版本号全局一致性）+ `.venv/bin/python scripts/check-doc-links.py --ci`（文档死链/死锚点/重复标题/层级/编号序列/§引用机检）+ Bug 回归用例 + 测试隔离验证（`.venv/bin/python -m pytest --co`） + `.venv/bin/python scripts/check-file-length.py --ci`（单文件行数红线：主程序 >800 / 测试 >1200）
 10. **P1 全通** — 不可合并 master：`.venv/bin/python scripts/test-runner.py --mode verify` + §4 中 P1 级各自动化回归项全部通过（报告完整性 / Excel 视觉 / HTML 渲染 / 缓存刷新 / Provider 降级）
-11. **P2 已执行** — 可合入但不可发布：`.venv/bin/python scripts/test-runner.py --mode verify,regression` + `.venv/bin/python scripts/check-code-traces.py --ci`（代码注释历史痕迹检查）+ `.venv/bin/python scripts/check-doc-traces.py --ci`（文档历史痕迹检查）+ `.venv/bin/python scripts/check-task-numbering.py --ci`（任务编号全局一致性检查）+ `.venv/bin/python scripts/check-semantic-index.py --ci`（语义命名索引正反向校验）+ `.venv/bin/python scripts/check-doc-drift.py --ci`（文档与实现一致性：章节/开关/默认值/面板编号/目录树/统计表/归档索引/管理文档分区纪律/Thinking 支持矩阵）+ `.venv/bin/python scripts/check-test-redundancy.py --ci`（测试用例冗余与无效：死用例/无断言/完全重复/自证用例）+ `.venv/bin/python scripts/check-requirement-trace.py --ci`（需求 ID ↔ 验证载体追溯）+ `.venv/bin/python scripts/check-version-consistency.py --ci`（版本号全局一致性）+ `.venv/bin/python scripts/check-doc-links.py --ci`（文档死链/死锚点机检）+ §4 中 P2 级各自动化回归项全部通过（断网降级 S7 / 全新运行 S4 / 旧缓存格式 / 跨缓存池污染，均已在 `verify,regression` 内覆盖）+ **发布手动验证**（建议，非自动门禁）：`.venv/bin/python scripts/test-runner.py --mode perf,security`（端到端性能基准 + 安全基线，独立标记不进自动门禁，手工/发布前运行）
+11. **P2 已执行** — 可合入但不可发布：`.venv/bin/python scripts/test-runner.py --mode verify,regression` + `.venv/bin/python scripts/check-code-traces.py --ci`（代码注释历史痕迹检查）+ `.venv/bin/python scripts/check-doc-traces.py --ci`（文档历史痕迹检查）+ `.venv/bin/python scripts/check-task-numbering.py --ci`（任务编号全局一致性检查）+ `.venv/bin/python scripts/check-semantic-index.py --ci`（语义命名索引正反向校验）+ `.venv/bin/python scripts/check-doc-drift.py --ci`（文档与实现一致性：章节/开关/默认值/面板编号/目录树/统计表/归档索引/管理文档分区纪律/Thinking 支持矩阵）+ `.venv/bin/python scripts/check-test-redundancy.py --ci`（测试用例冗余与无效：死用例/无断言/完全重复/自证用例）+ `.venv/bin/python scripts/check-requirement-trace.py --ci`（需求 ID ↔ 验证载体追溯）+ `.venv/bin/python scripts/check-version-consistency.py --ci`（版本号全局一致性）+ `.venv/bin/python scripts/check-doc-links.py --ci`（文档死链/死锚点机检）+ §4 中 P2 级各自动化回归项全部通过（断网降级 S7 / 全新运行 S4 / 旧缓存格式 / 跨缓存池污染，均已在 `verify,regression` 内覆盖）+ **发布手动验证**（建议，非自动门禁）：`.venv/bin/python scripts/test-runner.py --mode perf,security`（端到端性能基准 + 安全基线，独立标记不进自动门禁，手工/发布前运行） + `.venv/bin/python scripts/check-file-length.py --ci`（单文件行数红线：主程序 >800 / 测试 >1200）
     > 注：P2 的 `verify` 在 `dev → merge → tag master` 常规流程中与 P1 重复。保留冗余是为了覆盖**直接从 dev 打 tag 发布**（未过 P1 合入门禁）的场景。若团队有严格 merge 屏障且从不直接发布 dev，P2 可简化为 `--mode regression`（仅场景测试，~6min），节省约 1min 单元测试重复时间。
 
 ### 6.4 补充自动化门禁
