@@ -40,7 +40,7 @@
 | # | 文件 | 行数 | 状态 | 拆分建议 |
 |---|------|------|------|----------|
 
-| **rf-626** | `llm/prompts_core.py`、`llm/generators.py`、`report/html_writer.py`、`analysis/rebalance.py` | 799 / 786 / 754 / 751 | **临界带（≥750 行）四文件未纳入本表登记**；`prompts_core` 距 800 红线仅 1 行——下次提示词/数据块增补即触发 `--ci` finding（2026-10-07 实测，与 `-v` 同口径） | 本行即四文件的登记项；`prompts_core` 下次增补前按职责下沉（`FAIL_REASON_*` 失败常量、`_build_*_block` 数据块、`_self_review_*` 自审提示词各归其域），`generators` 按生成器域下沉；`html_writer`/`rebalance` 由 `-v` 月度复核、逼近 780 行启动拆分 |
+| **rf-626** | `llm/prompts_core.py`、`llm/generators.py`、`report/html_writer.py`、`analysis/rebalance.py` | 350 / 444 / 754 / 751 | **临界带（≥750 行）四文件登记项**；`prompts_core`/`generators` 主体已按域下沉完成（800/787 → 350/444：failure_reasons / prompts_data_blocks / prompts_review / generators_singletons 四新模块承载，两文件保留门面 re-export、消费方导入面不变，仅 4 处测试 patch 按「测试指向持有子模块」纪律改指新域）；余 `html_writer`(754)/`rebalance`(751) 在带内 | `html_writer`/`rebalance` 由 `-v` 月度复核、逼近 780 行启动拆分（方法沿用本次：域下沉 + 门面 re-export + 测试 patch 改指持有子模块） |
 | **rf-75** | `core/registry.py` | 785 | 维持现状但**临界**（中央注册表被 56 文件引用，数据表内聚；2026-10-07 实测 785（`-v` 同口径），较登记 743 增 42——报告导航分组 `nav_group`/`llm_supported` 字段增补；同批已把计算注册表拆出 `core/computation_registry.py` 控住 800 红线，余量 15 行，后续注册项增补须优先下沉子模块） | 报告章节/缓存TTL/LLM模块/数据模块 4 个注册职责（不拆） |
 | **rf-86** | `cache/operations.py` | 740 | 500-800 可选优化区间（2026-10-05 脚本实测 740，较 2026-10-02 的 637 增长 103，临近 800 须关注） | 数据结构定义/基金刷新/公共缓存/持仓缓存/缓存清理 5 个职责 |
 | **rf-79** | `core/code_utils.py` | 671 | 维持现状（仍在 500-800 区间内聚；2026-10-02 实测 671，较登记值 542 增长 129，主要为符号映射/判定函数增补） | 可考虑将 `estimate_market_cap_by_prefix()` 等非核心判定函数移出（不拆） |

@@ -54,8 +54,8 @@
   ┌────────────────┐  ┌──────────────────┐  ┌────────────────────┐
   │ generators.py  │  │ generators_news  │  │ skeleton.py        │ ← 骨架层
   │                │  │ .py              │  │                    │
-  │ 4 个单例生成   │  │ LLM 增强新闻关联 │  │ generate_llm_      │
-  │ 函数           │  │ enhance_news_    │  │ module()           │
+  │ 辩论+自审+门面 │  │ LLM 增强新闻关联 │  │ generate_llm_      │
+  │ 单例函数再导出 │  │ enhance_news_    │  │ module()           │
   │                │  │ correlation()    │  │                    │
   └───────┬────────┘  └────────┬─────────┘  │ _run_standard_mode │
           │                    │             │ run_batch_mode     │
@@ -163,7 +163,8 @@ skeleton.py:generate_llm_content()
 |:-----|:-----|:------|:---------|
 | `generators_orchestrator.py` | 编排门面 | 缓存预检查（`_compute_module_cache_info` / `_precheck_*`）+ 主编排入口与**生成后一遍**（事实锚定校验 + 可选生成后自检）；worker 装配与线程池分发下沉 `_llm_dispatch.py` 并经本门面 re-export（`_dispatch_llm_workers`，patch 点不变） | `generate_all_llm()` |
 | `_llm_dispatch.py` | 编排层 | 4+1 模块并行调度：`_build_module_fns` 模块→生成函数映射（`_MODULE_FNS`）、`ThreadPoolExecutor` 分发与进度回调、thinking 串行上限与辩论模式 `_debate_wrapper` 路由、`_LLM_CLIENT_SETTINGS` HTTP 客户端设置 | `_dispatch_llm_workers()` |
-| `generators.py` | 生成层 | 4 个单例生成函数（global_macro / expert_review / health_check / penetration_deep）+ 辩论模式 pro/con/synthesis 生成 + `generate_self_review()`（生成后自检）+ `generate_holding_change_review()`（持仓变动复盘归因） | 各 `generate_*()` |
+| `generators.py` | 生成层 | 生成门面（按生成器域拆分）：辩论模式 pro/con/synthesis 生成 + `generate_self_review()`（生成后自检）+ `generate_holding_change_review()` 门面（实现于 `holding_change_review.py`）+ 单例四函数门面再导出 | 各 `generate_*()` |
+| `generators_singletons.py` | 生成层 | 4 个单例生成函数（global_macro / expert_review / health_check / penetration_deep，自 generators 按生成器域下沉；**测试 patch 以本模块为解析点**——`generate_llm_module` 等 seam 名在本域内解析） | 各 `generate_*()` |
 | `self_review.py` | 运行作用域 | 生成后自检的开关判定/输入存在性判定/失败隔离与运行作用域载体（报告层零参 pull；**不经** `_MODULE_FNS` 并行调度） | `run_self_review()` / `get_self_review_block()` |
 | `holding_change_review.py` | 运行作用域 | 持仓变动复盘归因的契约准入（feature + 快照准入 + 事实块非空）/失败隔离，结果写回契约 `llm_review`（**不经** `_MODULE_FNS` 并行调度，编排层串行后置调用） | `run_holding_change_review()` |
 | `depth_profile.py` | 配置层 | 报告深度档位表（唯一事实来源）：档位只**收窄**模块集合与新闻采集规模，不进提示词正文 | `resolve_depth_profile()` / `depth_gate()` |
@@ -175,7 +176,10 @@ skeleton.py:generate_llm_content()
 | `strategy.py` | 基础设施 | 多 Provider 切换策略引擎（priority/weighted/cost_first/fallback_only），模块偏好注入，代理偏好后置处理 | `resolve_provider_chain()` |
 | `fact_checker/`（子包 9 模块，`__init__.py` 重导出 4 公开函数） | 基础设施 | LLM 输出事实锚定校验（数值一致性/品种存在性/排名正确性）+ 自动修正 | `run_fact_check()` |
 | `fallback.py` | 基础设施 | 全模块失败时的降级占位模板；占位识别（`is_placeholder_content()` 按模板共有的稳定签名 `⚠️ 当前无法` 判定，供 `report/llm_quality.py` 等内容侧消费——签名常量与模板同文件，改模板即改签名） | `get_fallback_content()` / `get_placeholder_text()` / `is_placeholder_content()` |
-| `prompts_core.py` | 工具 | System Prompt 常量 + 上下文构建块（数据降级/收益归因/竞争语境/再平衡/概念板块/管线差异） | `_SYSTEM_*` 常量 + `_build_system_debate_synthesis()` |
+| `prompts_core.py` | 工具 | 提示词门面：System Prompt 常量 + 辩论 synthesis 构建 + **三域子模块门面再导出**（失败原因/数据块/复盘自审，旧导入面不变） | `_SYSTEM_*` 常量 + `_build_system_debate_synthesis()` |
+| `failure_reasons.py` | 工具 | LLM 模块失败原因常量（`FAIL_REASON_*` + `LLM_MODULE_FAILURE`，自 prompts_core 按职责下沉） | `LLM_MODULE_FAILURE` |
+| `prompts_data_blocks.py` | 工具 | 上下文数据块与格式化辅助（管线差异/数据降级/收益归因/竞争语境/再平衡/概念板块 + `_fmt_wan`/`_fmt_holding_line`/`_is_valid_number`，自 prompts_core 下沉） | `_build_*_block()` |
+| `prompts_review.py` | 工具 | 自审与持仓变动复盘提示词（`_SYSTEM_SELF_REVIEW`/`_SYSTEM_HOLDING_CHANGE_REVIEW` + 构建器与摘要辅助，自 prompts_core 下沉） | `_build_self_review_prompt()` |
 | `prompts_tables.py` | 工具 | 持仓/穿透/指标/情景/数据质量/汇率等数据块格式化为 Markdown | `_format_holdings_block()` / `_build_holdings_summary()` |
 | `prompts_action.py` | 工具 | 各模块 User Prompt 构建（global_macro / expert_review / health_check / penetration_deep / debate_synthesis）+ 集中度问答块 | `_build_expert_review_prompt()` / `_build_concentration_qa_block()` |
 | `prompts_signals.py` | 工具 | 信号预消化：行业资金流向段方向标注与分方向排名（无开关，默认路径）+ 算法评级信号块（市场温度/估值分位/尾部风险/持仓基本面/叙事与数字背离 → `信号：…` 行，`deterministic_signal` 开关（读侧注入面），判定收敛于缓存后缀函数保证读写键同源） | `_build_sector_flow_block()` / `_build_signal_digest_block()` / `_signal_digest_cache_suffix()` |

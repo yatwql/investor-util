@@ -9,6 +9,8 @@
 
 ## [0.12.7-dev] - 开发中（未发布）
 
+- **工程效能**：**临界文件按域拆分**——`llm/prompts_core.py`（800→350）按职责下沉三子模块（`failure_reasons` 失败原因常量 / `prompts_data_blocks` 上下文数据块与格式化辅助 / `prompts_review` 自审与持仓复盘提示词），`llm/generators.py`（787→444）按生成器域下沉 `generators_singletons`（单例四生成函数）；两文件保留门面 re-export（消费方导入面不变），仅 4 处测试 patch 按「测试指向持有子模块」纪律改指新域；llm-technical/folders 同步 + 门面同一性回归测试 4 项 | rf-626
+
 - **工程效能/发布**：**版本一致性 `--fix` 不再吞空行 + 消除脚本 SyntaxWarning**——`_auto_fix_header` 行首空白类改同行字符类（原 `\s` 含换行，MULTILINE 下吞掉版本头前空行，developer-guide 受损已恢复），docstring 改 raw 串消除 invalid escape 警告；回归补「空行保留 + 跨行不误判 + 无警告编译」用例 | rf-624
 - **工程效能/发布**：**`release.py publish` 归一化 `--title`**——新增 `normalize_release_title()` 剥离 title 自带的 `release: v… —— ` 前缀，防双前缀 subject（v0.12.6 发布提交实测出现，历史不可变，修复防再犯） | rf-625
 - **运行体验**：**生成进行中阶段 ETA 预估**——`core/perf` 新增同阶段历史中位数预估 `estimate_stage_eta`（最近 20 次运行同名阶段减已耗时、严格同报告类型筛样本、无样本与读档/计算异常一律静默降级）与阶段状态唯一格式器；`PerfCollector` 可选阶段广播回调（回调异常隔离，basic/both/full 三处管线构造点零调用点改动）；`ProgressReporter.stage_progress` 基类单一实现，CLI verbose / Web / TUI 同源（瞬时阶段不刷屏、历史不足先静默后仅显已耗时） | plan-97

@@ -114,3 +114,28 @@ class TestBuildRebalanceBlock:
         assert not (tmp_path / "rebalance_silence.json").exists() or _silence._load_silence_state(silence_file).get(
             "600001"
         )
+
+
+class TestFacadeReexports:
+    """三域子模块下沉后 prompts_core 门面同一性（回归：旧导入面不得破坏）。"""
+
+    def test_all_names_resolve_on_facade(self) -> None:
+        """__all__ 每个名字在门面上均可解析（拆分后门面仍完整）。"""
+        from src.python.llm import prompts_core
+
+        for name in prompts_core.__all__:
+            assert getattr(prompts_core, name, None) is not None, name
+
+    def test_domain_symbols_are_same_objects(self) -> None:
+        """三域符号与子模块对象同一（门面即子模块，非副本）。"""
+        from src.python.llm import failure_reasons, prompts_core, prompts_data_blocks, prompts_review
+
+        assert prompts_core._fmt_wan is prompts_data_blocks._fmt_wan
+        assert prompts_core._is_valid_number is prompts_data_blocks._is_valid_number
+        assert prompts_core.FAIL_REASON_API_ERROR is failure_reasons.FAIL_REASON_API_ERROR
+        assert prompts_core.LLM_MODULE_FAILURE is failure_reasons.LLM_MODULE_FAILURE
+        assert prompts_core._build_self_review_prompt is prompts_review._build_self_review_prompt
+        # 未列入 __all__ 的域符号同样经门面可达（消费方旧导入面）
+        assert prompts_core._build_holding_change_review_prompt is prompts_review._build_holding_change_review_prompt
+        assert prompts_core._SYSTEM_SELF_REVIEW is prompts_review._SYSTEM_SELF_REVIEW
+        assert prompts_core._build_rebalance_block is prompts_data_blocks._build_rebalance_block

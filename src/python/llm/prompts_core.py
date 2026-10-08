@@ -13,27 +13,44 @@ from __future__ import annotations
 
 import logging
 
-from src.python.core.code_utils import is_qdii_extended
+# ── 门面再导出（三域子模块；消费方与测试导入面保持稳定） ──────
+from src.python.llm.failure_reasons import (  # noqa: F401
+    FAIL_REASON_API_ERROR,
+    FAIL_REASON_CIRCUIT_OPEN,
+    FAIL_REASON_DISABLED,
+    FAIL_REASON_NETWORK_ERROR,
+    FAIL_REASON_NOT_CONFIGURED,
+    FAIL_REASON_QUOTA_EXCEEDED,
+    FAIL_REASON_TIMEOUT,
+    LLM_MODULE_FAILURE,
+)
+from src.python.llm.prompts_data_blocks import (  # noqa: F401
+    _build_competitive_context_block,
+    _build_concept_sector_block,
+    _build_data_degradation_block,
+    _build_difpipeline_data_block,
+    _build_profit_attribution_block,
+    _build_rebalance_block,
+    _fmt_holding_line,
+    _fmt_wan,
+    _is_valid_number,
+)
+from src.python.llm.prompts_review import (  # noqa: F401
+    _SYSTEM_HOLDING_CHANGE_REVIEW,
+    _SYSTEM_SELF_REVIEW,
+    _build_holding_change_review_prompt,
+    _build_self_review_prompt,
+    _self_review_holdings_digest,
+    _self_review_penetration_digest,
+    _strip_html_for_review,
+)
+
 
 logger = logging.getLogger("invest")
 
 # ── 缓存前缀 ─────────────────────────────────────────────────
 
 CACHE_PREFIX_LLM = "llm_"
-
-# ── 模块级失败原因记录（供 write_llm_sheets 读取以输出具体提示） ──
-
-FAIL_REASON_NOT_CONFIGURED = "not_configured"
-FAIL_REASON_API_ERROR = "api_error"
-FAIL_REASON_NETWORK_ERROR = "network_error"
-FAIL_REASON_TIMEOUT = "timeout"
-FAIL_REASON_CIRCUIT_OPEN = "circuit_open"
-# 端点配额/风控类拒绝（如订阅制端点的 5 小时窗口、并发上限）——重试无益且会加剧风控画像
-FAIL_REASON_QUOTA_EXCEEDED = "quota_exceeded"
-FAIL_REASON_DISABLED = "disabled"
-
-LLM_MODULE_FAILURE: dict[str, str | dict] = {}
-"""{module_key: reason|dict} 各 LLM 模块最近一次生成的失败原因。"""
 
 # ── System Prompt 常量 ───────────────────────────────────────
 
@@ -152,331 +169,6 @@ _SYSTEM_NEWS_CORRELATION = """你是一位资深金融分析师。以下会给�
 每条新闻必须分析，不允许跳过任何一条。idx 对应当前批新闻列表中的序号（0 开始）。
 sentiment 字段判断该新闻对持仓的利好/利空影响（结合行业和概念判断）。
 只输出JSON，不要其他内容。"""
-
-# ── 上下文构建块 ──────────────────────────────────────────
-
-
-def _build_difpipeline_data_block(pipeline_data: dict | None) -> str:
-    """构建差异上下文文本块（紧凑格式），供 LLM 注入环比分析能力。
-
-    Returns:
-        格式化的差异文本块，为空时不做任何注入。
-    """
-    if not pipeline_data:
-        return ""
-    diff = pipeline_data.get("diff")
-    if diff is None or not isinstance(diff, dict):
-        return ""
-    if diff.get("is_first_check"):
-        return "【对比基准】这是首次生成的报告，暂无历史对比数据。"
-
-    lines: list[str] = []
-    days = diff.get("days_since_last_report", 0)
-    lines.append(f"【环比对比】距上次报告 {days} 天")
-
-    tv_diff = diff.get("total_value_diff", 0)
-    tv_pct = diff.get("total_value_diff_pct", 0)
-    lines.append(f"总市值变化: {tv_diff:+,.0f} ({tv_pct:+.2f}%)")
-
-    tp_diff = diff.get("total_pnl_diff", 0)
-    lines.append(f"总盈亏变化: {tp_diff:+,.0f}")
-
-    added = diff.get("added", [])
-    removed = diff.get("removed", [])
-    increased = diff.get("increased", [])
-    decreased = diff.get("decreased", [])
-
-    if added:
-        _a = "、".join(f"{a['name']}({a['code']})" for a in added[:3])
-        lines.append(f"新增持仓: {_a}")
-    if removed:
-        _r = "、".join(f"{r['name']}({r['code']})" for r in removed[:3])
-        lines.append(f"清仓: {_r}")
-    if increased:
-        _i = "、".join(f"{i['name']}+{i['shares_diff']:.0f}份" for i in increased[:3])
-        lines.append(f"加仓: {_i}")
-    if decreased:
-        _d = "、".join(f"{d['name']}{d['shares_diff']:.0f}份" for d in decreased[:3])
-        lines.append(f"减仓: {_d}")
-
-    return "\n".join(lines)
-
-
-def _build_data_degradation_block(pipeline_data: dict | None) -> str:
-    """构建数据质量降级上下文文本块。
-
-    Returns:
-        格式化的降级状态文本块。无降级记录时返回空字符串。
-    """
-    if not pipeline_data:
-        return ""
-    events = pipeline_data.get("data_degradation")
-    if not events or not isinstance(events, list):
-        return ""
-
-    degraded = [e for e in events if e.get("degraded")]
-    if not degraded:
-        return ""
-
-    lines = ["【数据质量降级】"]
-    for e in degraded:
-        _sk = e.get("source_key", "?")
-        _tier = e.get("tier", "?")
-        _ft = e.get("failure_type", "?")
-        _cnt = e.get("count", 0)
-        lines.append(f"- {_sk}: {_tier} 降级 ({_ft}, 累计{_cnt}次)")
-    lines.append("（以上数据源部分或完全不可用，分析建议时请考虑数据缺失的影响）")
-    return "\n".join(lines)
-
-
-def _build_profit_attribution_block(holdings_details: list[dict] | None) -> str:
-    """构建收益归因段落（TOP 5 品种按贡献排序）。
-
-    复用 `analysis.return_attribution.compute_return_attribution` 的单一计算实现
-    （与行动建议归因子块表格共享，避免重复实现），此处仅做提示词段落格式化。
-    """
-    from src.python.analysis.return_attribution import compute_return_attribution
-
-    data = compute_return_attribution(holdings_details)
-    if not data:
-        return ""
-
-    lines = ["【收益归因】（以下数值为贡献占比 pp，非个股收益率，两者不可混用）"]
-    pos = data["盈利来源"]
-    neg = data["亏损来源"]
-    if pos:
-        pos_parts = [f"{i['name']}(+{i['contribution_pp']:.1f}pp)" for i in pos]
-        lines.append(f"主要盈利来源: {'、'.join(pos_parts)}")
-    if neg:
-        neg_parts = [f"{i['name']}({i['contribution_pp']:.1f}pp)" for i in neg]
-        lines.append(f"主要亏损来源: {'、'.join(neg_parts)}")
-
-    pos_total = data["pos_total"]
-    neg_total = data["neg_total"]
-    if pos_total > 0 and neg_total < 0:
-        lines.append(
-            f"盈利品种合计 +{_fmt_wan(pos_total)}，亏损品种合计 {_fmt_wan(neg_total)}（净{_fmt_wan(pos_total + neg_total)}）"
-        )
-    elif pos_total > 0:
-        lines.append(f"全部品种盈利，合计 +{_fmt_wan(pos_total)}")
-    elif neg_total < 0:
-        lines.append(f"全部品种亏损，合计 {_fmt_wan(neg_total)}")
-
-    return "\n".join(lines)
-
-
-def _build_concept_sector_block(penetrated_assets: list[dict] | None) -> str:
-    """构建概念板块占比段落（穿透 TOP10 的概念汇总）。"""
-    if not penetrated_assets:
-        return "暂无概念板块数据"
-
-    concept_mv: dict[str, float] = {}
-    for asset in penetrated_assets:
-        mv = asset.get("mv", 0) or 0
-        concepts = asset.get("concepts") or []
-        for c in concepts:
-            if isinstance(c, str) and c.strip():
-                concept_mv[c.strip()] = concept_mv.get(c.strip(), 0) + mv
-
-    if not concept_mv:
-        return "部分品种无概念分类"
-
-    total_mv = sum(concept_mv.values())
-    sorted_concepts = sorted(concept_mv.items(), key=lambda x: -x[1])
-    top5 = sorted_concepts[:5]
-
-    lines = ["【概念板块分布】"]
-    for name, mv in top5:
-        pct = mv / total_mv * 100 if total_mv > 0 else 0
-        lines.append(f"- {name}: {_fmt_wan(mv)} ({pct:.1f}%)")
-
-    if top5:
-        top1_pct = top5[0][1] / total_mv * 100 if total_mv > 0 else 0
-        top3_pct = sum(v for _, v in top5[:3]) / total_mv * 100 if total_mv > 0 else 0
-        if top1_pct > 40 or top3_pct > 70:
-            lines.append("集中度判断: 高")
-        elif top1_pct > 20 or top3_pct > 50:
-            lines.append("集中度判断: 中")
-        else:
-            lines.append("集中度判断: 低")
-
-    return "\n".join(lines)
-
-
-def _build_rebalance_block(holdings_details: list[dict] | None, total_mv: float) -> str:
-    """构建再平衡建议段落。
-
-    静默期不适用：LLM 智囊团深度复盘为一次性分析提示，需看到当前全部
-    超限信号；且不得读写共享静默期文件（避免与「行动建议」章节相互抑制，
-    造成同一报告内再平衡信号不一致）。静默期是用户侧重复建议的 UX 护栏。
-    """
-    from src.python.analysis.simple_rebalance import compute_simple_rebalance_signals
-
-    signals = compute_simple_rebalance_signals(holdings_details, total_mv, silence_days=0)
-    if not signals:
-        return ""
-
-    lines = ["【再平衡建议】"]
-    for s in signals:
-        if s.get("summary"):
-            lines.append(f"⚠ {s['message']}")
-        else:
-            weight_pct = s["weight"] * 100
-            threshold_pct = s["threshold"] * 100
-            lines.append(
-                f"- {s['name']}({s['code']}) 持仓占比 {weight_pct:.1f}%，"
-                f"超出建议上限 {threshold_pct:.0f}%，{s['action']}"
-            )
-
-    return "\n".join(lines)
-
-
-def _build_competitive_context_block(
-    a_indices: dict | None,
-    total_mv: float,
-    total_today_profit: float,
-    history_data: dict | None = None,
-    comparison_indices: dict[str, str] | None = None,
-    metrics: dict | None = None,
-) -> str:
-    """构建竞争语境段落（组合 vs 多指数收益对比，含指标对比）。
-
-    Args:
-        a_indices: A 股指数行情字典（由 fetch_indices() 返回）。
-        total_mv: 组合总市值。
-        total_today_profit: 组合当日盈亏。
-        history_data: 历史数据（含 benchmark_returns, portfolio_returns）。
-        comparison_indices: {代码: 名称} 对比指数池配置，
-            默认 {"sh000300": "沪深300", "sh000905": "中证500", "sh000012": "中证全债"}。
-        metrics: 量化指标字典（含 sharpe_ratio、annualized_volatility 等）。
-    """
-    lines: list[str] = []
-
-    if comparison_indices is None:
-        comparison_indices = {"sh000300": "沪深300", "sh000905": "中证500", "sh000012": "中证全债"}
-
-    # ── 今日对比：组合 vs 各指数 ──
-    if a_indices and total_mv > 0:
-        portfolio_chg = total_today_profit / total_mv * 100
-        today_lines: list[str] = []
-        for code, name in comparison_indices.items():
-            idx_data = a_indices.get(code)
-            if not idx_data:
-                continue
-            idx_chg = idx_data.get("change_pct")
-            if idx_chg is None:
-                continue
-            today_lines.append(f"组合 {portfolio_chg:+.2f}% vs {name} {idx_chg:+.2f}%")
-
-        if today_lines:
-            lines.append("【今日对比】" + " | ".join(today_lines))
-
-        # 相对沪深300 跑赢/跑输（沪深300 始终作为主要对比基准）
-        csi300 = a_indices.get("sh000300")
-        if csi300 and csi300.get("change_pct") is not None:
-            diff = portfolio_chg - csi300["change_pct"]
-            lines.append(f"相对沪深300 {'跑赢' if diff >= 0 else '跑输'} {abs(diff):.2f}%")
-
-    # ── 区间对比 ──
-    if history_data and isinstance(history_data, dict):
-        benchmark_returns = history_data.get("benchmark_returns")
-        portfolio_returns = history_data.get("portfolio_returns")
-        if benchmark_returns is not None and portfolio_returns is not None:
-            p_return = (
-                portfolio_returns[-1] * 100 if isinstance(portfolio_returns, list) and portfolio_returns else None
-            )
-            b_return = (
-                benchmark_returns[-1] * 100 if isinstance(benchmark_returns, list) and benchmark_returns else None
-            )
-            if p_return is not None and b_return is not None:
-                lines.append(f"【区间对比】组合累计 {p_return:+.2f}% vs 沪深300 {b_return:+.2f}%")
-
-    # ── 指标对比（组合级） ──
-    if metrics and isinstance(metrics, dict):
-        metric_parts: list[str] = []
-        sharpe = metrics.get("sharpe_ratio")
-        if sharpe is not None and _is_valid_number(sharpe):
-            metric_parts.append(f"夏普 {sharpe:.2f}")
-        vol = metrics.get("annualized_volatility")
-        if vol is not None and _is_valid_number(vol):
-            metric_parts.append(f"年化波动率 {vol:.1%}" if abs(vol) < 1 else f"年化波动率 {vol:.2f}%")
-        mdd = metrics.get("max_drawdown")
-        if mdd is not None and _is_valid_number(mdd):
-            metric_parts.append(f"最大回撤 {mdd:.1%}" if abs(mdd) < 1 else f"最大回撤 {mdd:.2f}%")
-        calmar = metrics.get("calmar_ratio")
-        if calmar is not None and _is_valid_number(calmar):
-            metric_parts.append(f"卡玛 {calmar:.2f}")
-        if metric_parts:
-            lines.append("【指标对比】" + " | ".join(metric_parts))
-
-    if not lines:
-        return "暂无足够历史数据进行竞争语境对比"
-
-    # ── 口径说明（脚注） ──
-    lines.append("")
-    lines.append(
-        "⚠ 口径说明：组合收益为费后净收益，指数为价格指数（非全收益）；"
-        "组合含现金管理品种，指数不含；对比期间可能存在持仓变动（非静态组合）。"
-        "以上差异可能导致对比结果偏移，仅供大致参考。"
-    )
-
-    # ── 幸存者偏差提示 ──
-    lines.append(
-        "⚠ 幸存者偏差提示：对比指数的成分股/成分基金会定期调整，"
-        "表现差的成分可能被剔除，因此指数本身存在幸存者偏差。"
-        "你的组合对比结果可能略显保守。"
-    )
-
-    return "\n".join(lines)
-
-
-def _is_valid_number(val: object) -> bool:
-    """检查值是否为有效有限数值（排除 None/NaN/Inf）。"""
-    import math
-
-    if val is None:
-        return False
-    if isinstance(val, (int, float)):
-        return math.isfinite(val)
-    return False
-
-
-# ── 共用格式化函数 ──────────────────────────────────────────
-
-
-def _fmt_wan(num: float) -> str:
-    """将数值格式化为中文单位（万/亿），减少 token 消耗。"""
-    if abs(num) >= 100_000_000:
-        return f"{num / 100_000_000:.2f}亿"
-    if abs(num) >= 10_000:
-        return f"{num / 10_000:.1f}万"
-    return f"{num:,.0f}"
-
-
-def _fmt_holding_line(h: dict, show_cost: bool = False, compact: bool = False) -> str:
-    """格式化单条持仓明细行，含净值日期 / QDII 标注。"""
-    code = h.get("code", "")
-    mv = h.get("market_value", 0)
-    profit = h.get("profit", 0)
-    rate = h.get("profit_rate")
-    rate_str = f"{rate:+.2f}%" if rate is not None else "--"
-    nav_date = h.get("nav_date", "")
-    source_api = h.get("source_api", "")
-    name = h.get("name", "")
-    qdii_suffix = "(QDII滞后1日)" if is_qdii_extended(name) else ""
-
-    if show_cost:
-        cost = h.get("cost", 0)
-        base = f"{code} 成本{_fmt_wan(cost)} 市值{_fmt_wan(mv)} 盈亏{_fmt_wan(profit)}({rate_str})"
-    else:
-        base = f"{code} 市值{_fmt_wan(mv)} 盈亏{_fmt_wan(profit)}({rate_str})"
-
-    if source_api != "tencent" and nav_date:
-        return f"{base} 净值:{nav_date}{qdii_suffix}"
-    chg = h.get("change_pct", 0)
-    if compact:
-        return f"{base}{qdii_suffix}"
-    return f"{base} 今{chg:+.2f}%{qdii_suffix}"
 
 
 # ── 辩论模式 System Prompt 常量 ─────────────────────────────
@@ -656,144 +348,3 @@ __all__ = [
     "_build_rebalance_block",
     "_build_competitive_context_block",
 ]
-
-
-_SYSTEM_SELF_REVIEW = """你是严格的投资复盘内容复核员。你会收到同一次报告中若干个分析模块的产出文本，
-以及持仓/穿透数据摘要。你的唯一任务是**复核这些产出与数据是否自洽**，而不是重新做一遍分析。
-
-## 必须输出的固定条目（缺一条即视为不合格输出）
-
-【自检清单】
-1. 结论与数据是否矛盾：逐条列出发现的矛盾（引用原文片段 + 说明与哪项数据冲突）；未发现时写「未发现」。
-2. 未标注的推测性表述：列出把推测当作事实陈述、或未标注不确定性的表述（引用原文片段）；未发现写「未发现」。
-3. 模块间结论是否互斥：指出相互冲突的结论对；未发现写「未发现」。
-
-## 硬性禁止（违反即为无效输出）
-
-- **禁止给出任何投资建议、买卖方向、目标价、仓位建议**——你只复核，不提供建议。
-- **禁止新增数据、数值或排名**：只能引用你收到的文本与摘要中的既有信息；不确定就写「无法核实」。
-- **禁止声称已"校验无误"或给出质量评分**：你只报告发现，不下结论性背书。
-- 不得复述原文全文，只引用必要片段（每条不超过 40 字）。
-
-输出为 Markdown，只输出上述清单，不要寒暄、不要总结段落。"""
-
-
-def _build_self_review_prompt(
-    module_outputs: dict | None,
-    holdings_details: list | None = None,
-    penetrated_assets: list | None = None,
-    per_module_limit: int = 4000,
-) -> str:
-    """构造自检 user prompt：各模块产出（截断）+ 数据摘要（比对基准）。
-
-    Args:
-        module_outputs: 模块名 → HTML 产出文本（None/空串跳过）。
-        holdings_details: 持仓明细。
-        penetrated_assets: 穿透资产列表。
-        per_module_limit: 单个模块文本的字符上限（防止 prompt 无限膨胀）。
-
-    Returns:
-        自检 user prompt。
-    """
-    lines: list[str] = ["以下是本次报告的各模块分析产出（已截断），请按系统提示要求复核。", ""]
-    for key, text in (module_outputs or {}).items():
-        if not isinstance(text, str) or not text.strip():
-            continue
-        plain = _strip_html_for_review(text)
-        if len(plain) > per_module_limit:
-            plain = plain[:per_module_limit] + "…（已截断）"
-        lines.append(f"### 模块：{key}")
-        lines.append(plain)
-        lines.append("")
-
-    lines.append("### 持仓数据摘要")
-    lines.append(_self_review_holdings_digest(holdings_details))
-    lines.append("")
-    lines.append("### 穿透资产摘要")
-    lines.append(_self_review_penetration_digest(penetrated_assets))
-    return "\n".join(lines)
-
-
-def _strip_html_for_review(text: str) -> str:
-    """粗略剥离 HTML 标签与实体，供自检比对（不追求完美，够用即可）。"""
-    import re
-
-    plain = re.sub(r"<[^>]+>", " ", text)
-    plain = plain.replace("&nbsp;", " ").replace("&amp;", "&").replace("&lt;", "<").replace("&gt;", ">")
-    return re.sub(r"[ \t]+", " ", plain).strip()
-
-
-def _self_review_holdings_digest(holdings_details: list | None) -> str:
-    """持仓比对基准：名称/代码/市值/盈亏/占比（每行一条，截断至 40 行）。"""
-    if not holdings_details:
-        return "（无持仓明细）"
-    rows: list[str] = []
-    for d in holdings_details[:40]:
-        get = d.get if isinstance(d, dict) else lambda k, _d=d: getattr(_d, k, None)
-        rows.append(
-            "- {name}({code}) 市值 {mv} 盈亏 {profit} 占比 {ratio}".format(
-                name=get("name") or "?",
-                code=get("code") or "?",
-                mv=get("market_value") if get("market_value") is not None else get("mv"),
-                profit=get("profit"),
-                ratio=get("weight_pct") if get("weight_pct") is not None else get("ratio_pct"),
-            )
-        )
-    return "\n".join(rows)
-
-
-def _self_review_penetration_digest(penetrated_assets: list | None) -> str:
-    """穿透比对基准：资产名 + 占比（截断至 20 行）。"""
-    if not penetrated_assets:
-        return "（无穿透数据）"
-    rows: list[str] = []
-    for a in penetrated_assets[:20]:
-        if not isinstance(a, dict):
-            continue
-        rows.append(f"- {a.get('name', '?')} 占比 {a.get('ratio_pct', '?')}%")
-    return "\n".join(rows) or "（无穿透数据）"
-
-
-# ── 持仓变动复盘归因（章内 LLM 归因块） ──────────────────
-
-_SYSTEM_HOLDING_CHANGE_REVIEW = """你是投资复盘分析师，负责对「持仓变动复盘」的结构化事实做归因说明。
-
-你会收到：快照差分得到的变动事件清单（**区间净额推断、非逐笔**）+ 指标汇总（变动频率/结构计数/区间贡献分解/意图对账）+ 窗口内历史信号清单。你的任务是解释"这段时间持仓为什么变成这样"，只做结构级归因。
-
-## 归因框架（按序排查，命中即写明依据）
-
-1. **账户/数据结构变更（优先排查）**：事实清单含"疑似账户结构重排"标注，或出现同日跨品种清仓 + 次日同名新增、单日过桥持仓（当日新增次日清仓）——这类形态是账户/份额数据结构变更而非真实调仓，必须单独说明，**不得当作战绩、主动调仓或择时解读**。
-2. **信号/决策对应**：与意图对账的"一致/分歧"行及窗口内历史信号对照——有明确决策记录或信号指向的变动，说明其对应关系；"分歧"行要指出差异点。
-3. **指数/行业被动跟随**：触及品种集中在同一指数/行业且同日同向变动——按被动跟随/资金申赎驱动解读。
-4. **无法归因**：以上均不成立时明确写"无法从现有数据判定成因"，并说明缺口（如缺逐笔成交、缺决策记录）。
-
-## 硬性禁止（违反即为无效输出）
-
-- **禁止给出任何投资建议、买卖方向、目标价、仓位建议**。
-- **禁止编造清单之外的数据**：成交日期、成交价格、费用、逐笔数量一概不得出现（区间净额推断不含这些维度）；引用数字只能来自收到的事实清单。
-- **禁止输出持仓健康度评价或后市判断**——你只归因已发生的变动。
-- 不得复述清单全文，只引用必要片段（每条不超过 40 字）。
-
-输出为 Markdown：以「## 持仓变动归因」开头，3~5 个要点段（每段先给结论再给依据）；最后一段固定以「口径与局限：」开头，写明"事件为区间净额推断（非逐笔），不含成交日期/单价/费用；分红再投与份额折算混入份额变动"。不要寒暄。"""
-
-
-def _build_holding_change_review_prompt(context_block: str, signal_block: str = "") -> str:
-    """构造持仓变动复盘归因 user prompt：事实块 + 窗口信号对账块。
-
-    Args:
-        context_block: 契约 ``prompt_block``（报告展示与 LLM 同源渲染的事件清单）。
-        signal_block: 窗口内历史信号清单（可为空——信号功能关闭时附录零贡献）。
-
-    Returns:
-        user prompt 文本。
-    """
-    lines = [
-        "以下是本期「持仓变动复盘」的结构化事实（快照差分，区间净额推断、非逐笔），",
-        "请按系统提示的归因框架输出。",
-        "",
-        context_block or "（变动事实块缺席）",
-    ]
-    if signal_block:
-        lines.append("")
-        lines.append(signal_block)
-    return "\n".join(lines)
