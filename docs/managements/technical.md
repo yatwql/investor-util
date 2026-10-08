@@ -226,7 +226,7 @@ llm/generators_orchestrator.py ──→ cache/（可选）
 | **用户交互** | Web 进度报告 | WebProgressReporter（事件缓冲、进度查询） | `web/progress.py` |
 | **输入** | 持仓读取 | xlsx 解析、列校验、多账户 | `core/reader.py` |
 | **配置** | 配置管理层 | 三文件分层配置 | `config/` |
-| **注册** | 中央注册表 | 数据模块 + 报告模块注册 | `core/registry.py` |
+| **注册** | 中央注册表 | 数据模块 + 报告模块注册（两域子模块下沉，门面单入口再导出） | `core/data_registry.py` + `core/report_section_registry.py`（`core/registry.py` 门面） |
 | **数据获取** | 数据源注册中心 | 熔断器、会话缓存、策略、审计 | `core/provider_registry.py` |
 | **数据获取** | Fetcher 调度 | Provider Chain 路由、数据获取 | `fetcher/price.py` 等 |
 | **数据获取** | 数据源 Provider | 外部 API 封装 | `providers/*.py` |

@@ -41,7 +41,6 @@
 |---|------|------|------|----------|
 
 | **rf-626** | `llm/prompts_core.py`、`llm/generators.py`、`report/html_writer.py`、`analysis/rebalance.py` | 350 / 444 / 754 / 751 | **临界带（≥750 行）四文件登记项**；`prompts_core`/`generators` 主体已按域下沉完成（800/787 → 350/444：failure_reasons / prompts_data_blocks / prompts_review / generators_singletons 四新模块承载，两文件保留门面 re-export、消费方导入面不变，仅 4 处测试 patch 按「测试指向持有子模块」纪律改指新域）；余 `html_writer`(754)/`rebalance`(751) 在带内 | `html_writer`/`rebalance` 由 `-v` 月度复核、逼近 780 行启动拆分（方法沿用本次：域下沉 + 门面 re-export + 测试 patch 改指持有子模块） |
-| **rf-75** | `core/registry.py` | 785 | 维持现状但**临界**（中央注册表被 56 文件引用，数据表内聚；2026-10-07 实测 785（`-v` 同口径），较登记 743 增 42——报告导航分组 `nav_group`/`llm_supported` 字段增补；同批已把计算注册表拆出 `core/computation_registry.py` 控住 800 红线，余量 15 行，后续注册项增补须优先下沉子模块） | 报告章节/缓存TTL/LLM模块/数据模块 4 个注册职责（不拆） |
 | **rf-86** | `cache/operations.py` | 740 | 500-800 可选优化区间（2026-10-05 脚本实测 740，较 2026-10-02 的 637 增长 103，临近 800 须关注） | 数据结构定义/基金刷新/公共缓存/持仓缓存/缓存清理 5 个职责 |
 | **rf-79** | `core/code_utils.py` | 671 | 维持现状（仍在 500-800 区间内聚；2026-10-02 实测 671，较登记值 542 增长 129，主要为符号映射/判定函数增补） | 可考虑将 `estimate_market_cap_by_prefix()` 等非核心判定函数移出（不拆） |
 | **rf-89** | `report/excel_generator.py` | 632 | **500-800 可选优化区间，增长偏快**（2026-10-07 实测 632，较 2026-10-05 的 585 增长 47——持仓基本面合并页签等增补）；暂维持现状，`-v` 按月复核 | 页签编排可进一步下沉到独立 writer（后续择机） |
@@ -54,6 +53,8 @@
 
 - rf-624 已修复（2026-10-07，v0.12.6 发布后自查，当批修复）：`scripts/check-version-consistency.py` 的 `_auto_fix_header` docstring 含裸 `\s` 转义 → 非 raw 字符串下每次导入/运行打印 `SyntaxWarning: invalid escape sequence '\s'`（py3.12+），污染终端与 CI stderr（全仓扫描仅此一处）；修复 = docstring 改 raw 前缀（顺带 `[ \t]` 显示由真实 TAB 还原为字面 `\t`）；回归 = 以 `warnings.simplefilter("error", SyntaxWarning)` + `compile()` 锁定脚本可无警告编译（同批自纠：本条回归测试类的 docstring 初版亦含裸 `\s`，由提交前钩子回放段告警捕获，已同步 raw 化）
 - rf-625 已修复（2026-10-07，v0.12.6 发布 publish 实战，当批修复）：`release.py publish` 组装 release subject 时未归一 `--title`——title 自带 `release: v… —— ` 前缀时拼出双前缀（v0.12.6 发布提交 `a68f2376` 即 `release: v0.12.6 —— release: v0.12.6 —— …`；tag/历史不可变故保留）；修复 = 新增 `normalize_release_title()` 剥离重复前缀（剥离后为空回退原值）；回归 = 带前缀 title 断言 subject 单前缀 + 纯描述/纯前缀变体不变
+
+- rf-75 已修复（2026-10-07，文件长度红线治理，当批修复）：`core/registry.py` 785 行临界（余 15 行）——按注册职责域下沉 `core/data_registry.py`（数据模块/缓存 TTL/LLM 设置键派生，441 行）+ `core/report_section_registry.py`（报告章节/导航分组/页签名称派生，335 行），`registry.py` 收敛为 62 行门面（computation/section_block 原有单入口再导出保留，导入面/测试 patch 面不变）；两域零跨域引用、`__all__` 声明契约且互不相交；`check-semantic-index` 章节 AST 解析改指持有子模块（`_SECTION_REGISTRY_PY`）；门面同一性+域契约测试 3 项
 
 ### 归档档案
 

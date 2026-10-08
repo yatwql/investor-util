@@ -9,6 +9,8 @@
 
 ## [0.12.7-dev] - 开发中（未发布）
 
+- **工程效能**：**中央注册表按注册职责域拆分**——`core/registry.py`（785 行临界，余 15 行）下沉 `core/data_registry.py`（数据模块/缓存 TTL/LLM 设置键派生，441 行）+ `core/report_section_registry.py`（报告章节/导航分组/页签名称派生，335 行），`registry.py` 收敛为 62 行门面（computation/section_block 单入口再导出保留，导入面与测试 patch 面不变）；两域零跨域引用、`__all__` 声明契约互不相交；`check-semantic-index` 章节 AST 解析改指持有子模块；门面同一性+域契约测试 3 项 | rf-75
+
 - **工程效能**：**临界文件按域拆分**——`llm/prompts_core.py`（800→350）按职责下沉三子模块（`failure_reasons` 失败原因常量 / `prompts_data_blocks` 上下文数据块与格式化辅助 / `prompts_review` 自审与持仓复盘提示词），`llm/generators.py`（787→444）按生成器域下沉 `generators_singletons`（单例四生成函数）；两文件保留门面 re-export（消费方导入面不变），仅 4 处测试 patch 按「测试指向持有子模块」纪律改指新域；llm-technical/folders 同步 + 门面同一性回归测试 4 项 | rf-626
 
 - **工程效能/发布**：**版本一致性 `--fix` 不再吞空行 + 消除脚本 SyntaxWarning**——`_auto_fix_header` 行首空白类改同行字符类（原 `\s` 含换行，MULTILINE 下吞掉版本头前空行，developer-guide 受损已恢复），docstring 改 raw 串消除 invalid escape 警告；回归补「空行保留 + 跨行不误判 + 无警告编译」用例 | rf-624

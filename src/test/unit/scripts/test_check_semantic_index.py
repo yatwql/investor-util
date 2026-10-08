@@ -9,7 +9,7 @@
   - 注释剔除：tokenize 剔除注释、字符串字面量保留
   - 反向存在性：代码中出现为 True、仅注释提及为 False、__pycache__ 跳过
   - run_checks 三向校验：全通过 / 正向表外键 / 反向僵尸条目 / 合并章 key 缺失 / 标记缺失
-  - 真实仓库冒烟：当前 technical.md + _config_defaults.py + registry.py 一致
+  - 真实仓库冒烟：当前 technical.md + _config_defaults.py + report_section_registry.py 一致
 
 测试通过脚本 import 方式直接复用解析函数，不运行真实 CLI。
 """
@@ -276,6 +276,6 @@ class TestRealRepoSmoke:
     def test_current_repo_passes(self, sem_index):
         doc_text = sem_index._TECHNICAL_MD.read_text(encoding="utf-8")
         defaults_source = sem_index._CONFIG_DEFAULTS.read_text(encoding="utf-8")
-        registry_source = sem_index._REGISTRY_PY.read_text(encoding="utf-8")
+        registry_source = sem_index._SECTION_REGISTRY_PY.read_text(encoding="utf-8")
         findings = sem_index.run_checks(doc_text, defaults_source, registry_source, sem_index._CODE_ROOT)
         assert findings == []

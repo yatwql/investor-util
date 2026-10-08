@@ -671,3 +671,27 @@ def test_fund_purchase_cache_registered_ttl_aligned_with_nav():
     assert not set(purchase.cache_groups) & {"refresh", "preload"}
     # 类型映射：过期清理与派生查询认识该精确键
     assert get_exact_type_map()["fund_purchase_status_table"] == "fund_purchase"
+
+
+class TestFacadeReexports:
+    """两域子模块下沉后门面同一性（回归：导入面与 patch 面不破坏、职责不交叠）。"""
+
+    def test_domain_symbols_are_same_objects(self) -> None:
+        """data_registry.__all__ 每个名字经门面可得且为同一对象（门面即子模块，非副本）。"""
+        from src.python.core import data_registry, registry
+
+        for name in data_registry.__all__:
+            assert getattr(registry, name) is getattr(data_registry, name), name
+
+    def test_report_symbols_are_same_objects(self) -> None:
+        """report_section_registry.__all__ 每个名字经门面可得且为同一对象。"""
+        from src.python.core import registry, report_section_registry
+
+        for name in report_section_registry.__all__:
+            assert getattr(registry, name) is getattr(report_section_registry, name), name
+
+    def test_domain_contract_is_disjoint(self) -> None:
+        """两域 __all__ 互不相交（注册职责边界不重叠，拆分不产生双属主）。"""
+        from src.python.core import data_registry, report_section_registry
+
+        assert set(data_registry.__all__) & set(report_section_registry.__all__) == set()
