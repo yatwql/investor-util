@@ -1,6 +1,6 @@
 # 投资复盘助手 — 实现计划
 > 文档版本：0.12.7-dev
-> **编号源**：`plan-next = 109`（新增计划项取此编号，完成后更新为 +1；已用最大 plan-108，递增保证唯一，归档不回收。若与历史归档冲突，运行 `scripts/check-task-numbering.py` 校验）
+> **编号源**：`plan-next = 110`（新增计划项取此编号，完成后更新为 +1；已用最大 plan-109，递增保证唯一，归档不回收。若与历史归档冲突，运行 `scripts/check-task-numbering.py` 校验）
 
 ---
 
@@ -8,7 +8,7 @@
 
 本文档记录项目的实现计划。已完成的历史版本计划已归档，此处仅跟踪当前迭代中的工作。
 
-**当前迭代**：在办 25 项按「价值 / 收益 / 风险」分三档（2026-10-07 重排，档位定义见「当前迭代待办」）——P1 五项（**plan-71** 转正判据先行 + 风险/核心价值改进 **plan-99/85/91/95**）、P2 十四项（**plan-49/55/83** 等待条件型 + 改进批 **plan-88/89/90/92/93/100/101** + Web 展示借鉴批 **plan-103/104/105/106**）、P3 六项（**plan-70** 死线观察，已有落地设计 `decision-reflection-shadow-design.md`；择机 **plan-87/94/102** + 借鉴批择机 **plan-107/108**）；**plan-85 ~ plan-102** 为 2026-10-07 自审改进盘点迁入批（18 项）；**plan-103 ~ plan-108** 为 2026-10-07 Web 展示借鉴批（awesome-design-md 研究 6 项，立项映射见 [`awesome-design-md-borrow-candidates-research.md`](../plan/awesome-design-md-borrow-candidates-research.md)）；历史批次（**plan-59 ~ plan-84**，含 Vibe-Trading / gs-quant / 工程效能 / TradingAgents-CN 借鉴批）已全部收口，完成态与未采纳记录随档见 [`archived_plan.0.11.x.md`](../archive/v0.11.x/archived_plan.0.11.x.md) 与 [`archived_plan.0.12.x.md`](../archive/v0.12.x/archived_plan.0.12.x.md)，借鉴批研究文档随档在 `docs/archive/v0.12.x/`（plan-66 ~ plan-68 候选现状见「P3」）。
+**当前迭代**：在办 26 项按「价值 / 收益 / 风险」分三档（2026-10-07 重排，档位定义见「当前迭代待办」）——P1 五项（**plan-71** 转正判据先行 + 风险/核心价值改进 **plan-99/85/91/95**）、P2 十五项（**plan-49/55/83** 等待条件型 + 改进批 **plan-88/89/90/92/93/100/101** + Web 展示借鉴批 **plan-103/104/105/106/109**）、P3 六项（**plan-70** 死线观察，已有落地设计 `decision-reflection-shadow-design.md`；择机 **plan-87/94/102** + 借鉴批择机 **plan-107/108**）；**plan-85 ~ plan-102** 为 2026-10-07 自审改进盘点迁入批（18 项）；**plan-103 ~ plan-109** 为 Web 展示借鉴批（awesome-design-md 研究 7 项：2026-10-07 首批 6 项 + 2026-10-08 HTML 报告专项补研追加 plan-109，立项映射见 [`awesome-design-md-borrow-candidates-research.md`](../plan/awesome-design-md-borrow-candidates-research.md)）；历史批次（**plan-59 ~ plan-84**，含 Vibe-Trading / gs-quant / 工程效能 / TradingAgents-CN 借鉴批）已全部收口，完成态与未采纳记录随档见 [`archived_plan.0.11.x.md`](../archive/v0.11.x/archived_plan.0.11.x.md) 与 [`archived_plan.0.12.x.md`](../archive/v0.12.x/archived_plan.0.12.x.md)，借鉴批研究文档随档在 `docs/archive/v0.12.x/`（plan-66 ~ plan-68 候选现状见「P3」）。
 
 > **命名纪律（强制）**：重构/新增的变量名、函数名、注释与文档表述必须与新章节语义相关（如 `position_relationship`/`portfolio_history_drawdown`/`style_factor`/`action`），**绝对禁止用任务编号命名**（F 系列、plan-N、rf-N 等）。任务编号仅在本表作链接锚点，不进入实现层。
 
@@ -159,7 +159,7 @@
 
 **现状与问题**（2026-10-07 Web 展示借鉴批）：报告是「长文 + 密集数字表」阅读场景，但字阶/行高/章节节奏散落模板内联 CSS 未表化；数值列未统一等宽数字与列对齐，几十张表扫读费力——阅读型样板（notion/mintlify）的字阶表与数据密度样板（sentry）的表格规范可直接对照
 
-**动作**：立字阶与行高表（正文/小标题/表格/脚注/图表题注五类）并在模板落地；数值列统一 `font-variant-numeric: tabular-nums` 右对齐 + 正负号语义色（与涨跌口径一致）；章节间距节奏化；明暗两主题按 WCAG AA 过对比度
+**动作**：立字阶与行高表（正文/小标题/表格/脚注/图表题注五类）并在模板落地；数值列统一 `font-variant-numeric: tabular-nums` 右对齐 + 正负号语义色（与涨跌口径一致）；章节间距节奏化；明暗两主题按 WCAG AA 过对比度；宽度与密度分治（正文单列阅读宽、宽表/图表区独享横向密度——数据密度样板 binance「product surfaces where horizontal density matters」）；表格行态统一为族（粘性表头/行悬停/列对齐，斑马纹作可选档——minimax `data-table` 三件套 header/row/hairline 的组件化写法）
 
 ### P3 — 预期实施，有空时安排
 
@@ -206,6 +206,12 @@
 **现状与问题**（2026-10-07 Web 展示借鉴批，择机）：DESIGN.md 的 Do/Don't 若仅靠人审，AI 辅助改动下会失守——项目已有 check-svg/模板结构机检先例，样式面是空白
 
 **动作**：复用 `scripts/_checklib` 立样式护栏检查（候选规则：新增 CSS 禁裸色值必须走角色变量、圆角/间距只取档位值、强调色越权、两面 token 名对表），先 `--ci` 观察模式统计误报，稳定后评估入钩子域与 CI guards；规则文本与 DESIGN.md Do/Don't 逐条同源（依赖 plan-103/104 先行）
+
+#### 🔲 `plan-109` 报告空状态与降级呈现统一（空态样式族 + 文案口径）
+
+**现状与问题**（2026-10-08 Web 展示借鉴批·HTML 报告专项补研）：数据降级是本报告的核心常态面（数据降级治理体系的最终出口），但呈现层未统一——模板/partials 实测并存 4 种占位样式类（`.empty-section` ×19、`.empty-note placeholder-note` ×18 同义组合、`.chart-empty-note` ×5、`.empty-note` ×4）与 5 种近义文案（不可用 / 暂无 / 数据不可用 / 暂无数据 / 无数据），章节间占位观感与口径不一；上游样板的 empty-state 语义分层（状态色 + whisper 弱化文本，mastercard）与全样本「状态语义化」共性可直接对照
+
+**动作**：归并占位样式为一族（章节级 / 单元级 / 图表级三档 + 状态语义色阶）；降级文案口径单源化（「数据不可用 + 原因」句式，与健康检查降级原因同源，HTML/Excel 双端一致）；对照数据状态矩阵（data_status 契约）补「状态 → 观感」映射并写入 DESIGN.md 状态节（plan-103）；20 个 partial 逐一核对切换
 
 ## 归档
 

@@ -59,3 +59,25 @@ Google Stitch 提出的「设计系统纯文本契约」：与 `AGENTS.md`（怎
 
 - 上游规范：Stitch DESIGN.md specification（`https://stitch.withgoogle.com/docs/design-md/specification/`）；上游仓库见文首。
 - 本笔记为中间计划文件（`docs/plan/`），对应任务完成收口时随完成态移入版本归档（沿用借鉴批研究文档惯例）。
+
+## 7. HTML 报告专项补研（2026-10-08 追加，新增 plan-109）
+
+> 方法：对 74 份 DESIGN.md 先排除 9 个标准节筛「非常见节」，再按报告强相关主题（表格密度 / 空状态 / 图表 / 打印 / 数字）逐行扫描硬规则，最后对照我方 `report_template.html` 实测缺口；首扫已覆盖 sentry/linear/notion/kraken（见 §2）不重复。
+
+**上游扫描结论**：
+- 强相关非常见节共 10 家——`intercom`（**Semantic & Report Palette**：产品内图表色独立命名并与营销面颜色显式分离，「in-product chart colors, not marketing surface colors」）；`minimax`（**Data Tables**：table/header/row 三件套逐层指定 bg/ink/type/padding/hairline 到 token）；`ferrari`/`nvidia`（Editorial Surfaces / Accents：长文面克制点缀与 pale-wash callout 底色）；mintlify/miro/mistral/mongodb/notion（Documentation Components：属性行/比较表等文档型组件）。其余样本以营销站组件（logo wall/testimonial/FAQ）为主，报告级硬规则（表格密度/空状态/图表）在上游覆盖稀疏——再次印证 §5「只借结构方法不搬数值」。
+- 数字排版样板：binance（数字用 weight 600「tabular and reliable」、产品面 ~1440px 与「horizontal density matters」）、coinbase（专用 mono 字体族供 tabular numerical data）。
+
+**我方 HTML 报告实测对照（2026-10-08）**：
+- 已完备面（不立项）：打印管线（A4 `@page` + fold.js beforeprint 全展开 + theme.js 强制浅色 + chart-print.js 快照 + 按钮/提示条排除，4 处 `@media print`）；表格已有 sticky 表头 + 行悬停；空数据占位 `.chart-empty-note` 有专节语义（模板内注释「4.12 空值语义」）；`--chart-*` 职责边界已写入 plan-104 现状。
+- 真实缺口：数值列 `tabular-nums` 全模板 **0 处**（plan-106 已立项 ✓）；**占位/降级呈现未统一**——模板与 partials 实测 4 种占位样式类（`.empty-section` ×19、`.empty-note placeholder-note` ×18 同义组合、`.chart-empty-note` ×5、`.empty-note` ×4）+ 5 种近义文案（不可用/暂无/数据不可用/暂无数据/无数据），章节间观感与口径不一。
+
+**立项落点**：
+
+| 补研洞察 | 归属 |
+|---|---|
+| 空态样式族归并 + 降级文案口径单源（对照 mastercard empty-state whisper 分层与全样本状态语义化） | **新增 plan-109**（P2） |
+| 宽度/密度分治（正文单列 vs 宽表横向密度，binance）+ 表格行态统一（minimax 三件套写法） | 扩充 **plan-106** 动作 |
+| 报告图表色板分域声明（intercom Report Palette 方法） | 既有 **plan-104**（`--chart-*` 职责边界）与 **plan-103** Colors/图表节覆盖，不重复立项 |
+| 打印/导出 PDF 版式、营销型组件、上游稀疏的图表/密度硬规则 | 不采纳（前者我方已完备，后者见 §5） |
+
