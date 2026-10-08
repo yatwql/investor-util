@@ -332,8 +332,8 @@ class TestSwitchOffGoldenBaseline(unittest.TestCase):
     后更新基线常量（评审动作，不是自动豁免）。
     """
 
-    _GOLDEN_BASE_SHA256 = "5b2cb32487a9e1077957c7f4cff2d184b047faf8e41994f17fb4eddc46e99e5a"
-    _GOLDEN_FULL_SHA256 = "f307c43b26ddb5d7649df00a65dcdb1ac1f74e549c9fdd5e8d10ef1237121ec6"
+    _GOLDEN_BASE_SHA256 = "e0e0fd08d5bfb20471448196d732d41ee3965997c538c95cbfac032d9c7f0f91"
+    _GOLDEN_FULL_SHA256 = "08051038a5a8a5247d9723cc361a9d6f397399bf0ddf13d52e5715e79ba69754"
 
     def _render(self, **extra) -> str:
         from unittest.mock import patch

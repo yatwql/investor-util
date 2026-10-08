@@ -17,7 +17,7 @@
   --warn: #9a6700;
   --error: #cf222e;
   --focus: #0969da;
-  --radius: 12px;
+  --radius: 8px;  /* DESIGN.md Layout 圆角档：卡面 8px（旧 12px 收敛） */
   --radius-sm: 8px;
   --space-card: 24px;
   --shadow-card: 0 1px 2px rgba(31, 35, 40, 0.05), 0 4px 16px rgba(31, 35, 40, 0.05);
