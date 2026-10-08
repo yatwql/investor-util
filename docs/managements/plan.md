@@ -1,6 +1,6 @@
 # 投资复盘助手 — 实现计划
 > 文档版本：0.12.7-dev
-> **编号源**：`plan-next = 85`（新增计划项取此编号，完成后更新为 +1；已用最大 plan-84，递增保证唯一，归档不回收。若与历史归档冲突，运行 `scripts/check-task-numbering.py` 校验）
+> **编号源**：`plan-next = 103`（新增计划项取此编号，完成后更新为 +1；已用最大 plan-102，递增保证唯一，归档不回收。若与历史归档冲突，运行 `scripts/check-task-numbering.py` 校验）
 
 ---
 
@@ -8,7 +8,7 @@
 
 本文档记录项目的实现计划。已完成的历史版本计划已归档，此处仅跟踪当前迭代中的工作。
 
-**当前迭代**：在办 **plan-49 / plan-55 / plan-83**（用户侧待条件满足）；P3 纪律项 **plan-70/71**（实验功能撤销死线/转正判据，plan-70 已有落地设计 `decision-reflection-shadow-design.md`）；**Vibe-Trading 借鉴批：plan-76/77/78/81 已完成归档（先决门槛全过；plan-76/77 四迭代落地、plan-78 三指标评测判定转正立项 → plan-81 转正实施落地）**（持仓变动复盘 / What-if 回放成本与基准 / 因子目录评测与实施，均带先决门槛，详见 `docs/plan/vibe-trading-borrow-candidates-research.md` 与各设计文档）；**gs-quant 借鉴批：plan-79/80 已完成归档（先决门槛三段全过、四迭代落地）**（事件窗量化对照 / 调仓纪律回放，均带先决门槛，详见 `docs/plan/gs-quant-borrow-candidates-research.md`）；**工程效能批：plan-82/84 已完成归档**（流程耗时优化：收尾触点清单、顺序依赖二分工具、执行纪律修订；发布流程分步编排脚本 `scripts/release.py`）。TradingAgents-CN 借鉴批已收口：plan-59~65 完成、plan-66~68 归档未采纳（详见下方 P3/P4 说明与归档文档）。
+**当前迭代**：在办 23 项按「价值 / 收益 / 风险」分三档（2026-10-07 重排，档位定义见「当前迭代待办」）——P1 六项（**plan-71** 转正判据先行 + 风险/核心价值改进 **plan-98/99/85/91/95**）、P2 十二项（**plan-49/55/83** 等待条件型 + 改进批 **plan-86/88/89/90/92/93/96/100/101**）、P3 五项（**plan-70** 死线观察，已有落地设计 `decision-reflection-shadow-design.md`；择机 **plan-87/94/97/102**）；**plan-85 ~ plan-102** 为 2026-10-07 自审改进盘点迁入批（18 项）；历史批次（**plan-59 ~ plan-84**，含 Vibe-Trading / gs-quant / 工程效能 / TradingAgents-CN 借鉴批）已全部收口，完成态与未采纳记录随档见 [`archived_plan.0.11.x.md`](../archive/v0.11.x/archived_plan.0.11.x.md) 与 [`archived_plan.0.12.x.md`](../archive/v0.12.x/archived_plan.0.12.x.md)，借鉴批研究文档随档在 `docs/archive/v0.12.x/`（plan-66 ~ plan-68 候选现状见「P3」）。
 
 > **命名纪律（强制）**：重构/新增的变量名、函数名、注释与文档表述必须与新章节语义相关（如 `position_relationship`/`portfolio_history_drawdown`/`style_factor`/`action`），**绝对禁止用任务编号命名**（F 系列、plan-N、rf-N 等）。任务编号仅在本表作链接锚点，不进入实现层。
 
@@ -18,7 +18,53 @@
 
 > **P0** = 必须完成才能发布 · **P1** = 当前待办 · **P2** = 下一阶段就绪 · **P3** = 预期实施，有空时安排 · **P4** = 实验功能（缺省关闭，需显式启用）
 
-### P1 — 当前待办
+> **重排说明（2026-10-07）**：全部在办任务按「价值 / 收益 / 风险」三维重排分档——P1 立即执行（转正判据先行、数据完整性与费用风险、核心量化缺口与报告首屏），P2 前置与等待条件已写明、满足即开工，P3 择机与被动观察；编号不表达优先级，重排不改号。
+
+> **改进迁入批（2026-10-07）**：plan-85 ~ plan-102 共 18 项迁自同日自审「改进机会盘点」（新功能/体验改进，非缺陷；原自审编号 rf-626 ~ rf-643 随迁出释放，rf-626 另复用于 review-findings 文件过长临界登记）。迁入时已对照 `docs/archive/` 放弃清单过滤——Brinson 业绩归因、MC 蒙特卡洛情景模拟、Euler 精确风险贡献、申万行业分类迁移、全量行业指数 K 线、仓位硬建议、全市场基金筛选等历史放弃项**不再重提**；唯一重提项 plan-102（报告对话式追问）按归档留下的重提条件（若未来增加交互式报告或对话式 TUI 可重新考虑）先评估后实施。
+
+### P1 — 当前待办（立即执行）
+
+> 入选标准：立即可执行且价值/风险最高——转正判据先行（解锁 plan-49/83 转正族）、数据完整性与费用风险、核心量化缺口与报告首屏呈现。
+
+#### 🔲 `plan-71` 景气度框架诊断（prosperity_framework）转正判据明确化
+
+**动机**：当前最重的实验功能（六维评分卡 + 基金层扩展），声明「需真实组合样本验证评分口径」但无可判定的验收条件，转正遥遥无期。
+
+**动作**：定出可判定的转正条件（拟：① 六维中至少 5 维在真实持仓报告中有非「需核实」数据覆盖；② 评分结论经 1 个发布周期的真实复盘认可与人工比对无显著偏差；③ experiment_stats 记录的启用次数足够支撑观察），满足后按「转正 = 改注册表分组与默认值」流程执行（需求条目 R-PF 同步）。执行需采集用户真实复盘反馈，持用户确认后再动。
+
+#### 🔲 `plan-98` 生成中断缺清理与产物一致性保障
+
+**现状与问题**（2026-10-07 自审迁入）：`orchestrator` 无 KeyboardInterrupt 处理，菜单层仅打印「操作已取消」——中途中断可能留下半成品产物/线程池未收敛/多文件产物只写了一半（原子写只保单文件，不保整批一致性）
+
+**动作**：阶段边界协作式取消（检查取消标志，在安全落点收尾），中断时清理本次临时产物并明确提示哪些已写盘、哪些被丢弃；运行状态记为「已中断」，下次启动不误判为成功
+
+#### 🔲 `plan-99` LLM 运行事前无成本预估与预算上限
+
+**现状与问题**（2026-10-07 自审迁入）：`estimate_cost`/session usage 均为事后统计（完成后才 print_llm_session_usage）；full 模式多模块 + 辩论/深度档开销差异大——跑前不知道这次大约花多少，也无预算熔断
+
+**动作**：生成前按启用模块数 × 模型单价给区间预估并确认（TUI y/N、Web 弹层、CLI `--yes` 跳过）；可选日预算上限（超限时提示降级走缓存或中止），预估失败不阻塞生成
+
+#### 🔲 `plan-85` 组合相对基准缺风险调整超额度量
+
+**现状与问题**（2026-10-07 自审迁入）：已有基准归一化走势对比（`benchmark.normalize_benchmarks`）与单决策/单事件 alpha（decision_settlement / event_impact），但全仓无 `information_ratio` / `tracking_error` / 滚动超额序列——组合级滚动超额曲线、信息比率、跟踪误差、近 12/24 月跑赢基准胜率均未计算，「跑赢基准了吗」只能靠肉眼比归一化曲线
+
+**动作**：基于既有组合 as-if 日频序列 + 基准日线计算滚动 1Y 超额、年化 IR、TE、跑赢月数；落点为组合历史走势章子块（双端同源），样本不足按 technical.md §1.4.5 降级为「数据不足」占位
+
+#### 🔲 `plan-91` 摘要区缺「本期要点」与环比对照
+
+**现状与问题**（2026-10-07 自审迁入）：`summary_section.html` 无环比/上期字段（grep 环比\|上期 = 0 命中）；`pipeline_data.diff`（快照 diff）已计算但只喂 LLM 提示词——读者在首屏看不到「本期关键变化 Top N（新增/清仓/大幅加减仓/评级变化）」与关键指标环比
+
+**动作**：首屏执行摘要卡：3~5 条关键变化 + 关键指标环比行（总市值/总收益率/持仓数/集中度），取数快照 diff 单源；无上期快照时整块降级隐藏，开关关闭时关态产物逐字节不变
+
+#### 🔲 `plan-95` 生成完成后无一键打开
+
+**现状与问题**（2026-10-07 自审迁入）：`finish_report` 仅错误摘要 + 耗时排行 + 按任意键；全仓无 `webbrowser`/`os.startfile`/`xdg-open`——生成完仍要手动进目录找文件（HTML 路径虽有打印但不可直接操作）
+
+**动作**：收尾打印本次产物路径清单 + 询问「按 O 打开输出目录」（跨平台 start/explorer/xdg-open，失败回退打印路径不报错）；Web 侧已有下载入口不受影响
+
+### P2 — 下一阶段就绪（满足条件即开工）
+
+> 入选标准：价值明确、前置与等待条件已写明（用户侧样本与确认 / 真实报告启用积累 / 先决门槛评测），条件满足即开工。
 
 #### 🔲 `plan-49` 景气度框架诊断：转正评估（默认开启）
 
@@ -49,23 +95,71 @@
 
 **预估成本**：低（评测脚本 + 模板渲染 + 一个独立客户端模块）；**价值**：中（仅影响一个出厂默认关闭的模块，收益以「更稳的解析 + 可校准概率」为主，不以成本节约为卖点）。
 
+#### 🔲 `plan-83` 章节类实验转正批次（holding_change_review / whatif_trade_cost / event_window_impact）
+
+**动机**：三项章节级实验（plan-76/77/79 落地）先决门槛均已过审，但 `experiment_stats` 无真实报告启用记录、按「启用次数支撑观察」判据不足以转正；且旧转正定义对章节类形态过于激进（实验组转常规组即默认永远出章）。
+
+**动作**：转正定义已扩展为「**移出实验组、目标组按功能形态选**——常驻读侧增强→常规组（默认开），章节/页签类→报告章节与增强组（默认关、按需开）」（注册表注释与三份手册同步）；待真实报告启用积累且用户确认产物质量后，三项分批执行注册表迁移（每批一次注册表改动 + TUI/Web 编号与分组行、`--experiment` 取值域、报告自述与需求条目同步；转正后产物自述与启用统计随实验组身份移除）。
+
+#### 🔲 `plan-89` 大类资产收益贡献分解缺失
+
+**现状与问题**（2026-10-07 自审迁入）：`category.py` 有分类市值/盈亏统计，但无「总收益中权益贡献 X pp / 固收 Y pp / 现金 Z pp」的贡献占比——报告回答不了「这波赚/亏主要来自哪类资产」
+
+**动作**：本地分类盈亏 ÷ 总盈亏得贡献 pp，与 `return_attribution` 品种 TOP5 同口径分层呈现（大类 → 品种两级）。**边界**：与归档已放弃的 plan-4 Brinson 归因不同——仅用本地资产分类数据，不需基准行业权重/行业指数 K 线，无归档所列 3 项数据源缺口
+
+#### 🔲 `plan-86` 月度收益日历缺失
+
+**现状与问题**（2026-10-07 自审迁入）：全仓无月度收益热力图（近 24~36 个月逐月红绿格）——「哪几个月在亏、是否连亏、盈亏月份分布」这一经典复盘视图不存在（grep 月度收益/monthly_return 仅命中计划回放域）
+
+**动作**：由既有组合日频序列聚合月度收益：HTML 侧热力格（复用 Chart.js/无 JS 回退表格），Excel 侧条件格式行；纯本地计算，零外部依赖
+
+#### 🔲 `plan-88` 危机区间组合表现未量化回放
+
+**现状与问题**（2026-10-07 自审迁入）：`crisis_annotation` 仅在图上标注 2015 股灾 / 2018 贸易摩擦 / 2020 疫情 / 2022 调整四个区间，未计算「组合在各危机区间的实际收益、最大回撤、恢复天数 vs 指数」——「再来一次我扛得住吗」无量化答案
+
+**动作**：切片既有组合与基准日频序列按四窗口统计，输出危机回放小表（Excel 子块 + HTML 表）；窗口首日数据不足则该行显示「数据不足」，不阻塞其余区间
+
+#### 🔲 `plan-90` 交易行为量化分析缺失
+
+**现状与问题**（2026-10-07 自审迁入）：`transactions` 已入报告管线（XIRR 现金流消费），但无行为视角——买入时机分布（追涨杀跌）、盈利/亏损持有期对比（处置效应）、调仓频率与后续表现均未量化
+
+**动作**：基于既有流水纯本地计算持有期分布、买入点相对区间位置、处置效应指标，作为行动建议/决策复盘章子块或 LLM 上下文段。**边界**：仅数据呈现，不涉及归档放弃的「开户/定投交互式对话」（那是交互形态，非分析指标）
+
+#### 🔲 `plan-101` LLM 强刷为全局粒度
+
+**现状与问题**（2026-10-07 自审迁入）：`force` 是布尔全局开关，全模块绕缓存重跑——只想重生成某一个不满意的模块（如 expert_review）做不到，只能全量烧钱或手改缓存文件
+
+**动作**：CLI `--llm-module expert_review`（可重复传参）、TUI [L] 交互多选、Web 勾选；沿用既有模块指纹缓存键，仅对指定模块置 force，其余照常命中缓存
+
+#### 🔲 `plan-96` 主菜单缺运行状态仪表盘
+
+**现状与问题**（2026-10-07 自审迁入）：`print_header` 仅首次使用指引；上次运行时间、缓存健康、数据新鲜度、降级摘要、LLM 配置状态散落在 [V]/[H]/[4]/[S] 四处，启动后要逐个点进去才知系统近况
+
+**动作**：页头常驻一行紧凑状态（上次报告时间 · 缓存过期数 · 数据新鲜度 · 降级源数 · LLM 状态点），全部取自既有 `data_freshness`/`doctor`/缓存统计单源，点对应菜单展开；无数据显示「—」，不新增任何外部调用
+
+#### 🔲 `plan-92` Excel 纯数字呈现，缺可视化辅助
+
+**现状与问题**（2026-10-07 自审迁入）：17 页签全为静态数字与文字，无条件格式（ColorScale/DataBar）/迷你图/openpyxl 原生图表——收益率高低、集中度偏离、偏离度优劣需逐格读数
+
+**动作**：对高价值数值列加色阶/数据条、趋势列加迷你折线（openpyxl 原生能力）；先试点 2~3 个页签（持仓明细/量化指标/集中度），避免全表泛滥、样式膨胀与体积增长，试点认可后再扩
+
+#### 🔲 `plan-93` 历史报告归档无索引导航
+
+**现状与问题**（2026-10-07 自审迁入）：`html_save` 按日期归档到子目录但不生成 index；TUI 无「最近报告」菜单项（grep 历史报告/报告列表 = 0）；Web 有运行历史但 HTML 归档目录本身不可浏览——找上期报告靠翻文件系统
+
+**动作**：生成/刷新 `output_dir/index.html`（按日期列出 Excel/HTML 产物与打开链接），TUI 加「打开输出目录 / 最近报告」入口（与 rf-636 联动）；索引页不泄漏路径以外的本地信息，匿名化口径与报告一致
+
+#### 🔲 `plan-100` CLI 定时任务无完成/失败通知
+
+**现状与问题**（2026-10-07 自审迁入）：无人值守场景只有退出码与日志，成功/失败都要人工翻日志；全仓无 webhook/邮件/系统通知通道
+
+**动作**：可配置通知钩子（webhook URL / 邮件 / 桌面通知，失败必发、成功可选发），载荷含报告类型、产物路径、降级摘要、错误数；未配置时静默跳过（默认关，符合「配置文件不必须存在」惯例）
+
 ### P3 — 预期实施，有空时安排
 
-> **本批 P3 已清空**。源 TradingAgents-CN 仓库研究的 10 项候选（详细分析见 [`tradingagents-cn-borrow-candidates-research.md`](../archive/v0.11.x/tradingagents-cn-borrow-research/tradingagents-cn-borrow-candidates-research.md)）中 plan-59 ~ plan-65 已完成（2026-10-01）：前四项见 [`archived_plan.0.11.x.md`](../archive/v0.11.x/archived_plan.0.11.x.md)，plan-63/64/65 见同文档「LLM 成本调节 / 生成后自检 / 调用级源指定」段；整体设计见 [`report-depth-selfreview-source-override-design.md`](../archive/v0.11.x/llm-depth-selfreview-source-override/report-depth-selfreview-source-override-design.md)。
+> **候选与历史批说明**：源 TradingAgents-CN 仓库研究的 10 项候选（详细分析见 [`tradingagents-cn-borrow-candidates-research.md`](../archive/v0.11.x/tradingagents-cn-borrow-research/tradingagents-cn-borrow-candidates-research.md)）中 plan-59 ~ plan-65 已完成（2026-10-01）：前四项见 [`archived_plan.0.11.x.md`](../archive/v0.11.x/archived_plan.0.11.x.md)，plan-63/64/65 见同文档「LLM 成本调节 / 生成后自检 / 调用级源指定」段；整体设计见 [`report-depth-selfreview-source-override-design.md`](../archive/v0.11.x/llm-depth-selfreview-source-override/report-depth-selfreview-source-override-design.md)。
 >
 > 剩余 P4 三项（plan-66 ~ plan-68）仍为候选；**立项前须先做本仓库现状比对**（rf-510 教训：plan-64 原立项前提「无生成后质检」即被 `llm/fact_checker` 既有实现部分推翻，最终按「分层不重叠」重新定位）。
-
-> **plan-72 已完成归档**（2026-10-03）：本期迭代 1~3（数据链路 → 展示集成 → 文档登记）P0 门禁十项全绿完成（手工真实抓取验收 HTTP 200 / 27,695 行 / `purchase_schema=1`），完成态见 [`archived_plan.0.12.x.md`](../archive/v0.12.x/archived_plan.0.12.x.md)；迭代 4（合并/调仓联动）另立 `plan-74`（已完成归档），设计文档随完成态移入 [`fund-purchase-limit/`](../archive/v0.12.x/fund-purchase-limit/)。
-
-> **plan-73 已完成归档**（2026-10-03）：四迭代（单源渲染器与契约字段 → 主路径四模块接线与指纹 → 辩论/自检/新闻批量覆盖核验 → 文档登记）P0 门禁十项全绿完成；全部 LLM 分析章（标准四模块 + 辩论 pro/con/synthesis + 生成后自检 + 新闻批量）的提示词与缓存指纹同源携带申购限购约束块（`constraint_block` 契约字段，`generate_all_llm` 提取同一实例交统一附录第 4 段），降级态提示词与缓存键双不变。完成态并入 [`archived_plan.0.12.x.md`](../archive/v0.12.x/archived_plan.0.12.x.md)；设计文档 [`fund-purchase-limit-llm-context-design.md`](../archive/v0.12.x/fund-purchase-limit/fund-purchase-limit-llm-context-design.md) 已改「设计 + 已实施」随归档留存。
-
-> **plan-74 已完成归档**（2026-10-03）：四迭代（受限索引与判定原语 → What-if 接线 → 回归网与零改动断言 → 文档登记）P0 门禁十项全绿完成；What-if 目标持仓申购受限提示落地（`restricted_index` 契约字段 + `evaluate_purchase_feasibility` 判定 + Excel/HTML 双端提示块，降级态逐字节回退）。完成态并入 [`archived_plan.0.12.x.md`](../archive/v0.12.x/archived_plan.0.12.x.md)；设计文档 [`fund-purchase-limit-advice-design.md`](../archive/v0.12.x/fund-purchase-limit/fund-purchase-limit-advice-design.md) 已改「设计 + 已实施」随归档留存。
-
-> **plan-75 已完成归档**（2026-10-03）：持仓分类汇总（Excel 区块②末列 + HTML 持仓分类表条件列，两端一致）追加「申购状态」——与区块①同一套单源原语（`purchase_column_visible` 判据 / `format_purchase_status_cell` 文案 / `stale_level` 时效），小计与总计行留空，开关复用 `fund_purchase_limit` 不新增；新增 6 用例，P0 门禁十项全绿。完成态并入 [`archived_plan.0.12.x.md`](../archive/v0.12.x/archived_plan.0.12.x.md)。
-
-> **plan-76 已完成归档**（2026-10-05）：四迭代（快照事件抽取与契约 + 快照保留 60 → 180 天 → 指标纯计算与意图对账 + `detect_account_reorder` 账户重排双形态识别 → 双端复盘面板接线（Excel/HTML 单源，缺省关态逐字节不变）→ LLM 归因双轨（附录第 5 段随四模块+辩论+自检携带 / 串行模块 `holding_change_review` 写章内归因块））P0 门禁全绿；先决门槛三段全过（28 有效期 / 71 事件 / 结论人工认可「有启发」，10-02 全量清仓→10-03 同名新增判定为**疑似账户结构变更**、不作交易结论）。需求 R-HCR-01~06、测试 88 项。完成态并入 [`archived_plan.0.12.x.md`](../archive/v0.12.x/archived_plan.0.12.x.md)；设计文档 [`holding-change-review-design.md`](../archive/v0.12.x/holding-change-review/holding-change-review-design.md) 为「已实施」状态随归档留存（含 §15 实施与验收记录）。
-
-> **plan-77 已完成归档**（2026-10-05）：四迭代（`trade_cost_model` FIFO 批次成本模型 + 费率表选档下沉 `fee_schedule_model` → 费率数据三级可得性（`fund_fee` 链 F10 → akshare 备链 → 过期缓存 + 申购状态表手续费列 + `fund_fee_fallback` 配置兜底）→ `benchmark_index_resolver` 三阶基准映射 + `whatif_cost_panel` 双端面板（Excel 第 5 页签 + HTML⑧ 区，开关 `whatif_trade_cost` 默认关）→ 回归网与文档同步（关态 sha256 黄金断言/换手翻转/双端一致））P0 门禁全绿；先决门槛三段全过（抽样 20 只经真实链路复测两费率侧均 **95% ≥ 80%**、交易日口径与 FIFO 首见日下界三项经用户拍板、30% 换手 ×≈19.5bp 翻转案例人工复核入网）。需求 **R-WIF-12~14**、开关 31 项（实验 5）、TUI 12-28 号。完成态并入 [`archived_plan.0.12.x.md`](../archive/v0.12.x/archived_plan.0.12.x.md)；设计文档 [`whatif-cost-benchmark-design.md`](../archive/v0.12.x/whatif-cost-benchmark/whatif-cost-benchmark-design.md) 为「已实施」状态随归档留存（含 §14 门槛与验收记录）。
 
 #### 🔲 `plan-70` 决策跨期反思闭环（decision_reflection）验证死线
 
@@ -75,29 +169,29 @@
 
 **落地设计**：若判定转正，按 [`decision-reflection-shadow-design.md`](../plan/decision-reflection-shadow-design.md) 四迭代执行（决策条目结构化 → 到期结算器 → doctor 概览增强 → 报告内反思块），该设计以 Vibe-Trading `shadow_account`（extract→backtest→render）为参照；死线未过前不实施。plan-76 持仓变动复盘落地后与其构成「意图 vs 成交」对账（只读，不互写）。
 
-> **plan-78 已完成归档**（2026-10-06）：先决门槛即评测本体，评测脚本 `scripts/factor_zoo_eval.py` 五阶段（目录冻结 → 字段可得 → 信号相关 → 耗时基线 → 判定汇总）实测三指标全过——**A 23/25 = 92% ≥ 80%、B 19/23 = 82.6% ≥ 30%（分母 23 ≥ 10，`rebalance_overflow` 族按设计降级）、C 冷启动 12.831s ÷ 报告基线 446.255s = 2.9% ≤ 20%** → **判定：转正立项**（评测产物 `docs/tmp/factor-zoo/`，判定书口径预注册与复算说明）；25 因子五族目录与门槛口径冻结于设计文档，40 项脚本单测入网；设计文档 [`factor-zoo-catalog-design.md`](../archive/v0.12.x/factor-zoo-catalog/factor-zoo-catalog-design.md) 为「已评测·判定转正立项」状态随归档留存（含 §13 判定记录）。实施转 **plan-81**；评测期自审 rf-591（对数市值非有限值）已修复、rf-592（push2 扩展字段空值待复核）挂待处理。
+#### 🔲 `plan-97` 生成进行中无 ETA / 阶段预估
 
-> **plan-79 已完成归档**（2026-10-06）：先决门槛三段全过（① 日期可用率 **100%（22/22）≥ 80%**；② 严格 ±5 单源口径经 8 例窗口越界降级实证、半窗截断否决；③ 真实链路采样 10 例人工比对 **9/10 ≥ 7**，用户判定通过）；四迭代落地（`event_window_impact` 纯计算 → `event_impact_panel` 事件表编排 → 报告双端 + LLM 注入 → 文档与门禁）P0 门禁全绿。分歧例块经**统一 prompt 附录**随四模块+辩论+自检携带（开关开启时新闻先行串行注入，解决「极性由 LLM 产出、同轮须进 LLM」的鸡生蛋）；关态逐字节回退、隐藏章不消耗连续编号。开关 **32 项（实验 6）**、TUI 实验段 **8~13**、报告章节序列新增 `event_impact` 章（附录三项顺延）。自审 **rf-594**（Web 面板配置项表实验行缺 whatif 与编号段陈旧）已修复、**rf-593**（`debate_procon_fingerprint` 未并入统一附录块，pre-existing）挂待处理。完成态并入 [`archived_plan.0.12.x.md`](../archive/v0.12.x/archived_plan.0.12.x.md)；设计文档 [`event-window-impact-design.md`](../archive/v0.12.x/event-window-impact/event-window-impact-design.md) 为「已实施」状态随归档留存（含 §14 判定记录）。
+**现状与问题**（2026-10-07 自审迁入）：进度仅 `[..]` 阶段消息，耗时排行要等完成后才输出；`core/perf.py` 已持久化历史阶段耗时但未用于事中预估——full + LLM 长任务只能干等
 
-> **plan-82 已完成归档**（2026-10-06）：耗时分析定位主因为「触点数 × 往返轮次」（门禁机器时间 <3%）；四项落地——① `CLAUDE.md` 执行纪律修订（红线随每批代码跑 / **编辑与 `--sync`/检查永不同批**防竞态 / **提交前免重复十守护**，pre-commit 钩子内含 `--sync`+十守护 / **收尾一次性枚举全量 finding 批量修**）；② `developer-guide.md`「计划收尾：文档触点清单与一次性枚举」（按任务类型列触点全集 + 三步工作流）；③ `scripts/find-order-dependent-test.py` 顺序依赖污染源二分（单跑确认 → 复现门 → 记忆化前缀二分 → 配对确认/预算内精简，22 项单测含端到端）；④ guard 测试写死派生量全仓审计（12 处命中均为合成夹具/固定内容/结构不变量，无遗留）。不降低任何检查强度，完成态并入 [`archived_plan.0.12.x.md`](../archive/v0.12.x/archived_plan.0.12.x.md)。
+**动作**：基于 perf 历史同阶段中位数显示「当前阶段 / 预计剩余」，历史不足时仅显示已耗时；CLI verbose 与 Web 进度条同源受益，计算失败静默降级为无 ETA
 
-> **plan-81 已完成归档**（2026-10-06）：按设计 §3 语义命名落地四组件——`schemas/factor_catalog.py`（25 条五来源族冻结目录 + 中性点字典 + 字段类型路由，装载前完整性校验）、`fetcher/factor_catalog_loader.py`（装载校验拒载降级 + 四类输入备数逐类型失败入 unavailable 不外抛）、`analysis/_factor_formulas.py`（25 因子公式纯计算原语，无 I/O）、`analysis/factor_evaluator.py`（池构造：直接持仓 ∪ 穿透 A 股 → 逐因子池内横截面 → 中性相对与评级，全链 fail-soft）；`signal_ledger` 第 6 类 `factor_catalog`（「因子目录」，每日单条组合级快照）+ 报告呈现「风格与因子分析」章内**区块四**（Excel `_write_catalog_block` + HTML 模板块同源三态，关态产物逐字节不变）。开关第 33 项入实验组（实验 7），TUI 实验段 8~14、后续编号顺延；需求 **R-FCT-01~05** 入 §6.14、testplan 批 9 载体、三个新测试文件 + 四个既有文件用例扩充。前置 rf-592 复核结论入档（源侧字段策略变更 + 端点断连两次实测，`fund_pb`/`fund_size_log_cap` 判不可得-降级、目录条目保留待源恢复，归档已解决）。
+#### 🔲 `plan-87` 相关性分析为静态单点
 
-> **plan-80 已完成归档**（2026-10-07）：先决门槛三段全过（① 指标原语复用核对 ≥3 处——LOCF/归一/指标/日历经 `whatif_backtest` 公共出口与 `metrics*`/`trading_calendar` 复用，零新造引擎；② 成本软依赖 `trade_cost_model` 声明并落地两态（可得逐笔 FIFO 计入 / 不可用「未计成本」双回显）；③ 真实样例 2 组——支付宝场外账户 7 只近 12 个月回放（A 月度定期 37.16% / B 阈值 5pp 38.78% vs 买入持有 32.85%，夏普 1.25/1.27 vs 1.14，缺口 ≤0.4%），用户判定「有启发、想持续看」）；四迭代落地（`replay_schedule` 契约与 `schedule_replay` 回放纯计算 → 成本软接入 → `schedule_replay_panel` 双端面板 + LLM 统一附录引用段 → 文档与门禁）P0 门禁全绿（`dev-verify` 5868 passed、十守护 0 finding）。开关 **34 项（实验 8）**、TUI 实验段 **8~15**、报告章节序列新增 `schedule_replay` 章（附录三项顺延至 18/19/20，隐藏章不消耗连续编号）。需求 **R-SR-01~05**、测试 58 项新用例 + 19 处既有同步。完成态并入 [`archived_plan.0.12.x.md`](../archive/v0.12.x/archived_plan.0.12.x.md)；设计文档 [`rebalance-schedule-replay-design.md`](../archive/v0.12.x/rebalance-schedule-replay/rebalance-schedule-replay-design.md) 为「已实施」状态随归档留存（含 §14 实施与门槛判定记录）。
+**现状与问题**（2026-10-07 自审迁入）：`correlation.py` 仅 `compute_correlation_matrix` 全区间静态矩阵，无滚动窗口——分散化是否随时间失效（危机期相关性系统性抬升）不可见
 
-> **plan-84 已完成归档**（2026-10-07）：`scripts/release.py` 七子命令分步编排落地——`check` 预检（分支/工作树/版本形态/tag/版本一致性）、`prepare` 版本全链 + changelog 发布段归档 + 一致性 `--fix` 传播、`refresh` bench+collect+sync、`evolution` 演进对照按 git 清单 + 逐文件行数口径快照（`--release` 双列，默认只滚开发列）、`gate` P2 regression + 十守护、`publish` release 提交 + P1 verify + `--no-ff` 合并 + tag（默认不推送）、`devbump` 切开发版，共 49 项单测（版本纯函数/归档迁移/预检/演进/门禁/编排序列，`FakeRunner` 子进程替身不触真 git 网络）；文档触点（CLAUDE 发布编排 bullet / developer-guide 发布类速查与版本发布流程编排提示 / technical 约束外参照 / folders 目录树）同源登记，完成态并入 [`archived_plan.0.12.x.md`](../archive/v0.12.x/archived_plan.0.12.x.md)。
+**动作**：滚动 60/120 日组合平均相关性 + 重点品对滚动相关（序列复用 `downsample` 降采样）；呈现为走势章附线或矩阵时间条，历史长度不足时按可得区间截断并标注口径
 
-#### 🔲 `plan-83` 章节类实验转正批次（holding_change_review / whatif_trade_cost / event_window_impact）
+#### 🔲 `plan-94` 图表数据无导出通道
 
-**动机**：三项章节级实验（plan-76/77/79 落地）先决门槛均已过审，但 `experiment_stats` 无真实报告启用记录、按「启用次数支撑观察」判据不足以转正；且旧转正定义对章节类形态过于激进（实验组转常规组即默认永远出章）。
+**现状与问题**（2026-10-07 自审迁入）：HTML 9 图数据仅存在于 JS 数据集，读者想二次分析（透视/自绘图）只能手动誊抄；无 CSV 导出
 
-**动作**：转正定义已扩展为「**移出实验组、目标组按功能形态选**——常驻读侧增强→常规组（默认开），章节/页签类→报告章节与增强组（默认关、按需开）」（注册表注释与三份手册同步）；待真实报告启用积累且用户确认产物质量后，三项分批执行注册表迁移（每批一次注册表改动 + TUI/Web 编号与分组行、`--experiment` 取值域、报告自述与需求条目同步；转正后产物自述与启用统计随实验组身份移除）。
+**动作**：每图「导出 CSV」前端 Blob 下载（纯本地零后端），或报告产物附一份 `chart_data.csv`；导出内容沿用匿名化脱敏口径，与屏显一致
 
-#### 🔲 `plan-71` 景气度框架诊断（prosperity_framework）转正判据明确化
+#### 🔲 `plan-102` 报告对话式追问（重提，归档重提条件已满足）
 
-**动机**：当前最重的实验功能（六维评分卡 + 基金层扩展），声明「需真实组合样本验证评分口径」但无可判定的验收条件，转正遥遥无期。
+**现状与问题**（2026-10-07 自审迁入）：归档 `better-investment-advice` §4.2 放弃「反问引导/对话式」的理由是「单向报告无法承载交互」，并明注「**若未来增加交互式报告或对话式 TUI 可重新考虑**」——现 Web 交互渠道已落地，该条件已成立；读者看完报告想追问（「为什么说集中度偏高？」）目前只能重跑 LLM 模块
 
-**动作**：定出可判定的转正条件（拟：① 六维中至少 5 维在真实持仓报告中有非「需核实」数据覆盖；② 评分结论经 1 个发布周期的真实复盘认可与人工比对无显著偏差；③ experiment_stats 记录的启用次数足够支撑观察），满足后按「转正 = 改注册表分组与默认值」流程执行（需求条目 R-PF 同步）。执行需采集用户真实复盘反馈，持用户确认后再动。
+**动作**：按新 plan 立项评估（不直接实现）：Web 报告页「就本期报告追问」输入框，会话内多轮，上下文 = 报告关键数据 + 首问摘要，复用既有 provider 链/预算/降级/事实校验；成本与缓存策略先行设计，TUI 侧后置。**明确不做**：仓位硬建议、全市场筛选仍守归档边界
 
 ## 归档
 
