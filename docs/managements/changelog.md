@@ -9,6 +9,8 @@
 
 ## [0.12.7-dev] - 开发中（未发布）
 
+- **工具/缺陷**：**性能基准报告三处缺陷修复**——测试时间随运行时刻动态生成（`_test_time_text`）；持仓规模文案按实际样本派生（新增 `PerfSample` + 账户口径 `_sample_of`，概述/表格/结论三处同源出数，港股不再被按代码位数误计为基金），股票样本池扩到 50 支使 `_PHASE3_STOCK_COUNT` 被覆盖、`[:N]` 静默截断消失；LLM mock patch 目标改为包属性 `src.python.llm.generate_all_llm`（与 `_llm_news` 函数内 import 读取点一致）+ 返回值对齐 `generate_all_llm` 8 元组契约（经核查 both 路径 `enable_llm=False`、原 patch 本就无效）；回归测试 18 项（摘除修复后 16 项红） | rf-631
+
 - **工程效能/缺陷**：**scripts 退出码 docstring 契约族补正**——`check-test-markers` 声明「0/1」而实现走 `_checklib.report()` 实为 0/2；`check-file-length` / `check-style-guardrails` / `check-version-consistency` 缺「退出码」声明节（后者 usage 还错写「不一致退出 1」）；`check-requirement-trace` 的 0/2 同行不成节；CLAUDE「scripts 共享设施与契约」段未涵盖 `check-doc-traces` 的 1=HIGH 分级——逐处补正，并把分级退出码特例（code-traces / doc-traces / svg / version-consistency 事实源不可读）写进契约段与 plan-110 白名单；防再犯由 plan-110 机检承接 | rf-630
 
 - **报告安全/缺陷**：**持仓匿名化代码面改在渲染点掩码**——HTML 自由文本清扫剥离代码（原实现把真码并入整份 HTML 子串替换，与「数字串全局替换有金额误伤风险、刻意不在 HTML 自由文本换代码」的前提相悳，实测 `1600519.00` 会被改成 `1000XXX.00` 破坏金额与 JSON 数值；summary 模式映射不含代码，明细以外章节真码裸奔）；新增 `build_code_display_map` / `mask_holding_code` / `code_masking_enabled` / `mask_code_text`（**边界安全**精确键替换，相邻非数字/小数点/冒号才认作独立代码 token）与模板 `anon_code` pass_context 过滤器，9 份 partial 代码列在渲染点键控折叠（列表型 codes 逐项 map），演进图表 `top_holdings` 代码在数据层折叠，LLM 提示词组装点折叠且代码白名单块改写为「真码一律不写」反幻觉约束；数值面评估：派生章节数值为公开市场/财报数据、保留原值，仓位面已由明细层 full 千位模糊 / summary 大类聚合覆盖；回归 = 产物级 HTML 真码断言 + 匿名化映射/边界安全替换/过滤器/图表数据层/提示词五组单测，手册 §L 改写 | rf-628
