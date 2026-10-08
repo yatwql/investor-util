@@ -420,9 +420,9 @@ class TestHtmlTocGroupedNav(unittest.TestCase):
         self.assertIn("flex-wrap: wrap", self._template_css(), "section-nav 应允许换行避免横向溢出")
 
     def test_toc_hidden_on_narrow_screen(self):
-        """窄屏（≤899px）隐藏左侧目录，移动端不因目录溢出。"""
+        """窄屏（≤1023px）隐藏左侧目录，移动端不因目录溢出。"""
         css = self._template_css()
-        self.assertRegex(css, r"@media \(max-width: 899px\)", "应存在窄屏断点样式")
+        self.assertRegex(css, r"@media \(max-width: 1023px\)", "应存在窄屏断点样式")
         self.assertRegex(
             css,
             r"\.toc-sidebar[\s,]*\.toc-toggle-btn\s*\{[^}]*display:\s*none",

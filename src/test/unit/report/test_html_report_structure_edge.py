@@ -242,25 +242,25 @@ class TestHtmlTocStatic(unittest.TestCase):
         self.assertIn(".toc-list a.active", self.tmpl)
 
     def test_toc_narrow_screen_hidden(self):
-        """窄屏（< 900px）隐藏左侧栏，保留横向 section-nav。"""
+        """窄屏（< 1024px）隐藏左侧栏，保留横向 section-nav。"""
         match = re.search(
-            r"@media\s*\(max-width:\s*899px\)\s*\{(.*?)\}",
+            r"@media\s*\(max-width:\s*1023px\)\s*\{(.*?)\}",
             self.tmpl,
             re.DOTALL,
         )
-        self.assertIsNotNone(match, "应存在 max-width: 899px 响应式块")
+        self.assertIsNotNone(match, "应存在 max-width: 1023px 响应式块")
         block = match.group(1)
         self.assertIn(".toc-sidebar", block, "窄屏块应隐藏 .toc-sidebar")
         self.assertIn(".toc-toggle-btn", block, "窄屏块应隐藏展开按钮")
 
     def test_toc_wide_screen_content_shift(self):
-        """宽屏（>= 900px）展开时内容让出左侧栏。"""
+        """宽屏（>= 1024px）展开时内容让出左侧栏。"""
         match = re.search(
-            r"@media\s*\(min-width:\s*900px\)\s*\{(.*?)\}",
+            r"@media\s*\(min-width:\s*1024px\)\s*\{(.*?)\}",
             self.tmpl,
             re.DOTALL,
         )
-        self.assertIsNotNone(match, "应存在 min-width: 900px 响应式块")
+        self.assertIsNotNone(match, "应存在 min-width: 1024px 响应式块")
         block = match.group(1)
         self.assertIn("margin-left: 220px", block, "宽屏展开时 .container 应让出 220px 左侧栏")
 

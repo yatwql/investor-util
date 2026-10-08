@@ -5,6 +5,8 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>个人投资分析报告 - {{ now }}</title>
     <style>
+        /* 移动阅读：禁横屏/字号自动放大（iOS text-size-adjust） */
+        html { -webkit-text-size-adjust: 100%; text-size-adjust: 100%; }
         :root {
             /* 设计 token — 跨面共享角色（DESIGN.md Colors；Web 工作台同名对齐） */
             --primary: #2E75B6;
@@ -206,6 +208,12 @@
         tr:nth-child(even) { background: var(--table-even); }
         tr:hover { background: var(--table-hover); }
 
+        /* 宽表首列冻结（窄屏横滚时标签列常显；打印归位） */
+        thead th:first-child, tbody td:first-child { position: sticky; left: 0; z-index: 1; background: var(--surface); }
+        thead th:first-child { background: var(--table-th-bg); z-index: 3; }
+        tr:nth-child(even) td:first-child { background: var(--table-even); }
+        tr:hover td:first-child { background: var(--table-hover); }
+        .kv-table tr:nth-child(even) td:first-child { background: var(--surface); }
         .subtotal-row { background: var(--subtotal-bg) !important; font-weight: 600; }
         .subtotal-row td { border-top: 2px solid var(--primary); }
         .grand-total-row { background: var(--grand-total-bg) !important; font-weight: 700; }
@@ -415,6 +423,7 @@
         details.section-fold { border: 1px solid var(--border-color, rgba(128,128,128,0.25)); border-radius: 8px; margin-top: 8px; background: var(--card-bg, transparent); }
         details.section-fold > summary.section-fold-summary {
             display: flex; align-items: center; gap: 6px;
+            min-height: 44px;
             padding: 9px 14px; font-size: var(--fs-table-sm); color: var(--text-muted);
             cursor: pointer; list-style: none; user-select: none;
             background: var(--source-tag-bg, rgba(128,128,128,0.08));
@@ -435,7 +444,7 @@
         /* 收起状态：侧栏移出视口 + 浮动展开按钮 */
         .toc-toggle-btn {
             position: fixed; left: 12px; top: 12px; z-index: 101;
-            display: none; width: 38px; height: 38px; border-radius: 6px;
+            display: none; width: 44px; height: 44px; border-radius: 6px;
             background: var(--primary); color: #fff; border: none; cursor: pointer;
             font-size: var(--fs-h2); line-height: 1; box-shadow: 0 2px 6px rgba(0,0,0,0.25);
         }
@@ -443,7 +452,7 @@
         /* ── 主题切换按钮（暗色模式（主题切换）；浮动右上角，两种模板通用）── */
         .theme-toggle-btn {
             position: fixed; right: 12px; top: 12px; z-index: 101;
-            width: 38px; height: 38px; border-radius: 50%;
+            width: 44px; height: 44px; border-radius: 50%;
             background: var(--primary); color: #fff; border: none; cursor: pointer;
             font-size: var(--fs-h2); line-height: 1; box-shadow: 0 2px 6px rgba(0,0,0,0.25);
             display: flex; align-items: center; justify-content: center;
@@ -452,12 +461,12 @@
         body.toc-collapsed .toc-sidebar { transform: translateX(-105%); }
         body.toc-collapsed .toc-toggle-btn { display: block; }
         /* 宽屏：展开时内容让出左侧栏 */
-        @media (min-width: 900px) {
+        @media (min-width: 1024px) {
             .container { margin-left: 220px; }
             body.toc-collapsed .container { margin-left: 0; }
         }
         /* 窄屏：隐藏左侧栏，保留横向 section-nav 导航 */
-        @media (max-width: 899px) {
+        @media (max-width: 1023px) {
             .toc-sidebar, .toc-toggle-btn { display: none; }
             .container { margin-left: 0 !important; }
         }
@@ -512,7 +521,7 @@
             /* 回到顶部按钮 */
             .back-to-top {
                 display: block; position: fixed; bottom: 16px; right: 16px;
-                width: 40px; height: 40px; border-radius: 50%;
+                width: 44px; height: 44px; border-radius: 50%;
                 background: var(--primary); color: #fff; border: none;
                 font-size: var(--fs-h2); cursor: pointer; box-shadow: 0 2px 8px rgba(0,0,0,0.2);
                 z-index: 999; opacity: 0.85;
@@ -523,6 +532,12 @@
             .source-tag-industry, .source-tag-concept {
                 font-size: var(--fs-footnote); padding: 0px 4px; margin: 0;
             }
+        }
+
+        /* ── 触屏档（≤768）：触控目标 ≥44px（DESIGN Responsive 契约）── */
+        @media (max-width: 768px) {
+            .toc-list a, .back-to-top-link a { display: flex; align-items: center; min-height: 44px; }
+            .chart-export-btn { min-height: 44px; }
         }
 
         /* ── 超小屏（320px-480px）──────────────── */
@@ -554,6 +569,9 @@
             .toc-sidebar,
             .toc-toggle-btn,
             .theme-toggle-btn { display: none !important; }
+
+            /* 宽表首列冻结归位（打印不冻结） */
+            thead th:first-child, tbody td:first-child { position: static; }
 
             /* 表头跨页重复 */
             thead { display: table-header-group; }

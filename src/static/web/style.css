@@ -1120,7 +1120,20 @@ a:hover {
   text-decoration: underline;
 }
 
-/* ── 响应式（375px 移动端不溢出）── */
+/* ── 触屏档（≤768）：触控目标 ≥44px（DESIGN Responsive 契约）── */
+@media (max-width: 768px) {
+  .tab-btn,
+  .theme-toggle,
+  .btn,
+  input[type='text'],
+  input[type='file'],
+  select,
+  textarea {
+    min-height: 44px;
+  }
+}
+
+/* ── 响应式（窄屏移动端不溢出）── */
 @media (max-width: 480px) {
   .app-header,
   .app-main,
