@@ -542,8 +542,8 @@ class TestSummaryDateTimeValueStyles(unittest.TestCase):
         )
         self.assertRegex(
             style,
-            r"font-size:\s*1[5-9]px",
-            f"所属交易日字号应加大，style={style!r}",
+            r"font-size:\s*(?:1[5-9]px|var\(--fs-(?:h1|h2|h3|kpi)\))",
+            f"所属交易日字号应在章节/数值大字档，style={style!r}",
         )
         self.assertRegex(
             style,

@@ -22,7 +22,7 @@
 <div class="section" id="sec-action" style="order: {{ section_numbers['action'] }};">
     <div class="section-title">
         {{ section_numbers['action'] }}、{{ section_names['action'] }}
-        <span style="font-size:12px;font-weight:400;opacity:0.8;margin-left:8px;">再平衡信号 · 交易纪律 · 调仓建议 · 收益归因</span>
+        <span style="font-size: var(--fs-table-sm);font-weight:400;opacity:0.8;margin-left:8px;">再平衡信号 · 交易纪律 · 调仓建议 · 收益归因</span>
     </div>
     {% if _action.get("available") %}
     <div class="section-content">
@@ -32,7 +32,7 @@
 
         <!-- ① 再平衡信号（单品占比超警戒线） -->
         {% set _rb = _action.get("rebalance_signals") or [] %}
-        <div style="font-weight: bold; font-size: 14px; margin: 10px 0 6px;">① 再平衡信号（单品占比超警戒线）</div>
+        <div style="font-weight: bold; font-size: var(--fs-body); margin: 10px 0 6px;">① 再平衡信号（单品占比超警戒线）</div>
         {% if _rb %}
         <div style="overflow-x:auto;">
         <table>
@@ -58,7 +58,7 @@
 
         <!-- ② 交易纪律（止盈/止损/回撤，后续轮次填充） -->
         {% set _ds = _action.get("discipline_signals") or [] %}
-        <div style="font-weight: bold; font-size: 14px; margin: 18px 0 6px;">② 交易纪律（止盈/止损/回撤）</div>
+        <div style="font-weight: bold; font-size: var(--fs-body); margin: 18px 0 6px;">② 交易纪律（止盈/止损/回撤）</div>
         {% if _ds %}
         <div style="overflow-x:auto;">
         <table>
@@ -84,7 +84,7 @@
 
         <!-- ③ 调仓建议（可行化清单：份额取整一手/费用估算/现金缓冲） -->
         {% set _adv = _action.get("rebalance_advice") or [] %}
-        <div style="font-weight: bold; font-size: 14px; margin: 18px 0 6px;">③ 调仓建议清单</div>
+        <div style="font-weight: bold; font-size: var(--fs-body); margin: 18px 0 6px;">③ 调仓建议清单</div>
         {% if _adv %}
         <div style="overflow-x:auto;">
         <table>
@@ -112,7 +112,7 @@
 
         <!-- ④ 收益归因（品种贡献占比，TOP5 正负分列 + 净额合计） -->
         {% set _attr = _action.get("attribution") %}
-        <div style="font-weight: bold; font-size: 14px; margin: 18px 0 6px;">④ 收益归因（品种贡献占比）</div>
+        <div style="font-weight: bold; font-size: var(--fs-body); margin: 18px 0 6px;">④ 收益归因（品种贡献占比）</div>
         {% if _attr and _attr.get("available") %}
         <div style="overflow-x:auto;">
         <table>
@@ -150,7 +150,7 @@
         <!-- ⑦ 市场情绪与持仓热点（报告增强开关 market_sentiment，默认关闭） -->
         {% set _ms = market_sentiment_data or {} %}
         {% if market_sentiment_data is not none %}
-        <div style="font-weight: bold; font-size: 14px; margin: 18px 0 6px;">⑦ 市场情绪与持仓热点</div>
+        <div style="font-weight: bold; font-size: var(--fs-body); margin: 18px 0 6px;">⑦ 市场情绪与持仓热点</div>
         {% if _ms.get("available") %}
         <div class="summary-tag" style="margin-bottom: 8px;">
             📣 交易日 <strong>{{ _ms.get("trade_date") or "未知" }}</strong>
@@ -159,7 +159,7 @@
             {% for k, v in (_ms.get("summary", {}).get("board_caps") or {}).items() %}{{ k }} {{ v }} 家{% if not loop.last %}；{% endif %}{% endfor %}
         </div>
         {% if not _ms.get("rows") %}
-        <div style="font-size:12px;color:var(--text-muted);margin:4px 0 8px;">{{ _ms.get("reason") or "当日无命中事件" }}</div>
+        <div style="font-size: var(--fs-table-sm);color:var(--text-muted);margin:4px 0 8px;">{{ _ms.get("reason") or "当日无命中事件" }}</div>
         {% else %}
         <div style="overflow-x:auto;">
         <table>
@@ -173,7 +173,7 @@
                     <td>{{ r.get("code", "") }}</td>
                     <td>{{ r.get("holding_kind", "") }}</td>
                     <td>{{ r.get("event_type", "") }}</td>
-                    <td class="text-left" style="font-size:12px;">
+                    <td class="text-left" style="font-size: var(--fs-table-sm);">
                         {% if r.get("event_type") == "龙虎榜" %}
                             净买额 {{ r.get("net_value_yi") }} 亿
                             {% if r.get("hot_money_net_value_yi") is not none %}｜游资 {{ r.get("hot_money_net_value_yi") }} 亿{% endif %}
@@ -193,10 +193,10 @@
         {% else %}
         <div class="summary-tag">{{ _ms.get("reason") or "暂无可用情绪数据" }}</div>
         {% for f in _ms.get("failures", []) %}
-        <div style="font-size:12px;color:var(--text-muted);">⚠ {{ f.get("source", "") }}：{{ f.get("reason", "") }}</div>
+        <div style="font-size: var(--fs-table-sm);color:var(--text-muted);">⚠ {{ f.get("source", "") }}：{{ f.get("reason", "") }}</div>
         {% endfor %}
         {% endif %}
-        <div style="font-size:12px;color:var(--text-muted);margin-top:4px;">
+        <div style="font-size: var(--fs-table-sm);color:var(--text-muted);margin-top:4px;">
             * 仅列持仓/穿透标的命中当日龙虎榜或连板梯队的事件（按代码精确匹配，不做概念联想）；非投资建议
         </div>
         {% endif %}
@@ -204,11 +204,11 @@
         <!-- ⑥ 景气度框架诊断（实验性功能 prosperity_framework，默认关闭） -->
         {% set _pf = prosperity_framework_data or {} %}
         {% if _pf.get("available") %}
-        <div style="font-weight: bold; font-size: 14px; margin: 18px 0 6px;">⑥ 景气度框架诊断（实验性）</div>
+        <div style="font-weight: bold; font-size: var(--fs-body); margin: 18px 0 6px;">⑥ 景气度框架诊断（实验性）</div>
         <div class="summary-tag" style="margin-bottom: 8px;">
             🧭 总分 <strong>{{ _pf.get("total_score", 0) }}</strong>/{{ _pf.get("scored_weight", 0) }}
             （{{ _pf.get("total_score_pct", 0) }}%）—— 评级：<strong>{{ _pf.get("rating_label", "") }}</strong>
-            {% if _pf.get("unverified") %}<span style="color:var(--text-muted);font-size:12px;">（{{ _pf.get("unverified") | length }} 维数据缺失，未计分）</span>{% endif %}
+            {% if _pf.get("unverified") %}<span style="color:var(--text-muted);font-size: var(--fs-table-sm);">（{{ _pf.get("unverified") | length }} 维数据缺失，未计分）</span>{% endif %}
         </div>
         <div style="overflow-x:auto;">
         <table>
@@ -221,7 +221,7 @@
                     <td class="text-left">{{ d.get("name", "") }}</td>
                     <td>{{ d.get("score", 0) }}</td>
                     <td>{{ d.get("max_score", 0) }}</td>
-                    <td class="text-left" style="font-size:12px;">
+                    <td class="text-left" style="font-size: var(--fs-table-sm);">
                         {% if d.get("status") == "unverified" %}
                             {{ (d.get("unverified") or ["数据缺失，未计分"]) | join("；") }}
                         {% else %}
@@ -235,7 +235,7 @@
         </table>
         </div>
         {% if _pf.get("holdings_view") %}
-        <div style="font-weight: bold; font-size: 13px; margin: 12px 0 6px;">持仓视角（按权重降序，前 10）</div>
+        <div style="font-weight: bold; font-size: var(--fs-table); margin: 12px 0 6px;">持仓视角（按权重降序，前 10）</div>
         <table>
             <thead><tr><th>名称（代码）</th><th>权重</th><th>板块</th><th>ROE / 备注</th></tr></thead>
             <tbody>
@@ -244,7 +244,7 @@
                     <td class="text-left">{{ item.get("name", "") }}（{{ item.get("code", "") }}）</td>
                     <td>{{ item.get("weight_pct", 0) }}%</td>
                     <td class="text-left">{{ item.get("sector", "") }}</td>
-                    <td class="text-left" style="font-size:12px;">
+                    <td class="text-left" style="font-size: var(--fs-table-sm);">
                         {% if item.get("roe") is not none %}ROE {{ "%.2f%%"|format(item.get("roe") * 100) }}{% else %}ROE 需核实{% endif %}
                         {% if item.get("notes") %}｜{{ item.get("notes") | join("；") }}{% endif %}
                     </td>
@@ -262,8 +262,8 @@
         <!-- ⑤ 历史决策复盘（决策跨期反思闭环，默认关闭） -->
         {% set _rev = decision_review_data or {} %}
         {% if _rev.get("available") %}
-        <div style="font-weight: bold; font-size: 14px; margin: 18px 0 6px;">⑤ 历史决策复盘（非回测，仅供反思参考）</div>
-        <div style="font-size:13px;color:var(--text-muted);margin: 2px 0 8px;">{{ _rev.get("disclaimer", "") }}</div>
+        <div style="font-weight: bold; font-size: var(--fs-body); margin: 18px 0 6px;">⑤ 历史决策复盘（非回测，仅供反思参考）</div>
+        <div style="font-size: var(--fs-table);color:var(--text-muted);margin: 2px 0 8px;">{{ _rev.get("disclaimer", "") }}</div>
         <table>
             <thead>
                 <tr>
@@ -315,7 +315,7 @@
     <div class="section-content">
         <div class="empty-note placeholder-note">
             <p><strong>无持仓数据，行动建议无法生成</strong></p>
-            <p style="margin-top:8px;font-size:13px;color:var(--text-muted);">行情数据不可用或持仓为空，待数据就绪后自动生成。</p>
+            <p style="margin-top:8px;font-size: var(--fs-table);color:var(--text-muted);">行情数据不可用或持仓为空，待数据就绪后自动生成。</p>
         </div>
     </div>
     {% endif %}

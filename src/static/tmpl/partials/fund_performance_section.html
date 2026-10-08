@@ -20,8 +20,8 @@
                         <td class="{% if p.get('syl_1y_raw') is defined and p['syl_1y_raw'] is number %}{% if p['syl_1y_raw'] >= 0 %}profit{% else %}loss{% endif %}{% endif %}">{{ p["syl_1y"] }}</td>
                         <td class="text-right" style="color: {{ p.get('profit_raw', 0) | profit_color }}">{{ p["profit"] }}</td>
                         <td class="text-right" style="color: {{ p.get('profit_rate_raw', 0) | profit_color }}">{{ p["profit_rate"] }}</td>
-                        <td class="text-left" style="font-size: 12px;">{{ p["benchmark"] }}</td>
-                        <td class="text-left" style="font-size: 12px;{{ ' color: var(--rating-excellent); font-weight: 600;' if p['rating_tag'] == '优秀' }}{{ ' color: var(--rating-poor); font-weight: 600;' if p['rating_tag'] == '较差' }}{{ ' color: var(--rating-deviation); font-weight: 600;' if p['rating_tag'] == '偏差' }}{{ ' color: var(--rating-stable); font-weight: 600;' if p['rating_tag'] == '稳定' }}">{{ p["rating"] }}</td>
+                        <td class="text-left" style="font-size: var(--fs-table-sm);">{{ p["benchmark"] }}</td>
+                        <td class="text-left" style="font-size: var(--fs-table-sm);{{ ' color: var(--rating-excellent); font-weight: 600;' if p['rating_tag'] == '优秀' }}{{ ' color: var(--rating-poor); font-weight: 600;' if p['rating_tag'] == '较差' }}{{ ' color: var(--rating-deviation); font-weight: 600;' if p['rating_tag'] == '偏差' }}{{ ' color: var(--rating-stable); font-weight: 600;' if p['rating_tag'] == '稳定' }}">{{ p["rating"] }}</td>
                         <td>{{ p["rank"] }}</td>
                     </tr>
                     {% endfor %}
@@ -48,21 +48,21 @@
                     <tr>
                         <td class="text-left">{{ c["name"] }}</td>
                         <td>{{ c["code"] }}</td>
-                        <td class="text-left" style="font-size: 12px;">{{ c["rating"] }}</td>
+                        <td class="text-left" style="font-size: var(--fs-table-sm);">{{ c["rating"] }}</td>
                         <td class="{% if c.get('syl_近1月_raw') is number %}{% if c['syl_近1月_raw'] >= 0 %}profit{% else %}loss{% endif %}{% endif %}">{{ c["syl_近1月"] }}</td>
                         <td class="{% if c.get('syl_近3月_raw') is number %}{% if c['syl_近3月_raw'] >= 0 %}profit{% else %}loss{% endif %}{% endif %}">{{ c["syl_近3月"] }}</td>
                         <td class="{% if c.get('syl_近6月_raw') is number %}{% if c['syl_近6月_raw'] >= 0 %}profit{% else %}loss{% endif %}{% endif %}">{{ c["syl_近6月"] }}</td>
                         <td class="{% if c.get('syl_近1年_raw') is number %}{% if c['syl_近1年_raw'] >= 0 %}profit{% else %}loss{% endif %}{% endif %}">{{ c["syl_近1年"] }}</td>
                         <td>{{ c["rank_text"] }}</td>
                         <td class="{% if c.get('max_drawdown_raw') is number and c['max_drawdown_raw'] < 0 %}loss{% endif %}">{{ c["max_drawdown"] }}</td>
-                        <td class="text-left" style="font-size: 12px;">{{ c["style"] }}</td>
-                        <td class="text-left" style="font-size: 12px;">{% if c.get("overlap_name") %}{{ c["overlap_jaccard"] }}（{{ c["overlap_name"] }}）{% else %}{{ c["overlap_jaccard"] }}{% endif %}</td>
+                        <td class="text-left" style="font-size: var(--fs-table-sm);">{{ c["style"] }}</td>
+                        <td class="text-left" style="font-size: var(--fs-table-sm);">{% if c.get("overlap_name") %}{{ c["overlap_jaccard"] }}（{{ c["overlap_name"] }}）{% else %}{{ c["overlap_jaccard"] }}{% endif %}</td>
                     </tr>
                     {% else %}
                     <tr>
                         <td class="text-left">{{ c.get("name", c["code"]) }}</td>
                         <td>{{ c["code"] }}</td>
-                        <td colspan="9" class="text-left" style="font-size: 12px; color: #b0413e;">数据获取失败（排名接口不可用），该候选跳过</td>
+                        <td colspan="9" class="text-left" style="font-size: var(--fs-table-sm); color: #b0413e;">数据获取失败（排名接口不可用），该候选跳过</td>
                     </tr>
                     {% endif %}
                     {% endfor %}

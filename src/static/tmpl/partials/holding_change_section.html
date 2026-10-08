@@ -22,7 +22,7 @@
 <div class="section" id="sec-holding_change" style="order: {{ section_numbers['holding_change'] }};">
     <div class="section-title">
         {{ section_numbers['holding_change'] }}、{{ section_names['holding_change'] }}
-        <span style="font-size:12px;font-weight:400;opacity:0.8;margin-left:8px;">快照差分事件级操作侧复盘</span>
+        <span style="font-size: var(--fs-table-sm);font-weight:400;opacity:0.8;margin-left:8px;">快照差分事件级操作侧复盘</span>
     </div>
     <details class="section-fold">
         <summary class="section-fold-summary">
@@ -35,7 +35,7 @@
         </div>
 
         <!-- ① 变动事件清单 + 「区间净额推断、非逐笔」标注（同现） -->
-        <div style="font-weight: bold; font-size: 14px; margin: 10px 0 6px;">① 变动事件清单（区间净额推断）</div>
+        <div style="font-weight: bold; font-size: var(--fs-body); margin: 10px 0 6px;">① 变动事件清单（区间净额推断）</div>
         <div style="overflow-x:auto;">
         <table>
             <thead>
@@ -52,15 +52,15 @@
 
         <!-- ② 频率与结构演变 -->
         {% if _hc.get("metrics_lines") %}
-        <div style="font-weight: bold; font-size: 14px; margin: 18px 0 6px;">② 频率与结构演变</div>
-        <div style="font-size: 13px; line-height: 1.9;">
+        <div style="font-weight: bold; font-size: var(--fs-body); margin: 18px 0 6px;">② 频率与结构演变</div>
+        <div style="font-size: var(--fs-table); line-height: 1.9;">
             {% for line in _hc.get("metrics_lines") %}<div>{{ line }}</div>{% endfor %}
         </div>
         {% endif %}
 
         <!-- ③ 意图对账（决策账本只读对照） -->
         {% if _hc.get("intent_rows") or _hc.get("intent_lines") %}
-        <div style="font-weight: bold; font-size: 14px; margin: 18px 0 6px;">③ 意图对账（决策账本只读对照）</div>
+        <div style="font-weight: bold; font-size: var(--fs-body); margin: 18px 0 6px;">③ 意图对账（决策账本只读对照）</div>
         {% if _hc.get("intent_rows") %}
         <div style="overflow-x:auto;">
         <table>
@@ -75,15 +75,15 @@
         </table>
         </div>
         {% endif %}
-        <div style="font-size: 13px; line-height: 1.9;">
+        <div style="font-size: var(--fs-table); line-height: 1.9;">
             {% for line in _hc.get("intent_lines", []) %}<div>{{ line }}</div>{% endfor %}
         </div>
         {% endif %}
 
         <!-- ④ 变动动因 LLM 归因（llm_review 注入后出现；缺席 = 分支隐藏） -->
         {% if _hc.get("llm_review_paragraphs") %}
-        <div style="font-weight: bold; font-size: 14px; margin: 18px 0 6px;">④ 变动动因 LLM 归因</div>
-        <div style="font-size: 13px; line-height: 1.9;">
+        <div style="font-weight: bold; font-size: var(--fs-body); margin: 18px 0 6px;">④ 变动动因 LLM 归因</div>
+        <div style="font-size: var(--fs-table); line-height: 1.9;">
             {% for p in _hc.get("llm_review_paragraphs") %}<p style="margin: 6px 0;">{{ p }}</p>{% endfor %}
         </div>
         {% endif %}
@@ -92,10 +92,10 @@
     <div class="section-content">
         <div class="empty-note placeholder-note">
             <p><strong>持仓变动复盘数据暂不可用</strong></p>
-            <p style="margin-top:8px;font-size:13px;color:var(--text-muted);">
+            <p style="margin-top:8px;font-size: var(--fs-table);color:var(--text-muted);">
                 {{ _hc.get("reason") }}
             </p>
-            <p style="margin-top:12px;font-size:12px;color:var(--text-faint);">
+            <p style="margin-top:12px;font-size: var(--fs-table-sm);color:var(--text-faint);">
                 {{ _hc.get("hint_line") }}
             </p>
         </div>

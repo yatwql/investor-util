@@ -33,7 +33,7 @@
                             {% if _drift == "严重" %}🔴 {{ _drift }}{% elif _drift == "中度" %}⚠️ {{ _drift }}{% elif _drift == "轻度" %}▲ {{ _drift }}{% elif _drift == "基准确立中" %}📋 {{ _drift }}{% else %}✅ {{ _drift }}{% endif %}
                         </td>
                         <td>{{ r.get("drift_score", "--") if r.get("drift_score") is not none else "--" }}</td>
-                        <td style="font-size: 12px;">{{ r.get("remark", "") if r.get("remark") else "" }}</td>
+                        <td style="font-size: var(--fs-table-sm);">{{ r.get("remark", "") if r.get("remark") else "" }}</td>
                         <td>{% if r.get("is_first_check") %}📋 基线{% else %}✅{% endif %}</td>
                     </tr>
                     {% endfor %}
@@ -78,7 +78,7 @@
                                 <div style="flex:1; background:var(--progress-track); border-radius:4px; height:14px;">
                                     <div style="width: {{ _bar_w }}%; height:14px; background:{% if _alloc >= 0.5 %}var(--primary){% elif _alloc >= 0.3 %}#70AD47{% else %}#C00000{% endif %}; border-radius:4px;"></div>
                                 </div>
-                                <span style="font-size:12px; white-space:nowrap;">{{ (_alloc * 100) | round(1) }}%</span>
+                                <span style="font-size: var(--fs-table-sm); white-space:nowrap;">{{ (_alloc * 100) | round(1) }}%</span>
                             </div>
                         </td>
                     </tr>

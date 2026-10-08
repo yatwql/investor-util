@@ -80,7 +80,7 @@
                 </tbody>
             </table>
             {% if purchase_status_display %}
-            <div style="padding: 4px 8px; font-size: 12px; color: {% if purchase_status_display.level == 'stale' %}#B8860B; font-weight: bold;{% else %}#888888;{% endif %}">{{ purchase_status_display.footnote }}</div>
+            <div style="padding: 4px 8px; font-size: var(--fs-table-sm); color: {% if purchase_status_display.level == 'stale' %}#B8860B; font-weight: bold;{% else %}#888888;{% endif %}">{{ purchase_status_display.footnote }}</div>
             {% endif %}
         </div>
 

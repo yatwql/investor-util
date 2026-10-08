@@ -9,6 +9,8 @@
 
 ## [0.12.7-dev] - 开发中（未发布）
 
+- **报告呈现**：**阅读版式与数字排版升级**——两模板（主报告 + What-if）201 处字号字面量收敛为 8 档字阶 token（`--fs-h1/kpi/h2/h3/body/table/table-sm/footnote`，图标 >24px 豁免）+ 3 档行高 token；表格全局 `tabular-nums` + th/td 行高档 + body 行高 1.7；正文行长控制（`.section p` 78ch，宽表/图表保持章节横滚）；章节节奏归档（section-title/block-title 阶外值入档）；WCAG AA 亮色修值（muted `#888`→`#6b6b6b`、faint `#999`→`#6e6e6e`、loss `#009900`→`#007a00`，两模板同步；暗色全套已达标）；What-if 模板补品牌蓝/字体栈 token 化（三面统一）；契约测试 18 项（字阶就位/游离字号零残留/数字排版/78ch/亮暗对比度动态计算），whatif 关态 golden 基线随样式合法刷新 | plan-106
+
 - **设计体系**：**工作台暗色主题与组件状态矩阵补齐**——`style.css` 新增 `[data-theme="dark"]` 暗色变量块（与报告暗色世界同值；品牌蓝不调）+ 组件亮色硬底暗色适配（上传区/正式选项/警示条）；`index.html` 样式表前防闪脚本 + 导航条右侧主题切换钮；`main.js` 主题模块与报告 theme.js **同键共享**（investor-theme-dark，偏好跨页一致）；组件六态矩阵落地（全局 focus-visible 兜底、按钮 aria-busy 进行中态闭环提交→生成结束、字段错误态、空态 `.empty-note` 与报告同名同义、链接态）；4 处空态挂点归类；静态断言测试 10 项（存储键与报告 theme.js 动态对表），手册 §2 补主题切换说明 | plan-105
 
 - **设计体系**：**双面设计 token 同名对齐**——跨面共享角色（surface/ink/border/状态/强调/焦点/字体栈）在 HTML 报告与 Web 工作台两面 `:root` 同名定义（对表验收 `test_design_tokens`）：报告侧新增 `--primary/--primary-hover/--focus/--font-stack` 并将 14 处模板 + 9 处 partial 品牌蓝裸值 token 化（Chart 域定义与 JS fallback 豁免）、`--status-ok/warn/info` 改名 `--ok/warn/info`、body 字体栈变量化；工作台侧 `--color-*` 104 处引用切角色名，旧名保留一版 `var()` 兼容映射；同名跨面值按各自明暗世界取值（验名不验值）；DESIGN.md Colors 表同步终态 | plan-104
