@@ -16,12 +16,14 @@ import threading
 import unittest
 from unittest.mock import MagicMock, patch
 
+import httpx
 import pytest
 
 from src.python.llm.api import (
     call_claude,
     call_gemini,
     call_llm,
+    call_single_provider,
 )
 from src.python.llm.api_base import (
     _extract_content,
@@ -704,3 +706,125 @@ class TestCallGeminiThinkingBudget(unittest.TestCase):
             _payload["generationConfig"]["thinkingConfig"]["thinkingBudget"],
             700,
         )
+
+
+# ═══════════════════════════════════════════════════════════
+#  call_single_provider http_client 缺省兜底（串行后置模块链路）
+# ═══════════════════════════════════════════════════════════
+
+
+class TestCallSingleProviderFallbackClient(unittest.TestCase):
+    """http_client=None 时漏斗自建一次性客户端（多链与 legacy 的唯一汇聚点）。
+
+    回归背景：编排层串行后置模块不注入 http_client，None 直达 provider 层
+    ``assert client is not None`` 秒败，AssertionError 又被 call_llm 的
+    per-provider except 吞掉，表现为整链失败、模块内容静默丢失。
+    """
+
+    @staticmethod
+    def _kw(**over) -> dict:
+        kw = dict(
+            system_prompt="sys",
+            user_prompt="user",
+            api_key="sk-test",
+            resolved_model="m",
+            endpoint="",
+            max_tokens=100,
+            timeout=5.0,
+            max_retries=1,
+            config_field="max_tokens",
+            temperature=None,
+            llm_config=None,
+        )
+        kw.update(over)
+        return kw
+
+    @patch("src.python.llm._api_claude.call_llm_with_retry")
+    def test_claude_none_client_builds_and_closes_real_client(self, mock_retry: MagicMock) -> None:
+        """None → 漏斗自建真实 httpx.Client 送进 provider 层，调用结束即关闭。"""
+        mock_retry.return_value = ("ok", {"input_tokens": 1})
+        result, usage = call_single_provider(provider="claude", http_client=None, **self._kw())
+        self.assertEqual(result, "ok")
+        client = mock_retry.call_args.kwargs["client"]
+        self.assertIsInstance(client, httpx.Client, "兜底必须是真实客户端而非 None")
+        self.assertTrue(client.is_closed, "一次性兜底客户端应在调用结束后关闭")
+
+    @patch("src.python.llm._api_gemini.call_llm_with_retry")
+    @patch("src.python.llm._api_openai.call_llm_with_retry")
+    def test_openai_and_gemini_none_client_build_real_client(
+        self, mock_openai: MagicMock, mock_gemini: MagicMock
+    ) -> None:
+        """兜底覆盖全部受支持 provider（非仅 claude）。"""
+        mock_openai.return_value = ("ok", {})
+        mock_gemini.return_value = ("ok", {})
+        for provider, mock_retry in (("openai", mock_openai), ("gemini", mock_gemini)):
+            with self.subTest(provider=provider):
+                result, _ = call_single_provider(provider=provider, http_client=None, **self._kw())
+                self.assertEqual(result, "ok")
+                client = mock_retry.call_args.kwargs["client"]
+                self.assertIsInstance(client, httpx.Client)
+                self.assertTrue(client.is_closed)
+
+    @patch("src.python.llm.api.call_claude")
+    def test_provided_client_passed_through_unchanged(self, mock_call: MagicMock) -> None:
+        """调用方自备客户端 → 原样透传，漏斗不接管、也不代为关闭。"""
+        mock_call.return_value = ("ok", {})
+        provided = MagicMock()
+        result, _ = call_single_provider(provider="claude", http_client=provided, **self._kw())
+        self.assertEqual(result, "ok")
+        self.assertIs(mock_call.call_args.kwargs["http_client"], provided)
+        provided.close.assert_not_called()
+
+    @patch("src.python.core.http_client.make_http_client")
+    def test_unknown_provider_skips_client_build(self, mock_make: MagicMock) -> None:
+        """不支持的 provider → 不建客户端，直接返回失败元组（不浪费连接）。"""
+        result = call_single_provider(provider="unknown", http_client=None, **self._kw())
+        self.assertEqual(result, (None, None))
+        mock_make.assert_not_called()
+
+    @patch("src.python.core.http_client.make_http_client")
+    @patch("src.python.llm.api.call_claude")
+    def test_fallback_builds_client_with_call_timeout(self, mock_call: MagicMock, mock_make: MagicMock) -> None:
+        """兜底客户端按调用方 timeout 构造，并原样传给 provider 层。"""
+        mock_call.return_value = ("ok", {})
+        fake_client = MagicMock()
+        mock_make.return_value.__enter__.return_value = fake_client
+        call_single_provider(provider="claude", http_client=None, **self._kw(timeout=7.5))
+        mock_make.assert_called_once_with(timeout=7.5)
+        self.assertIs(mock_call.call_args.kwargs["http_client"], fake_client)
+        mock_make.return_value.__exit__.assert_called_once()
+
+    @patch("src.python.llm._api_claude.call_llm_with_retry")
+    def test_chain_with_none_client_reaches_provider(self, mock_retry: MagicMock) -> None:
+        """多链路径 http_client=None → 不再被 per-provider except 吞成整链失败。"""
+        mock_retry.return_value = ("chain ok", {"input_tokens": 2})
+        config = {"_provider_list": [{"name": "p1", "provider": "claude", "api_key": "sk-p1"}]}
+        content, usage, info = call_llm("sys", "user", config)
+        self.assertEqual(content, "chain ok")
+        self.assertEqual((info or {}).get("name"), "p1")
+        client = mock_retry.call_args.kwargs["client"]
+        self.assertIsInstance(client, httpx.Client)
+        self.assertTrue(client.is_closed)
+
+    @patch("src.python.llm._api_claude.call_llm_with_retry")
+    @patch("src.python.llm._api_openai.call_llm_with_retry")
+    def test_chain_failover_builds_client_per_entry(self, mock_openai: MagicMock, mock_claude: MagicMock) -> None:
+        """首链失败 → 次链各自兜底建独立客户端（无共享客户端时的降级路径）。"""
+        mock_openai.return_value = (None, None)
+        mock_claude.return_value = ("recovered", {})
+        config = {
+            "_provider_list": [
+                {"name": "p-openai", "provider": "openai", "api_key": "sk-a", "priority": 1},
+                {"name": "p-claude", "provider": "claude", "api_key": "sk-b", "priority": 2},
+            ]
+        }
+        content, usage, info = call_llm("sys", "user", config)
+        self.assertEqual(content, "recovered")
+        self.assertEqual((info or {}).get("name"), "p-claude")
+        first = mock_openai.call_args.kwargs["client"]
+        second = mock_claude.call_args.kwargs["client"]
+        self.assertIsInstance(first, httpx.Client)
+        self.assertIsInstance(second, httpx.Client)
+        self.assertIsNot(first, second, "每条 entry 应各自兜底建客户端")
+        self.assertTrue(first.is_closed)
+        self.assertTrue(second.is_closed)

@@ -15,6 +15,7 @@ from __future__ import annotations
 import unittest
 from unittest.mock import MagicMock, patch
 
+import httpx
 import pytest
 
 from src.python.llm import generate_all_llm
@@ -437,3 +438,59 @@ class TestHoldingChangePrompts(unittest.TestCase):
         text_no_signal = _build_holding_change_review_prompt(_BLOCK)
         assert _BLOCK in text_no_signal
         assert "SIG-BLOCK" not in text_no_signal
+
+
+# ═══════════════════════════════════════════════════════════════
+#  串行后置入口 http_client 缺省 → 漏斗兜底客户端（端到端）
+# ═══════════════════════════════════════════════════════════════
+
+
+class TestRunHoldingChangeReviewFallbackClient(unittest.TestCase):
+    """编排层串行调用不注入 http_client 时，归因仍须真实到达 provider 层。
+
+    回归背景：``run_holding_change_review`` → ``generate_holding_change_review``
+    全链不传 ``http_client``，None 直达 provider 层 ``assert client is not
+    None`` 秒败，且异常被链路吞掉 → 返回 False、归因内容静默丢失。
+    """
+
+    def test_end_to_end_builds_and_closes_client(self):
+        """全链跑通：返回 True 且 provider 层收到一次性真实客户端（用后关闭）。"""
+        from src.python.llm.holding_change_review import run_holding_change_review
+
+        contract = {"available": True, "prompt_block": _BLOCK, "llm_review": None}
+        cfg = dict(_ENABLED)
+        cfg.update({"provider": "claude", "api_key": "sk-test"})
+        with (
+            patch("src.python.core.signal_ledger.is_active", return_value=False),
+            patch(
+                "src.python.llm._api_claude.call_llm_with_retry",
+                return_value=("## 持仓变动归因\n\n- 结构变更", {"input_tokens": 10, "output_tokens": 5}),
+            ) as mock_retry,
+        ):
+            ok = run_holding_change_review({"holding_change_data": contract}, cfg, force=True, holdings_details=[])
+
+        assert ok is True, "归因调用失败会静默返回 False，此处必须证明全链跑通"
+        assert contract["llm_review"] and "结构变更" in contract["llm_review"]
+        client = mock_retry.call_args.kwargs["client"]
+        assert isinstance(client, httpx.Client), "兜底必须是真实客户端而非 None"
+        assert client.is_closed, "一次性兜底客户端应在调用结束后关闭"
+
+    def test_end_to_end_registers_failure_when_provider_rejects(self):
+        """provider 层拒绝（模拟断言失败语义）→ 返回 False + 登记原因，不外抛。"""
+        from src.python.llm.holding_change_review import run_holding_change_review
+        from src.python.llm.prompts import LLM_MODULE_FAILURE
+
+        contract = {"available": True, "prompt_block": _BLOCK, "llm_review": None}
+        cfg = dict(_ENABLED)
+        cfg.update({"provider": "claude", "api_key": "sk-test"})
+        try:
+            with (
+                patch("src.python.core.signal_ledger.is_active", return_value=False),
+                patch("src.python.llm._api_claude.call_llm_with_retry", return_value=(None, None)),
+            ):
+                ok = run_holding_change_review({"holding_change_data": contract}, cfg, force=True, holdings_details=[])
+            assert ok is False
+            assert contract["llm_review"] is None
+            assert LLM_MODULE_FAILURE.get("holding_change"), "失败须登记可观测原因"
+        finally:
+            LLM_MODULE_FAILURE.pop("holding_change", None)

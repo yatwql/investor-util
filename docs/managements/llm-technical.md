@@ -171,7 +171,7 @@ skeleton.py:generate_llm_content()
 | `generators_news.py` | 生成层 | 新闻 LLM 二次关联分析（批量模式 7 函数） | `enhance_news_correlation()` |
 | `_llm_news_correlation.py` | 私有 | 新闻关联安全直调入口（返回类型 `(list[dict], bool, dict)` 与其余四模块的 `(str, bool)` 不同，**不经编排层线程池**，由 `report/news_correlation.py` 直接调用），由 `generators_orchestrator.py`（聚合门面）re-export 对外提供 | `run_news_correlation_safe()` |
 | `skeleton.py` | 骨架层 | 标准模式 + 批量模式共享生成骨架（85% 公共逻辑）+ `raw_filter_fn` 原始输出过滤钩子（markdown_to_html 之前） | `generate_llm_module()` |
-| `api.py` | API 层 | Provider 路由、Multi-Provider Chain 链式遍历、Extended Thinking 注入、单 Provider 分派 | `call_llm()` / `call_single_provider()` |
+| `api.py` | API 层 | Provider 路由、Multi-Provider Chain 链式遍历、Extended Thinking 注入、单 Provider 分派；`http_client` 缺省时自建一次性兜底客户端（串行后置模块链路，见 §4.2） | `call_llm()` / `call_single_provider()` |
 | `api_base.py` | 基础设施 | HTTP 调用、重试骨架、截断检测、Token 日志、失败追踪 | `call_llm_with_retry()` |
 | `strategy.py` | 基础设施 | 多 Provider 切换策略引擎（priority/weighted/cost_first/fallback_only），模块偏好注入，代理偏好后置处理 | `resolve_provider_chain()` |
 | `fact_checker/`（子包 9 模块，`__init__.py` 重导出 4 公开函数） | 基础设施 | LLM 输出事实锚定校验（数值一致性/品种存在性/排名正确性）+ 自动修正 | `run_fact_check()` |
@@ -448,6 +448,8 @@ _LLM_CLIENT_SETTINGS = {
 ```
 
 每个工作线程创建**独立**的 `httpx.Client` 实例（`_make_runner` 闭包），避免全局共享连接池的线程安全问题。`h2` 包不可用时自动降级到 HTTP/1.1。
+
+**缺省兜底（串行后置模块）**：客户端装配只发生在分发层（`_llm_dispatch._execute` 为并行 worker 装配）；**编排层串行后置调用**（`run_self_review` / `run_holding_change_review`）不注入 `http_client`，None 会直达 provider 层 `assert client is not None` 秒败，且 AssertionError 被 `call_llm` 的 per-provider `except Exception` 吞成「provider 异常，切换下一 provider」整链连环失败（归因整章静默丢失）。因此兜底收口在多链与 legacy 两路的**唯一汇聚点** `api.call_single_provider`：`http_client is None` 且 provider 受支持（claude/openai/gemini）时经 `core.http_client.make_http_client`（HTTP 客户端统一工厂约束）自建一次性客户端，`with` 块内完成调用后关闭；不支持的 provider 不建（避免浪费连接），调用方自备客户端则原样透传、漏斗不代为关闭。
 
 `max_workers=llm_config.llm_max_concurrency`（config 默认 3）控制并行调用数。开启 Extended Thinking 的模块（`thinking_enabled_{suffix}=true`）受独立信号量 `llm_max_thinking_concurrency`（默认 1）串行化约束——多 thinking 模块并发涌向 DeepSeek 等强制推理端点时偶发返回空 content（HTTP 200 空响应），该信号量从源头降低并发（thinking 请求同时最多 N 个），非 thinking 模块不受此限。
 

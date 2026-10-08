@@ -9,6 +9,8 @@
 
 ## [0.12.7-dev] - 开发中（未发布）
 
+- **LLM/缺陷**：**串行后置模块 http_client 缺省兜底**——`run_holding_change_review` / `run_self_review` 全链不注入 http_client，None 直达 provider 层 `assert client is not None` 秒败且被 `call_llm` per-provider `except` 吞成「provider 异常」整链连环失败（实测四 provider 各 ~2ms、归因整章静默丢失）；修复收敛在多链与 legacy 唯一汇聚点 `call_single_provider`：None 且 provider 受支持时经 `core.http_client.make_http_client` 自建一次性客户端、`with` 用后关闭（守 HTTP 客户端统一工厂约束）；回归测试 9 项（漏斗 7 + 端到端 2，摘除修复后 7 项全红） | rf-634
+
 - **报告呈现**：**报告空状态与降级呈现统一**——占位样式归并三档族（章节 `empty-section` / 单元 `empty-note` / 图表 `chart-empty-note`）：原 `placeholder-note` 同义修饰类并入 `empty-note` 基底（20 处双类清零，两模板定义合并）；文案二元口径落地（合法空「暂无+具体对象」——summary 指数占位双端改「暂无指数数据」、降级空「数据不可用：<原因>」——数据源状态行×2 与历史图空态加标准前缀，与 data_freshness 词根同源）；豁免表（哨兵值/拼接缀/条件说明句）入档；状态→观感映射与空态中性分工约束入 DESIGN Data States 节（含 20 partial 核对结论）；脆窗 print 断言改括号平衡解析；契约测试 11 项 | plan-109
 
 - **工程效能**：**设计护栏机检上线（观察期）**——`scripts/check-style-guardrails.py`（复用 `_checklib` 契约，`-v/--ci`、退出 0/2）：E 级判 finding（护栏 3 强调色越权——品牌蓝 hex 集从 `:root` 强调系 token 动态提取、护栏 5 明暗同步——dark 覆盖变量根缺、Colors「同名对齐」段双面 token 表↔实现双向对表）；W 级观察统计不判 finding（护栏 1 裸色值 129 处 / 护栏 2 圆角档外 7 处，`-v` 明细供分诊）；清理遗留 3 处品牌蓝 hover 字面量与工作台 `--radius:12px` 出档值（104 残留，收敛 8px）；测试 14 项；**观察期未入钩子与 CI**，稳定后评估入域；DESIGN 护栏节/圆角档同步落地标注 | plan-108

@@ -257,7 +257,38 @@ def call_single_provider(
     llm_config: dict | None,
     endpoint_key: str = "",
 ) -> tuple[str | None, dict | None]:
-    """调用单个 LLM provider。"""
+    """调用单个 LLM provider。
+
+    ``http_client`` 缺省（None）时自建一次性兜底客户端，调用结束后关闭。
+    分发层（``_llm_dispatch._execute``）为并行 worker 装配共享客户端，但
+    **串行后置模块**（生成后自检、持仓变动复盘归因）不经该装配、以 None
+    进入——此前 None 直达 provider 层 ``assert client is not None``，
+    AssertionError 又被 ``call_llm`` 的 per-provider ``except Exception``
+    吞掉，表现为「provider 异常，切换下一 provider」整链秒败、模块内容
+    静默丢失（本函数是多链与 legacy 两路的唯一汇聚点，兜底收口于此）。
+    """
+    if http_client is None and provider in ("claude", "openai", "gemini"):
+        from src.python.core.http_client import make_http_client
+
+        logger.debug("call_single_provider 未收到 http_client，自建一次性客户端（provider=%s）", provider)
+        with make_http_client(timeout=timeout) as _client:
+            return call_single_provider(
+                provider,
+                system_prompt,
+                user_prompt,
+                api_key,
+                resolved_model,
+                endpoint,
+                max_tokens,
+                timeout,
+                max_retries,
+                _client,
+                config_field,
+                temperature,
+                llm_config,
+                endpoint_key=endpoint_key,
+            )
+
     if provider == "claude":
         return call_claude(
             system_prompt,

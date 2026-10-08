@@ -1,6 +1,6 @@
 # 投资复盘助手 - 自我审查问题记录
 > 文档版本：0.12.7-dev
-> **编号源**：`rf-next = 634`（新增问题取此编号，完成后更新为 +1；已用最大 rf-633，递增保证唯一，归档不回收。若与历史归档冲突，运行 `scripts/check-task-numbering.py` 校验）
+> **编号源**：`rf-next = 635`（新增问题取此编号，完成后更新为 +1；已用最大 rf-634，递增保证唯一，归档不回收。若与历史归档冲突，运行 `scripts/check-task-numbering.py` 校验）
 
 ---
 
@@ -54,6 +54,8 @@
 | **rf-78** | `fetcher/batch.py` | 520 | 维持现状（BatchDispatcher 本身内聚，复核确认不拆；2026-10-02 实测 520，回落至登记值附近（rf-522 重试退避原语收编后下降）） | BatchDispatcher 本身内聚，可维持现状（不拆） |
 
 ## 已解决问题
+
+- rf-634 已修复（2026-10-08，线上持仓变动复盘归因静默丢失自查，当批修复）：**串行后置模块以 `http_client=None` 直达 provider 层**——`run_holding_change_review`（含孪生 `run_self_review`）经 `generate_llm_module` 全链不注入客户端，而客户端装配只在分发层 `_llm_dispatch._execute` 为并行 worker 做；None 触发 `_api_claude/_api_openai/_api_gemini` 的 `assert client is not None` 秒败，AssertionError 又被 `call_llm` 多链循环的 per-provider `except Exception` 吞成「provider 异常，切换下一 provider」——日志实测四 provider 各 ~2ms 内连环失败（2026-10-07/10-08 两次），归因整章静默丢失（plan-76 落地后从未成功过）；修复 = 在多链与 legacy 两路的唯一汇聚点 `call_single_provider` 收口：`http_client is None` 且 provider 受支持时经 `core.http_client.make_http_client`（HTTP 客户端统一工厂约束）自建一次性客户端、`with` 调用后关闭；回归 = 漏斗层 7 项（三 provider 兜底建/关客户端、调用方自备客户端透传不代关、未知 provider 不建、多链 `http_client=None` 贯通、链上每 entry 各建独立客户端）+ 端到端 2 项（归因全链跑通且 provider 收到已关闭真实客户端 / provider 拒绝时返回 False 并登记原因），**摘除修复后 7 项全红**验证回归有效性
 
 - rf-624 已修复（2026-10-07，v0.12.6 发布后自查，当批修复）：`scripts/check-version-consistency.py` 的 `_auto_fix_header` docstring 含裸 `\s` 转义 → 非 raw 字符串下每次导入/运行打印 `SyntaxWarning: invalid escape sequence '\s'`（py3.12+），污染终端与 CI stderr（全仓扫描仅此一处）；修复 = docstring 改 raw 前缀（顺带 `[ \t]` 显示由真实 TAB 还原为字面 `\t`）；回归 = 以 `warnings.simplefilter("error", SyntaxWarning)` + `compile()` 锁定脚本可无警告编译（同批自纠：本条回归测试类的 docstring 初版亦含裸 `\s`，由提交前钩子回放段告警捕获，已同步 raw 化）
 - rf-625 已修复（2026-10-07，v0.12.6 发布 publish 实战，当批修复）：`release.py publish` 组装 release subject 时未归一 `--title`——title 自带 `release: v… —— ` 前缀时拼出双前缀（v0.12.6 发布提交 `a68f2376` 即 `release: v0.12.6 —— release: v0.12.6 —— …`；tag/历史不可变故保留）；修复 = 新增 `normalize_release_title()` 剥离重复前缀（剥离后为空回退原值）；回归 = 带前缀 title 断言 subject 单前缀 + 纯描述/纯前缀变体不变
