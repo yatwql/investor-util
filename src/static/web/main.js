@@ -364,6 +364,7 @@
       return;
     }
     els.generateBtn.disabled = true;
+    els.generateBtn.setAttribute('aria-busy', 'true');
     els.generateBtn.textContent = '正在提交...';
     els.generateError.textContent = '';
 
@@ -396,6 +397,7 @@
         startPolling();
       })
       .catch(function (err) {
+        els.generateBtn.removeAttribute('aria-busy');
         updateGenerateBtn();
         els.generateBtn.textContent = '生成报告';
         if (err.errorCode === 'FILE_EXPIRED') {
@@ -443,6 +445,7 @@
         }
         if (data.status === 'done' || data.status === 'failed') {
           stopPolling();
+          els.generateBtn.removeAttribute('aria-busy');
           loadResult();
         }
       })
@@ -653,7 +656,7 @@
     els.healthList.textContent = '';
     if (!results.length) {
       var p = document.createElement('p');
-      p.className = 'status-text status-busy';
+      p.className = 'status-text status-busy empty-note';
       p.textContent = '暂无数据源检测结果';
       els.healthList.appendChild(p);
       return;
@@ -717,7 +720,7 @@
     var results = data.results || [];
     if (!results.length) {
       var p = document.createElement('p');
-      p.className = 'status-text status-busy';
+      p.className = 'status-text status-busy empty-note';
       p.textContent = '无自检结果';
       els.doctorList.appendChild(p);
       return;
@@ -791,7 +794,7 @@
     els.logList.textContent = '';
     if (!entries.length) {
       var p = document.createElement('p');
-      p.className = 'status-text status-busy';
+      p.className = 'status-text status-busy empty-note';
       p.textContent = '暂无匹配日志';
       els.logList.appendChild(p);
       return;
@@ -837,7 +840,7 @@
     els.historyList.textContent = '';
     if (!records.length) {
       var p = document.createElement('p');
-      p.className = 'status-text status-busy';
+      p.className = 'status-text status-busy empty-note';
       p.textContent = '暂无运行记录';
       els.historyList.appendChild(p);
       return;
@@ -1640,6 +1643,43 @@
         els.cacheCleanup.disabled = false;
       });
   }
+
+  // ── 深浅色主题（与 HTML 报告 theme.js 同款存储键 investor-theme-dark，偏好跨页共享）──
+  // 亮色 = 移除 data-theme 属性；暗色 = data-theme="dark"（style.css 变量块切换）。
+  (function () {
+    var KEY = 'investor-theme-dark';
+    var btn = document.getElementById('theme-toggle');
+    var dark = false;
+    try {
+      dark = localStorage.getItem(KEY) === '1';
+    } catch (e) {
+      /* 隐私模式/存储不可用：仅本次会话生效（同报告 theme.js 降级） */
+    }
+    function apply() {
+      if (dark) {
+        document.documentElement.setAttribute('data-theme', 'dark');
+      } else {
+        document.documentElement.removeAttribute('data-theme');
+      }
+      if (btn) {
+        btn.setAttribute('aria-pressed', dark ? 'true' : 'false');
+        btn.textContent = dark ? '浅色' : '深色';
+        btn.title = dark ? '切换为浅色模式' : '切换为深色模式';
+      }
+    }
+    apply();
+    if (btn) {
+      btn.addEventListener('click', function () {
+        dark = !dark;
+        apply();
+        try {
+          localStorage.setItem(KEY, dark ? '1' : '0');
+        } catch (e) {
+          /* ignore */
+        }
+      });
+    }
+  })();
 
   document.addEventListener('DOMContentLoaded', init);
 })();

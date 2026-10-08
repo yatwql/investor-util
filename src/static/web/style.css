@@ -38,6 +38,35 @@
   --color-focus: var(--focus);
 }
 
+/* ── 暗色主题（data-theme="dark"；与 HTML 报告暗色世界同值，品牌蓝不调）── */
+[data-theme="dark"] {
+  --bg: #121212;
+  --surface: #1e1e1e;
+  --border: #3a3a3a;
+  --text: #e0e0e0;
+  --text-secondary: #c0c0c0;
+  --ok: #66bb6a;
+  --warn: #f0a35e;
+  --error: #e74c3c;
+  --shadow-card: 0 1px 2px rgba(0, 0, 0, 0.5);
+  --shadow-card-hover: 0 4px 14px rgba(0, 0, 0, 0.6);
+  /* --primary/--focus/--accent 不覆盖：品牌蓝暗色不调（同报告则） */
+}
+/* 暗色下组件亮色硬底适配 */
+[data-theme="dark"] .upload-zone {
+  background: #1a1a1a;
+}
+[data-theme="dark"] .upload-zone:focus-within {
+  background: #10203a;
+}
+[data-theme="dark"] #formal-options {
+  background: #1a1a1a;
+}
+[data-theme="dark"] .formal-warning {
+  background: #2b1518;
+  color: #ff9aa2;
+}
+
 * {
   box-sizing: border-box;
 }
@@ -1023,6 +1052,72 @@ input[type='text']:focus {
   padding: 0 var(--space-card) 32px;
   color: var(--text-secondary);
   font-size: 0.8rem;
+}
+
+/* ── 设计契约：主题切换与组件状态矩阵（DESIGN.md Components）── */
+.theme-toggle {
+  margin-left: auto;
+  align-self: center;
+  padding: 8px 14px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+  color: var(--text-secondary);
+  font-family: inherit;
+  font-size: 0.9rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+.theme-toggle:hover {
+  color: var(--text);
+  border-color: var(--primary);
+}
+.theme-toggle[aria-pressed="true"] {
+  background: var(--text);
+  color: var(--bg);
+  border-color: var(--text);
+}
+
+/* 全局焦点可见性兜底（键盘/辅助导航，永不移除） */
+a:focus-visible,
+button:focus-visible,
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible,
+[tabindex]:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
+}
+
+/* 按钮进行中态（aria-busy：提交 → 生成完成全程） */
+.btn[aria-busy="true"] {
+  opacity: 0.65;
+  cursor: progress;
+}
+
+/* 表单字段错误态（校验类挂上即生效） */
+.has-error input,
+.has-error select,
+.has-error textarea {
+  border-color: var(--error);
+}
+.field-error {
+  color: var(--error);
+  font-size: 0.8rem;
+  margin-top: 4px;
+}
+
+/* 空态占位（与报告 empty-note 同名同义；文案口径见 DESIGN.md Data States） */
+.empty-note {
+  color: var(--text-secondary);
+  font-size: 0.85rem;
+  line-height: 1.5;
+  padding: 6px 0;
+}
+
+/* 链接态 */
+a:hover {
+  text-decoration: underline;
 }
 
 /* ── 响应式（375px 移动端不溢出）── */

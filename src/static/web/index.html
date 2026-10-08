@@ -4,6 +4,10 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>{{ app_name }} v{{ app_version }}</title>
+  <script>
+    /* 主题防闪：与存储键同源，CSS 解析前恢复暗色（main.js 同键读写） */
+    try { if (localStorage.getItem('investor-theme-dark') === '1') document.documentElement.setAttribute('data-theme', 'dark'); } catch (e) {}
+  </script>
   <link rel="stylesheet" href="/static/style.css?v={{ app_version }}">
 </head>
 <body>
@@ -25,6 +29,8 @@
               data-tab="status" aria-controls="panel-status" aria-selected="false" tabindex="-1">运行状态</button>
       <button type="button" class="tab-btn" role="tab" id="tab-logs"
               data-tab="logs" aria-controls="panel-logs" aria-selected="false" tabindex="-1">日志</button>
+      <button type="button" class="theme-toggle" id="theme-toggle"
+              aria-pressed="false" title="切换为深色模式">深色</button>
     </div>
   </nav>
 
