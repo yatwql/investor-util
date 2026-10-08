@@ -9,6 +9,8 @@
 
 ## [0.12.7-dev] - 开发中（未发布）
 
+- **工程质量/契约**：**scripts 顶层脚本契约机检上线（观察期）**——新增 `check-script-contract.py` 四条规则：退出码 docstring 声明 ⊆ `_checklib.report` 返回值域 {0,2}（白名单：code-traces 0/1/2/3、doc-traces/svg/version-consistency 的 1=HIGH/环境缺失/事实源不可读）、`check-*` 须统一 `add_common_args`（-v/--ci）、文本 I/O 显式 encoding（内建 open 非二进制模式 / Path.read_text·write_text / subprocess text=True，AST 全口径）、顶层脚本须被 `src/test/` 测试按文件名引用（一次性探测工具豁免）；同批把 `check-version-consistency` 手写 argv 解析改 argparse + `add_common_args`（补 `-v`）；当前唯一 finding 为 `check-code-traces` CLI 面（plan-114 收口后归零）；测试 39 项 | plan-110
+
 - **工程质量/缺陷**：**测试标记清单改由 conftest 派生**——`check-test-markers` 的 `KNOWN_MARKERS` 由手写 42 项改为 `registered_markers()` 对 `src/test/conftest.py` 的 `addinivalue_line("markers", …)` 做 AST 提取（多行调用与相邻字面量拼接天然处理），conftest 新增/删除标记自动跟随；已实测真实漂移：`cassette` 早已注册却不在手写清单内（43 vs 42），裸属性写法会被误判「未注册」；`EXPECTED_DIR_MARKERS` 补齐 5 个含测试却无期望的目录（`unit/cache`·`unit/startup`·`unit/web`·`scenario/perf`·`scenario/security`，原静默不查）并加目录结构绑定注释，`src/test/unit/conftest.py` 的 `_DIR_TO_MARKER` 同步补齐 cache/scripts/startup；docstring 删去「已移除的标记（如 integration）」与现状矛盾的表述；回归 = 27 项，含期望表↔目录、提示表↔期望表的结构性双向绑定断言 | rf-633
 
 - **测试/缺陷**：**四个零测脚本补齐直接单测**——`check-svg`（字符档位/锚点包围盒/最小面积容器归属/越界·贴边·重叠·越画布四类 finding/同列底部提示/`geom` 退出码 0·2）、`check-test-markers`（AST 三来源提取/`_get_relative_dir`/八类判定分支）、`perf-view`（均值极值降级/阶段跨记录合并/分组过滤·截尾·排序/趋势报告结构与过滤参数）、`collect-test-coverage`（收集退出码 0/4/5 原样传递与插件记录清空、`_target_files` 目录展开与 live 套件排除、模式与子标记计数、`main()` 出口 0/5 正常·非零原样 `sys.exit`）共 87 项；同批修复 `check-svg._text_box` 缺 x/y 时直接崩溃（rect 有 try/except 而 text 无，防御不对称 → 补同口径跳过）与 `perf-view` 明细时间列 `[-16:]` 截掉年份首位（`2026-01-01 10:00:00` → `6-01-01 10:00:00`）→ 改 `[:16]`；回归验证 = 摘防御 3 红 / 回退时间列 2 红 | rf-632
