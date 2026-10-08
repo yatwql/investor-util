@@ -1,6 +1,6 @@
 # 投资复盘助手 - 自我审查问题记录
 > 文档版本：0.12.7-dev
-> **编号源**：`rf-next = 627`（新增问题取此编号，完成后更新为 +1；已用最大 rf-626，递增保证唯一，归档不回收。若与历史归档冲突，运行 `scripts/check-task-numbering.py` 校验）
+> **编号源**：`rf-next = 628`（新增问题取此编号，完成后更新为 +1；已用最大 rf-627，递增保证唯一，归档不回收。若与历史归档冲突，运行 `scripts/check-task-numbering.py` 校验）
 
 ---
 
@@ -30,6 +30,7 @@
 |---|------|----------|
 
 | **rf-114** | TD3/TD-L1：双渲染路径共存——模板保留 Canvas `drawSimpleChart()`（265 行内联 JS）+ Chart.js 渲染器，Flag OFF 时旧路径仍活 | plan-1 稳定 2 版本后（v0.10.0，阶段 2→3 切换，判定标准见 upgrade.md §4.15）删除 `drawSimpleChart()` + Canvas 回退分支 + Feature Flag 条件分支，Chart.js 成唯一渲染器。**2026-08-05 决策：先完成 rf-113 人工验证（确认 Chart.js 真机渲染可靠）后再执行删除** |
+| **rf-627** | 持仓匿名化配置未接入报告管线——`anonymizer.anonymize_holdings(_details)` 在 `report/`/`llm/` 零调用，`anonymization.mode` 仅被状态展示（`system_info`）、TUI `[A]`/Web 配置编辑消费；生成的 Excel/HTML 报告仍用真实持仓，与 how-to-config §L「控制报告中的持仓信息匿名化显示层级」不符；安全场景测试仅直调脱敏函数，未做产物端到端验证 | 报告管线在持仓载入/明细装配处消费 `get_anonymization_mode()`（summary 拦在明细渲染层，code_display/full_anonymous 拦在名称/代码/盈亏字段层），LLM 提示词持仓块同源脱敏；安全场景测试升级为「产物 HTML/Excel 无真名」端到端断言；同步核对手册 §L 与实现口径 |
 
 ### P3 — 持续监控：文件过长登记表（>500 行观察 / **>800 行为硬上限必须拆分**；按距红线余量升序）
 

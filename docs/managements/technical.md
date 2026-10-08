@@ -1975,7 +1975,7 @@ get_combined_timeseries()
 
 **HTML 渲染**：`enable_interactive_charts` 开启时由 Chart.js 渲染交互图表（净值/回撤曲线、资产构成环形图、行业分布、穿透 TOP10、量化雷达图）；关闭时回退 `drawSimpleChart()`（Canvas 2D API 原生渲染，无 Chart.js 依赖），组合 as-if 曲线（实线）+ 基准指数（虚线，颜色循环），右侧图例显示。
 
-**Excel 渲染**：`portfolio_history_drawdown`（组合历史走势与回撤）页签分「走势表 + 回撤矩阵 + 危机区间标注」三区块——走势表每基准一列（归一化值）+ 指标汇总矩阵（累计收益/最大回撤/年化波动率/起止日，仅一份），回撤矩阵为独立回撤事件明细（含恢复耗时）+ 尾部风险统计（VaR(95/99)/最大单日跌幅/最长连续下跌/最大跌幅后恢复五行，百分比按 FMT_PERCENT 存小数，样本不足写「样本不足」占位），危机区间标注为 2015/2018/2020/2022 静态日期表 + 区间统计。
+**Excel 渲染**：`portfolio_history_drawdown`（组合历史走势与回撤）页签分「走势表 + 回撤矩阵 + 危机区间标注 + 月度收益日历」四区块——走势表每基准一列（归一化值）+ 指标汇总矩阵（累计收益/最大回撤/年化波动率/起止日，仅一份），回撤矩阵为独立回撤事件明细（含恢复耗时）+ 尾部风险统计（VaR(95/99)/最大单日跌幅/最长连续下跌/最大跌幅后恢复五行，百分比按 FMT_PERCENT 存小数，样本不足写「样本不足」占位），危机区间标注为 2015/2018/2020/2022 静态日期表 + 区间统计，月度收益日历为年 × 月红绿格（正值红字/负值绿字，`return_pct/100` 配 FMT_PERCENT）+ 口径与胜亏平统计说明行（数据源 `history_data.monthly_returns`，as-if 口径、双口径并排预留）。
 
 #### 持仓快照存储与清理（history_snapshot.py）
 
@@ -2946,7 +2946,7 @@ llm/skeleton.py                 # 教训区块注入专家复盘提示词（开�
 | 10 | `expert_review` | — | expert_review_section.html | — | llm_content.py | 同上 |
 | 11 | `health_check` | — | health_check_section.html | — | llm_content.py | 同上 |
 | 12 | `penetration_deep` | — | penetration_deep_section.html | — | llm_content.py | 同上 |
-| 13 | `portfolio_history_drawdown` | 3 | portfolio_history_drawdown_section.html | 走势表 / 回撤矩阵 / 危机区间标注 | portfolio_history_drawdown_sheet.py | 双端对等 |
+| 13 | `portfolio_history_drawdown` | 4 | portfolio_history_drawdown_section.html | 走势表 / 回撤矩阵 / 危机区间标注 / 月度收益日历 | portfolio_history_drawdown_sheet.py | 双端对等 |
 | 14 | `portfolio_evolution` | 5 | evolution_section.html | 自上次快照变化摘要 / 总市值与总盈亏趋势 / 持仓集中度趋势 / TOP 持仓占比变迁 / 账户配置流 | evolution_sheet.py | 双端对等（5 对 5；Excel 端标题已对齐 HTML 端） |
 | 15 | `holding_change` | 4 | holding_change_section.html | 变动事件清单 / 频率与结构演变 / 意图对账 / 变动动因 LLM 归因 | holding_change_panel.py | LLM 归因块条件写入，双端四对四 |
 | 16 | `schedule_replay` | 2 | schedule_replay_section.html | 纪律回放 vs 买入持有 / 规则 A 逐期调仓与成本 | schedule_replay_panel.py | 双端对等 |
@@ -3387,6 +3387,7 @@ make_http_client(timeout=10.0) → httpx.Client
 | `industry_beta` | 行业 Beta 暴露 | 风格与因子分析 | 风险/暴露 | 功能开关 `industry_beta`（默认关） |
 | `crisis_annotation` | 危机区间标注 | 组合历史走势与回撤 | 风险/暴露 | 始终渲染（样本不足时占位，R-TAIL 强制） |
 | `tail_risk` | 尾部风险 | 组合历史走势与回撤 | 风险/暴露 | 始终渲染（样本不足时占位，R-TAIL 强制） |
+| `monthly_returns` | 月度收益日历 | 组合历史走势与回撤 | 监控 | 历史数据可用时渲染（样本不足不出区块，as-if 口径、双口径并排预留） |
 | `snapshot_diff` | 快照差异 | 组合演进 | 监控 | 随 `enable_portfolio_evolution` |
 | `data_quality` | 数据质量仪表盘 | 数据源可用性矩阵 | 监控 | 功能开关 `data_quality`（默认开） |
 | `snapshot_namespace` | 快照隔离命名空间（试算域 `web` / 共享主目录） | 快照存储/Web 输入 | 输入隔离 | 无（run 级参数） |
@@ -3950,7 +3951,7 @@ investor-util/
 
 > `evolution_data`（组合演进，C19 契约，多快照趋势聚合）：`{"available": bool, "snapshot_count": int, "min_snapshots": int, "periods": list[str], "total_value": list[float], "total_cost": list[float], "total_pnl": list[float], "holding_counts": list[int], "account_flows": {account: list[float]}, "hhi": list[float\|None], "top_holdings": list[dict], "reason": str}`。`top_holdings` 每项含 code/name/weights（各期占比 %）/present_count（出现期数）；历史快照 `market_value=0.0` 时权重回退成本口径。由 `analysis/portfolio_evolution.py` 计算、`report/orchestrator.py` 注入（C7 注册 type=`evolution`、data_flag=`evolution_data`，见 §4.12），有效快照 < MIN_SNAPSHOTS=3 时 `available=false` 落 §1.4.5 降级。
 
-> `history_data`（组合历史走势 + 回撤，C19 契约，供组合历史走势与回撤章复用）：`{"bars": list[dict], "max_drawdown": float, "max_drawdown_pct": float, "drawdown_events": list[dict], "recovery_times": list[dict], "drawdown_available": bool, "annualized_volatility": float, "total_return": float, "daily_returns": list[float], "warnings": list[str], "benchmarks": list[dict], "successful_holdings": list}`。`drawdown_events`（独立回撤事件）含 peak_date/trough_date/recovery_date/drawdown_pct/duration_days/recovery_days/recovered；`recovery_times`（恢复耗时明细）含 start_date/end_date/days。由 `report/portfolio_history.py` 组装（C7 注册 type=`history`），`drawdown_available` 表示有效交易日 ≥ MIN_SPAN 才渲染回撤明细，否则落 §1.4.5 降级。消费方为「组合历史走势与回撤」（`portfolio_history_drawdown`，一章多区块，Excel 见 `report/portfolio_history_drawdown_sheet.py`、HTML 见模板 `report_template.html`），区块数据由本契约 + 下方 `crisis_annotation_data`/`tail_risk_data` 提供。
+> `history_data`（组合历史走势 + 回撤，C19 契约，供组合历史走势与回撤章复用）：`{"bars": list[dict], "max_drawdown": float, "max_drawdown_pct": float, "drawdown_events": list[dict], "recovery_times": list[dict], "drawdown_available": bool, "annualized_volatility": float, "total_return": float, "daily_returns": list[float], "monthly_returns": dict, "warnings": list[str], "benchmarks": list[dict], "successful_holdings": list}`。`drawdown_events`（独立回撤事件）含 peak_date/trough_date/recovery_date/drawdown_pct/duration_days/recovery_days/recovered；`recovery_times`（恢复耗时明细）含 start_date/end_date/days。由 `report/portfolio_history.py` 组装（C7 注册 type=`history`），`drawdown_available` 表示有效交易日 ≥ MIN_SPAN 才渲染回撤明细，否则落 §1.4.5 降级。消费方为「组合历史走势与回撤」（`portfolio_history_drawdown`，一章多区块，Excel 见 `report/portfolio_history_drawdown_sheet.py`、HTML 见模板 `report_template.html`），区块数据由本契约 + 下方 `crisis_annotation_data`/`tail_risk_data` 提供。
 
 > `crisis_annotation_data`（危机区间标注，C19 契约，8 键）：`{"available": bool, "intervals": list[dict]}`。`intervals` 每项含 name/start/end/desc/in_range/interval_drawdown_pct/trough_date/recovery_days/recovered——基于 `history_data.bars` 对预设历史危机区间（2015 股灾 / 2018 贸易摩擦 / 2020 疫情 / 2022 调整，`analysis/crisis_annotation.py::CRISIS_INTERVALS` 静态历史事实表，不随持仓变化、不拉长 lookback、无新增网络请求）做窗口重叠裁剪与区间统计：`in_range` 表示与报告数据窗口重叠；`interval_drawdown_pct` 为区间内 running-peak 最大回撤（正数 %，窗口内无 bar 时为 None）；`trough_date` 为区间最深日；`recovery_days` 为最深日→首个回到峰值的恢复耗时（数据窗口内未恢复为 None）；`recovered` 为是否已恢复。由 `analysis/crisis_annotation.py::build_crisis_annotation(history_data)` 计算（纯标准库、analysis 层隔离，无 report/llm 依赖），both 路径在 `report/_report_generation.py` 以 `build_crisis_annotation(history_data)` 注入 pipeline_data，Chart.js 净值图阴影带（`chart_data_builder.py` 计算起止索引 → `chart-init.js::buildCrisisBandPlugin`）与 HTML 危机表/Excel 危机区块消费。危机标注净值图必须 C20 图下说明（`.chart-caption` 跟随是否有 in_range 区间数据）。
 

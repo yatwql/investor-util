@@ -1,9 +1,12 @@
-"""组合历史走势与回撤 Excel 写入模块 — 走势表 + 回撤矩阵 + 危机区间标注合一页签（一章三区块）。
+"""组合历史走势与回撤 Excel 写入模块 — 走势表 + 回撤矩阵 + 危机区间标注 + 月度收益日历合一页签（一章四区块）。
 
-「组合历史走势与回撤」一章分「走势表 + 回撤矩阵 + 危机区间标注」三区块：
+「组合历史走势与回撤」一章分「走势表 + 回撤矩阵 + 危机区间标注 + 月度收益日历」四区块：
   一、走势表（upper）—— 净值时间线 + 基准归一化 + 指标汇总（组合 vs 基准对比矩阵，仅一份）
   二、回撤矩阵（lower）—— 独立回撤事件明细（含恢复耗时）
   三、危机区间标注 —— 2015/2018/2020/2022 静态日期表 + 区间统计（区间回撤/恢复天数）
+  四、月度收益日历 —— 年 × 月红绿格（正值红字/负值绿字）+ 口径与胜亏平统计说明行；
+    数据源 `history_data.monthly_returns`（analysis/monthly_returns，as-if 口径，
+    双口径并排预留）
 
 指标区（累计收益/最大回撤/波动率/起止日）在章内**只出现一次**（组合 vs 基准矩阵，
 组合为第一列，天然包含全部组合指标）。数据不可用时整页写占位。
@@ -27,7 +30,7 @@ from src.python.report.excel_writer import (
     write_header_row,
     write_title_row,
 )
-from src.python.report.styles import FMT_MONEY, FMT_PERCENT
+from src.python.report.styles import FMT_MONEY, FMT_PERCENT, profit_font
 
 logger = logging.getLogger("invest")
 
@@ -35,6 +38,8 @@ logger = logging.getLogger("invest")
 _DD_NCOLS = 8
 # 危机区间表列数
 _CRISIS_NCOLS = 6
+# 月度收益日历列数（年 + 12 月）
+_CAL_NCOLS = 13
 
 # 危机标注说明行（图下说明：区间数据出 → 说明出）
 _CRISIS_NOTE = (
@@ -49,9 +54,9 @@ def _data_ok(history_data: dict | None) -> bool:
 
 
 def _compute_ncols(history_data: dict | None) -> int:
-    """计算标题栏跨列数：走势表（4 + 基准数）与回撤明细（8）取最大。"""
+    """计算标题栏跨列数：走势表（4 + 基准数）、回撤明细（8）与月度日历（13）取最大。"""
     n_bm = len((history_data or {}).get("benchmarks", [])) if history_data else 0
-    return max(4 + n_bm, _DD_NCOLS, _CRISIS_NCOLS)
+    return max(4 + n_bm, _DD_NCOLS, _CRISIS_NCOLS, _CAL_NCOLS)
 
 
 def _apply_italic(ws: Worksheet, row: int, ncols: int) -> None:
@@ -267,13 +272,54 @@ def _write_crisis_block(
     return row
 
 
+def _write_monthly_calendar_block(
+    ws: Worksheet,
+    row: int,
+    history_data: dict | None,
+    ncols: int,
+) -> int:
+    """写入四、月度收益日历区块（年 × 月红绿格 + 口径/胜亏平说明行），返回下一行起始行号。"""
+    write_block_title(ws, row, "四、月度收益日历", ncols=ncols)
+    row += 1
+
+    monthly = (history_data or {}).get("monthly_returns") or {}
+    if not monthly.get("available"):
+        row = write_data_row(ws, row, ["月度收益数据不可用（样本不足）"])
+        return row + 1
+
+    stats = monthly.get("stats") or {}
+    streak = stats.get("max_down_streak") or {}
+    note = (
+        f"口径：{monthly.get('caliber_label', '')} · 最近 {monthly.get('window_months')} 个月"
+        f"：胜 {stats.get('up', 0)} / 亏 {stats.get('down', 0)} / 平 {stats.get('flat', 0)}"
+        f" · 最长连亏 {streak.get('length', 0)} 个月（结束于 {streak.get('end_key') or '—'}）"
+        "；正值红字、负值绿字，空格为窗口外或无样本月份"
+    )
+    row = write_data_row(ws, row, [note])
+    _apply_italic(ws, row - 1, max(ncols, _CAL_NCOLS))
+
+    row = write_header_row(ws, row, ["年"] + [f"{m}月" for m in range(1, 13)])
+    for year_group in monthly.get("years", []):
+        ws.cell(row=row, column=1, value=f"{year_group.get('year')}年")
+        for col, cell in enumerate(year_group.get("cells", [])[:12], start=2):
+            ret = cell.get("return_pct")
+            if ret is None:
+                continue
+            frac = ret / 100.0
+            target = ws.cell(row=row, column=col, value=frac)
+            target.number_format = FMT_PERCENT
+            target.font = profit_font(frac)
+        row += 1
+    return row + 1
+
+
 def write_portfolio_history_drawdown_sheet(
     ws: Worksheet,
     history_data: dict | None = None,
     crisis_annotation: dict[str, Any] | None = None,
     tail_risk: dict[str, Any] | None = None,
 ) -> None:
-    """写入组合历史走势与回撤页签（一章三区块：走势表 + 回撤矩阵 + 危机区间标注；尾部风险统计随回撤矩阵）。
+    """写入组合历史走势与回撤页签（一章四区块：走势表 + 回撤矩阵 + 危机区间标注 + 月度收益日历；尾部风险统计随回撤矩阵）。
 
     Args:
         ws: openpyxl Worksheet 对象。
@@ -298,6 +344,7 @@ def write_portfolio_history_drawdown_sheet(
     row = _write_trend_block(ws, row, history_data, ncols, tail_risk)
     row = _write_drawdown_block(ws, row, history_data, ncols)
     row = _write_crisis_block(ws, row, crisis_annotation, ncols)
+    row = _write_monthly_calendar_block(ws, row, history_data, ncols)
 
     freeze_header(ws, row=2)
     auto_width(ws, min_width=10, max_width=28)

@@ -196,6 +196,36 @@
             {% endif %}
             <div class="chart-caption">说明：阴影/高亮区间为历史上 A 股主要危机时段；区间与报告数据窗口重叠时统计区间最大回撤与恢复耗时</div>
             {% endif %}
+            <!-- ── 四、月度收益日历：年 × 月红绿格 + 口径与胜亏平统计 ── -->
+            {% set monthly = history_data.monthly_returns %}
+            {% if monthly and monthly.available %}
+            <div style="font-weight: bold; font-size: 14px; margin-top: 20px; margin-bottom: 6px;">四、月度收益日历（{{ monthly.caliber_label }}）</div>
+            <table class="monthly-return-calendar">
+                <thead>
+                    <tr>
+                        <th style="text-align:left;">年</th>
+                        {% for m in range(1, 13) %}
+                        <th style="text-align:center;">{{ m }}月</th>
+                        {% endfor %}
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for year_group in monthly.years %}
+                    <tr>
+                        <th style="text-align:left;">{{ year_group.year }}</th>
+                        {% for cell in year_group.cells %}
+                        <td style="text-align:center;{% if cell.return_pct is not none %} color: {{ cell.return_pct | profit_color }}; font-weight: 600;{% endif %}">
+                            {%- if cell.return_pct is not none %}{{ cell.return_pct | change }}{% endif -%}
+                        </td>
+                        {% endfor %}
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+            {% if monthly.stats %}
+            <div class="chart-caption">口径 {{ monthly.caliber_label }}：胜 {{ monthly.stats.up }} / 亏 {{ monthly.stats.down }} / 平 {{ monthly.stats.flat }} 月 · 最长连亏 {{ monthly.stats.max_down_streak.length }} 月（结束于 {{ monthly.stats.max_down_streak.end_key or "—" }}）· 最佳 {{ monthly.stats.best.key }} {{ monthly.stats.best.return_pct | change }} · 最差 {{ monthly.stats.worst.key }} {{ monthly.stats.worst.return_pct | change }}（正值红 / 负值绿，空格为窗口外或无样本月份）</div>
+            {% endif %}
+            {% endif %}
             <!-- 数据加载状态（组合历史走势与回撤章单一份） -->
             {% if history_data.warnings or history_data.failed_holdings or history_data.successful_holdings %}
             <div class="data-status" style="margin-top:12px;">

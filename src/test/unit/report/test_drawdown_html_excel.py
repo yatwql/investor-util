@@ -320,5 +320,82 @@ class TestExcelDrawdownSheet(unittest.TestCase):
         self.assertIn("--", flat)  # recovery_days 占位
 
 
+def _monthly_calendar() -> dict:
+    """真实聚合器构造月度日历契约（8月基线 → 9月 +10%，不 mock 计算引擎）。"""
+    from src.python.analysis.monthly_returns import aggregate_monthly_returns
+
+    return aggregate_monthly_returns(
+        [
+            {"date": "2026-08-15", "total_value": 100.0},
+            {"date": "2026-09-15", "total_value": 110.0},
+        ]
+    )
+
+
+class TestHtmlMonthlyCalendar(unittest.TestCase):
+    """月度收益日历区块（区块四）HTML 呈现测试。"""
+
+    def test_calendar_rendered_with_cells_and_caption(self) -> None:
+        """契约可用 → 年×月表格 + 口径标题 + 红绿格数值 + 胜亏统计说明。"""
+        soup = _render_drawdown(_history([], monthly_returns=_monthly_calendar()))
+        table = soup.select_one("table.monthly-return-calendar")
+        self.assertIsNotNone(table, "月度收益日历表应渲染")
+        text = soup.get_text()
+        self.assertIn("四、月度收益日历", text)
+        self.assertIn("as-if", text)  # 口径标注（双口径并排预留）
+        self.assertIn("+10.00%", text)  # 2026-09 月收益（change 滤镜两位小数）
+        self.assertIn("胜", text)
+        self.assertIn("最长连亏", text)
+        # 盈利格着色（profit_color，正值 var(--profit)）
+        colored = table.select("td[style*='--profit']")
+        self.assertTrue(colored, "正收益格应带 profit_color 内联样式")
+
+    def test_calendar_hidden_without_contract(self) -> None:
+        """history_data 无 monthly_returns（样本不足/旧数据）→ 区块整体不渲染。"""
+        soup = _render_drawdown(_history([]))
+        self.assertIsNone(soup.select_one("table.monthly-return-calendar"))
+        self.assertNotIn("月度收益日历", soup.get_text())
+
+
+class TestExcelMonthlyCalendar(unittest.TestCase):
+    """月度收益日历区块（区块四）Excel 呈现测试。"""
+
+    def _write(self, history_data):
+        from openpyxl import Workbook
+
+        from src.python.report.portfolio_history_drawdown_sheet import (
+            write_portfolio_history_drawdown_sheet,
+        )
+
+        wb = Workbook()
+        ws = wb.active
+        write_portfolio_history_drawdown_sheet(ws, history_data)
+        return ws
+
+    def test_calendar_block_written_with_percent_and_color(self) -> None:
+        """契约可用 → 区块标题 + 年行 + 月格小数/百分比格式 + 盈亏色字。"""
+        from src.python.report.styles import FMT_PERCENT, profit_font
+
+        ws = self._write(_history([], monthly_returns=_monthly_calendar()))
+        values = {str(c.value): c for row in ws.iter_rows() for c in row if c.value is not None}
+        self.assertIn("四、月度收益日历", values)
+        self.assertIn("2026年", values)
+        # 9月 +10% → 小数 0.1，FMT_PERCENT 显示 +10.00%，红字（profit_font 单源）
+        year_row = next(r for r in ws.iter_rows() if r[0].value == "2026年")
+        cell = next(c for c in year_row if isinstance(c.value, float) and abs(c.value - 0.1) < 1e-9)
+        self.assertEqual(cell.number_format, FMT_PERCENT)
+        self.assertEqual(cell.font.color.rgb, profit_font(0.1).color.rgb)
+        # 说明行携带口径与胜亏平统计
+        flat = [str(c.value) for row in ws.iter_rows() for c in row if c.value is not None]
+        self.assertTrue(any("口径：" in t and "胜" in t for t in flat))
+
+    def test_calendar_unavailable_placeholder(self) -> None:
+        """契约缺失/样本不足 → 区块标题仍出，下方写不可用占位。"""
+        ws = self._write(_history([]))
+        flat = [str(c.value) for row in ws.iter_rows() for c in row if c.value is not None]
+        self.assertIn("四、月度收益日历", flat)
+        self.assertTrue(any("月度收益数据不可用" in t for t in flat))
+
+
 if __name__ == "__main__":
     unittest.main()
