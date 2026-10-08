@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """单文件行数红线守护脚本。
 
-阈值口径（developer-guide「文件膨胀阈值」表 + review-findings P2A 硬上限）：
+阈值口径（developer-guide「文件膨胀阈值」表 + review-findings 文件过长监控区硬上限）：
   - 主程序（``src/python/**.py``） > 800 行 → finding（硬上限，必须拆分）
   - 测试（``src/test/**.py``）      > 1200 行 → finding（测试文件红线）
   - 主程序 500-800 / 测试 800-1200 为可选优化区间，不判 finding，仅 ``-v`` 输出清单，
@@ -79,7 +79,7 @@ def split_findings(
 
 
 def over_limit_inventory(records: list[tuple[str, str, int]]) -> list[str]:
-    """可选优化区间清单：主程序 >500 行、测试 >800 行（P2A/P2C 登记表派生源）。"""
+    """可选优化区间清单：主程序 >500 行、测试 >800 行（review-findings 文件过长登记表派生源）。"""
     rows = []
     for kind, path, lines in records:
         warn_at = 500 if kind == "主程序" else 800
