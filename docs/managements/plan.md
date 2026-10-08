@@ -1,6 +1,6 @@
 # 投资复盘助手 — 实现计划
 > 文档版本：0.12.7-dev
-> **编号源**：`plan-next = 110`（新增计划项取此编号，完成后更新为 +1；已用最大 plan-109，递增保证唯一，归档不回收。若与历史归档冲突，运行 `scripts/check-task-numbering.py` 校验）
+> **编号源**：`plan-next = 115`（新增计划项取此编号，完成后更新为 +1；已用最大 plan-114，递增保证唯一，归档不回收。若与历史归档冲突，运行 `scripts/check-task-numbering.py` 校验）
 
 ---
 
@@ -8,7 +8,7 @@
 
 本文档记录项目的实现计划。已完成的历史版本计划已归档，此处仅跟踪当前迭代中的工作。
 
-**当前迭代**：在办 19 项按「价值 / 收益 / 风险」分三档（2026-10-07 重排，档位定义见「当前迭代待办」）——P1 5 项（**plan-71** 转正判据先行 + 风险/核心价值改进 **plan-99/85/91/95**）、P2 10 项（**plan-49/55/83** 等待条件型 + 改进批 **plan-88/89/90/92/93/100/101**）、P3 4 项（**plan-70** 死线观察，已有落地设计 `decision-reflection-shadow-design.md`；择机 **plan-87/94/102**）；**plan-85 ~ plan-102** 为 2026-10-07 自审改进盘点迁入批（18 项）；**plan-103 ~ plan-109** Web 展示借鉴批 7 项**已全部完成并归档**（awesome-design-md 研究：2026-10-07 首批 6 项 + 2026-10-08 HTML 报告专项补研追加 plan-109，立项映射见 [`awesome-design-md-borrow-candidates-research.md`](../plan/awesome-design-md-borrow-candidates-research.md)）；历史批次（**plan-59 ~ plan-84**，含 Vibe-Trading / gs-quant / 工程效能 / TradingAgents-CN 借鉴批）已全部收口，完成态与未采纳记录随档见 [`archived_plan.0.11.x.md`](../archive/v0.11.x/archived_plan.0.11.x.md) 与 [`archived_plan.0.12.x.md`](../archive/v0.12.x/archived_plan.0.12.x.md)，借鉴批研究文档随档在 `docs/archive/v0.12.x/`（plan-66 ~ plan-68 候选现状见「P3」）。
+**当前迭代**：在办 24 项按「价值 / 收益 / 风险」分三档（2026-10-07 重排，档位定义见「当前迭代待办」）——P1 5 项（**plan-71** 转正判据先行 + 风险/核心价值改进 **plan-99/85/91/95**）、P2 12 项（**plan-49/55/83** 等待条件型 + 改进批 **plan-88/89/90/92/93/100/101** + scripts 核查批 **plan-110/112**）、P3 7 项（**plan-70** 死线观察，已有落地设计 `decision-reflection-shadow-design.md`；择机 **plan-87/94/102** 与 scripts 核查批 **plan-111/113/114**）；**plan-85 ~ plan-102** 为 2026-10-07 自审改进盘点迁入批（18 项）；**plan-103 ~ plan-109** Web 展示借鉴批 7 项**已全部完成并归档**（awesome-design-md 研究：2026-10-07 首批 6 项 + 2026-10-08 HTML 报告专项补研追加 plan-109，立项映射见 [`awesome-design-md-borrow-candidates-research.md`](../plan/awesome-design-md-borrow-candidates-research.md)）；历史批次（**plan-59 ~ plan-84**，含 Vibe-Trading / gs-quant / 工程效能 / TradingAgents-CN 借鉴批）已全部收口，完成态与未采纳记录随档见 [`archived_plan.0.11.x.md`](../archive/v0.11.x/archived_plan.0.11.x.md) 与 [`archived_plan.0.12.x.md`](../archive/v0.12.x/archived_plan.0.12.x.md)，借鉴批研究文档随档在 `docs/archive/v0.12.x/`（plan-66 ~ plan-68 候选现状见「P3」）。
 
 > **命名纪律（强制）**：重构/新增的变量名、函数名、注释与文档表述必须与新章节语义相关（如 `position_relationship`/`portfolio_history_drawdown`/`style_factor`/`action`），**绝对禁止用任务编号命名**（F 系列、plan-N、rf-N 等）。任务编号仅在本表作链接锚点，不进入实现层。
 
@@ -137,6 +137,18 @@
 
 **动作**：可配置通知钩子（webhook URL / 邮件 / 桌面通知，失败必发、成功可选发），载荷含报告类型、产物路径、降级摘要、错误数；未配置时静默跳过（默认关，符合「配置文件不必须存在」惯例）
 
+#### 🔲 `plan-110` scripts 契约机检守护（观察期）
+
+**现状与问题**（2026-10-08 scripts 核查）：退出码 docstring 声明与实现的契约（rf-629/rf-630 两例实错）、检查类 CLI 面（`-v`/`--ci`/`add_common_args`）、文本 I/O 显式 encoding、脚本↔测试映射，全靠人肉与逐案修复；一次核查即发现退出码声明 5 例不齐
+
+**动作**：新增 check-script-contract（复用 `_checklib`，`-v/--ci`、退出 0/2；观察期不入钩子与 CI，模式同 check-style-guardrails）：① docstring 退出码声明码集 ⊆ `_checklib.report` 返回值域 {0,2}（特例白名单：check-code-traces 0/1/2/3、check-doc-traces 0/1/2、check-svg 含 1=环境缺失）② 顶层 check-* 必须 `add_common_args` ③ 脚本文本 I/O 显式 encoding ④ 顶层脚本须有对应测试（一次性工具白名单豁免）；配单测覆盖规则命中与白名单
+
+#### 🔲 `plan-112` collect modes 与 test-runner MODES 单源化
+
+**现状与问题**（2026-10-08 scripts 核查）：`collect-test-coverage.py` 的 `modes` lambda 字典与 `_test_runner/modes.py::MODES` 的 marker 表达式双处定义，脚本注释自认「双处定义——modes.py 门禁 marker 变更必须同步本字典，否则计数表口径漂移」，纯人肉纪律无机检
+
+**动作**：二选一：① `modes.py` 导出语义化表达式（或编译谓词）供 collect 复用导入 ② 保留双处但新增机检（双向对表：MODES 键集 == modes 字典键集，表达式等价性抽查）；落地后删除同步警告注释
+
 ### P3 — 预期实施，有空时安排
 
 > **候选与历史批说明**：源 TradingAgents-CN 仓库研究的 10 项候选（详细分析见 [`tradingagents-cn-borrow-candidates-research.md`](../archive/v0.11.x/tradingagents-cn-borrow-research/tradingagents-cn-borrow-candidates-research.md)）中 plan-59 ~ plan-65 已完成（2026-10-01）：前四项见 [`archived_plan.0.11.x.md`](../archive/v0.11.x/archived_plan.0.11.x.md)，plan-63/64/65 见同文档「LLM 成本调节 / 生成后自检 / 调用级源指定」段；整体设计见 [`report-depth-selfreview-source-override-design.md`](../archive/v0.11.x/llm-depth-selfreview-source-override/report-depth-selfreview-source-override-design.md)。
@@ -170,6 +182,24 @@
 **现状与问题**（2026-10-07 自审迁入）：归档 `better-investment-advice` §4.2 放弃「反问引导/对话式」的理由是「单向报告无法承载交互」，并明注「**若未来增加交互式报告或对话式 TUI 可重新考虑**」——现 Web 交互渠道已落地，该条件已成立；读者看完报告想追问（「为什么说集中度偏高？」）目前只能重跑 LLM 模块
 
 **动作**：按新 plan 立项评估（不直接实现）：Web 报告页「就本期报告追问」输入框，会话内多轮，上下文 = 报告关键数据 + 首问摘要，复用既有 provider 链/预算/降级/事实校验；成本与缓存策略先行设计，TUI 侧后置。**明确不做**：仓位硬建议、全市场筛选仍守归档边界
+
+#### 🔲 `plan-111` 测试域脚本 loader 样板统一
+
+**现状与问题**（2026-10-08 scripts 核查）：`_load_script` importlib 加载样板在 60 个测试文件重复（每处约 12 行），加载方式靠复制传播，改造 scripts 加载面时需逐文件同步
+
+**动作**：提取公共 loader（`src/test/_script_loader.py` 或 conftest fixture），新测试强制使用，存量按批次增量迁移（不一次性改 60 文件）；迁移完成前旧样板兼容
+
+#### 🔲 `plan-113` scripts 大文件治理评估（红线域扩或拆分）
+
+**现状与问题**（2026-10-08 scripts 核查）：9 个脚本 ≥400 行，factor_zoo_eval 1595 / release 841 / check-test-redundancy 666 / check-doc-traces 592 / calibrate-dedup-threshold 520；`check-file-length` 800 红线域当前只含主程序与测试，scripts 不在域内（1595 行远超主程序红线但无守护）
+
+**动作**：评估三案：① check-file-length 域扩到 scripts（豁免清单重估）② 按 registry 拆分先例下沉子模块（如 factor_zoo_eval 拆评测核心/报告生成/CLI）③ 维持现状并登记豁免理由；产出决策记入 technical.md
+
+#### 🔲 `plan-114` check-code-traces 接入 _checklib 公共设施
+
+**现状与问题**（2026-10-08 scripts 核查）：`check-code-traces.py`（592 行，十守护之一）未引 `_checklib`——argparse 基建（`-v`/`--verbose`/`--ci`）手写、输出格式自成一派，与其余检查脚本的公共契约分叉（其 HIGH=1/LOW=3 四级退出码特例合理保留）
+
+**动作**：接入 `add_common_args` 与公共输出原语，退出码分级语义不变；同步 test_trace_check_scripts 对应断言
 
 ## 归档
 

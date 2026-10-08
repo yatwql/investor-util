@@ -1,6 +1,6 @@
 # 投资复盘助手 - 自我审查问题记录
 > 文档版本：0.12.7-dev
-> **编号源**：`rf-next = 630`（新增问题取此编号，完成后更新为 +1；已用最大 rf-629，递增保证唯一，归档不回收。若与历史归档冲突，运行 `scripts/check-task-numbering.py` 校验）
+> **编号源**：`rf-next = 634`（新增问题取此编号，完成后更新为 +1；已用最大 rf-633，递增保证唯一，归档不回收。若与历史归档冲突，运行 `scripts/check-task-numbering.py` 校验）
 
 ---
 
@@ -31,6 +31,10 @@
 
 | **rf-114** | TD3/TD-L1：双渲染路径共存——模板保留 Canvas `drawSimpleChart()`（265 行内联 JS）+ Chart.js 渲染器，Flag OFF 时旧路径仍活 | plan-1 稳定 2 版本后（v0.10.0，阶段 2→3 切换，判定标准见 upgrade.md §4.15）删除 `drawSimpleChart()` + Canvas 回退分支 + Feature Flag 条件分支，Chart.js 成唯一渲染器。**2026-08-05 决策：先完成 rf-113 人工验证（确认 Chart.js 真机渲染可靠）后再执行删除** |
 | **rf-628** | 持仓匿名化剩余衍生面——full 模式 HTML 各章节代码列与交互图表标签（自由文本数字全局替换有金额误伤风险，刻意未清扫）、LLM 提示词持仓块代码字段（字段层为键控链路保留真值所致）、summary 模式明细以外章节的单只数值与演进快照/财报摘要/估值分位等派生章节数据集内部真值（名称面已由产物清扫全覆盖，数值/代码面未覆盖） | 按面在渲染点做结构化掩码：HTML 代码列在模板/渲染器输出点换显示值、派生章节数据契约增加展示值字段、提示词组装点对代码做结构化替换；数值面按分享场景评估是否需聚合/模糊后注入 |
+| **rf-630** | scripts 退出码 docstring 契约族不齐——check-test-markers 声明「0/1」而实现走 `_checklib.report()` 实为 0/2（与 rf-629 同类实错）；check-file-length / check-style-guardrails / check-version-consistency 缺「退出码」声明节；check-requirement-trace 的 0/2 同行不成节；CLAUDE「scripts 共享设施与契约」段未涵盖 check-doc-traces 的 1=HIGH 语义 | 逐脚本补正 docstring（0/2 为基线，特例注明码义）；CLAUDE 契约段补 doc-traces 分级说明；防再犯由 plan-110 机检承接 |
+| **rf-631** | perf-report.py 三处缺陷——① 报告硬编码「测试时间 2026-07-20」不随运行更新 ② Phase3「50 品种」实为 27（`_STOCKS` 仅 24 支，`[:50]` 截断）、Phase1「20 品种」实为 23（20 股 + 3 基金），文案与实际不符 ③ `generate_all_llm` patch 到 `src.python.llm.generators_orchestrator` 子模块，而调用点 `_llm_news` 为函数内 `from src.python.llm import generate_all_llm` 读包属性——patch 不生效，Phase2 实跑会真调 LLM（费用/稳定性风险） | ① 动态 `datetime.now()` ② 按 `len(holdings)` 实际出文案或扩充样本池到 50 ③ patch 改 `src.python.llm.generate_all_llm`（包属性，与函数内 import 解析点一致）；补 `_generate_holdings`/`_verdict`/报告文案单测 |
+| **rf-632** | scripts 无测试/弱测试欠账——check-svg.py（307 行，字符宽度估算/容器归属/重叠判定纯函数零测）、check-test-markers.py（224 行，AST 提取/目录期望/未注册判定零测）、perf-view.py（199 行，分组聚合/趋势报告零测）、collect-test-coverage.py（`_collect` 退出码传递、`_target_files` 展开、modes 计数无直接单测，仅被 drift crosscheck 间接覆盖）；附带 check-svg `_text_box` 对缺 x/y 的 `<text>` 无防护（rect 有 try/except 而 text 无，防御不对称） | 按「纯函数优先」补测试：geom 字符宽度/容器归属/重叠判定、marker AST 提取与判定矩阵、trend 分组与空数据、collect 退出码白名单（0/5 过、非零拒收）与 modes 计数；`_text_box` 补缺失属性默认或跳过 |
+| **rf-633** | check-test-markers 双源与自相矛盾——KNOWN_MARKERS 手写 42 项与 conftest `addinivalue_line` 注册集人肉同步（当前双向零漂移，但 conftest 新增标记后本脚本不知情即误判「未注册」）、EXPECTED_DIR_MARKERS 目录期望表同理；docstring「已移除的标记（如 integration）」与 KNOWN_MARKERS 实际包含 integration 家族矛盾（DEPRECATED_MARKERS 为空集） | KNOWN 从 conftest 动态提取（AST 解析 addinivalue_line），EXPECTED 与目录结构绑定注释；docstring 按现状改写（integration 现为注册标记，已移除清单以 DEPRECATED 为准） |
 
 ### P3 — 持续监控：文件过长登记表（>500 行观察 / **>800 行为硬上限必须拆分**；按距红线余量升序）
 
