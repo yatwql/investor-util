@@ -88,7 +88,7 @@ def _generate_report_both(
     from src.python.report.html_writer import write_html_report
     from src.python.report.orchestrator import ReportResult
 
-    perf = PerfCollector(report_type="both", holdings=holdings)
+    perf = PerfCollector(report_type="both", holdings=holdings, stage_announcer=reporter.stage_progress)
     result = ReportResult()
     result.holdings_ok = True
 
@@ -405,7 +405,7 @@ def _generate_report_full(
     from src.python.report._snapshot import capture_snapshot
     from src.python.report.orchestrator import ReportResult, prepare_report_data
 
-    perf = PerfCollector(report_type="full", holdings=holdings)
+    perf = PerfCollector(report_type="full", holdings=holdings, stage_announcer=reporter.stage_progress)
     result = ReportResult()
     result.holdings_ok = True
     _health_fut = _spawn_health_checks()

@@ -8,7 +8,7 @@
 
 本文档记录项目的实现计划。已完成的历史版本计划已归档，此处仅跟踪当前迭代中的工作。
 
-**当前迭代**：在办 23 项按「价值 / 收益 / 风险」分三档（2026-10-07 重排，档位定义见「当前迭代待办」）——P1 六项（**plan-71** 转正判据先行 + 风险/核心价值改进 **plan-98/99/85/91/95**）、P2 十二项（**plan-49/55/83** 等待条件型 + 改进批 **plan-86/88/89/90/92/93/96/100/101**）、P3 五项（**plan-70** 死线观察，已有落地设计 `decision-reflection-shadow-design.md`；择机 **plan-87/94/97/102**）；**plan-85 ~ plan-102** 为 2026-10-07 自审改进盘点迁入批（18 项）；历史批次（**plan-59 ~ plan-84**，含 Vibe-Trading / gs-quant / 工程效能 / TradingAgents-CN 借鉴批）已全部收口，完成态与未采纳记录随档见 [`archived_plan.0.11.x.md`](../archive/v0.11.x/archived_plan.0.11.x.md) 与 [`archived_plan.0.12.x.md`](../archive/v0.12.x/archived_plan.0.12.x.md)，借鉴批研究文档随档在 `docs/archive/v0.12.x/`（plan-66 ~ plan-68 候选现状见「P3」）。
+**当前迭代**：在办 22 项按「价值 / 收益 / 风险」分三档（2026-10-07 重排，档位定义见「当前迭代待办」）——P1 六项（**plan-71** 转正判据先行 + 风险/核心价值改进 **plan-98/99/85/91/95**）、P2 十二项（**plan-49/55/83** 等待条件型 + 改进批 **plan-86/88/89/90/92/93/96/100/101**）、P3 四项（**plan-70** 死线观察，已有落地设计 `decision-reflection-shadow-design.md`；择机 **plan-87/94/102**）；**plan-85 ~ plan-102** 为 2026-10-07 自审改进盘点迁入批（18 项）；历史批次（**plan-59 ~ plan-84**，含 Vibe-Trading / gs-quant / 工程效能 / TradingAgents-CN 借鉴批）已全部收口，完成态与未采纳记录随档见 [`archived_plan.0.11.x.md`](../archive/v0.11.x/archived_plan.0.11.x.md) 与 [`archived_plan.0.12.x.md`](../archive/v0.12.x/archived_plan.0.12.x.md)，借鉴批研究文档随档在 `docs/archive/v0.12.x/`（plan-66 ~ plan-68 候选现状见「P3」）。
 
 > **命名纪律（强制）**：重构/新增的变量名、函数名、注释与文档表述必须与新章节语义相关（如 `position_relationship`/`portfolio_history_drawdown`/`style_factor`/`action`），**绝对禁止用任务编号命名**（F 系列、plan-N、rf-N 等）。任务编号仅在本表作链接锚点，不进入实现层。
 
@@ -168,12 +168,6 @@
 **动作**：在后续 2 个发布周期内（以 experiment_stats 启用计数与账本结算数为准）观察，若：① experiment_stats 中 decision_reflection 的启用次数未增长，或 ② `data/state/decision_ledger.jsonl` 已结算样本仍 <10 条（折叠统计 direction_accuracy 无法给出可信命中率），则撤销该实验功能（含 LLM 决策登记（`decision_llm_capture`）/行动章复盘块注入与对应需求条目）；若满足可信样本则据 doctor 账本概览评估转正。观测手段已就绪：`experiment_stats` 启用计数 + `doctor` 复盘账本概览（本批落地）。
 
 **落地设计**：若判定转正，按 [`decision-reflection-shadow-design.md`](../plan/decision-reflection-shadow-design.md) 四迭代执行（决策条目结构化 → 到期结算器 → doctor 概览增强 → 报告内反思块），该设计以 Vibe-Trading `shadow_account`（extract→backtest→render）为参照；死线未过前不实施。plan-76 持仓变动复盘落地后与其构成「意图 vs 成交」对账（只读，不互写）。
-
-#### 🔲 `plan-97` 生成进行中无 ETA / 阶段预估
-
-**现状与问题**（2026-10-07 自审迁入）：进度仅 `[..]` 阶段消息，耗时排行要等完成后才输出；`core/perf.py` 已持久化历史阶段耗时但未用于事中预估——full + LLM 长任务只能干等
-
-**动作**：基于 perf 历史同阶段中位数显示「当前阶段 / 预计剩余」，历史不足时仅显示已耗时；CLI verbose 与 Web 进度条同源受益，计算失败静默降级为无 ETA
 
 #### 🔲 `plan-87` 相关性分析为静态单点
 

@@ -13,6 +13,8 @@
 
 数据收集策略：
     - 每次 generate_report() 自动收集各阶段耗时
+    - 阶段开始时可经 stage_announcer 向进度通道广播状态行（当前阶段 / 已耗时 /
+      预计剩余，ETA 基于本文件历史同阶段中位数，计算失败静默降级）
     - 写入 data/state/perf_history.jsonl（JSONL 格式，一行一次运行）
     - 同时通过 logging 输出 INFO 级计时日志
     - 结果包含版本号，支持跨版本性能趋势追踪
@@ -23,7 +25,9 @@ from __future__ import annotations
 import json
 import logging
 import os
+import statistics
 import time
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from datetime import datetime
 from typing import Any
@@ -98,9 +102,17 @@ class PerfCollector:
     - 非单例、非模块级全局
     - 所有时间基于 time.perf_counter()
     - start/stop 成对调用；嵌套时自动关闭前一个并记录警告
+    - stage_announcer 为可选的阶段状态广播回调（进度通道显示当前阶段/
+      预计剩余），回调异常静默吞掉，不影响计时与生成流程
     """
 
-    def __init__(self, report_type: str, holdings: list) -> None:
+    def __init__(
+        self,
+        report_type: str,
+        holdings: list,
+        *,
+        stage_announcer: Callable[["PerfCollector"], None] | None = None,
+    ) -> None:
         self._report_type = report_type
         self._holdings_count = len(holdings)
         self._phases: list[_PhaseRecord] = []
@@ -108,6 +120,12 @@ class PerfCollector:
         self._warnings_count: int = 0
         self._current_name: str | None = None
         self._current_start: float | None = None
+        self._stage_announcer = stage_announcer
+
+    @property
+    def report_type(self) -> str:
+        """本次运行的报告类型（basic/both/full，供 ETA 预估按类型筛样本）。"""
+        return self._report_type
 
     # ── 阶段计时 ──
 
@@ -122,6 +140,25 @@ class PerfCollector:
             self.stop()
         self._current_name = phase_name
         self._current_start = time.perf_counter()
+        self._announce_stage()
+
+    def stage_status(self) -> dict[str, Any] | None:
+        """当前活跃阶段状态 {"phase": 阶段名, "elapsed": 已耗时秒}；无活跃阶段时 None。"""
+        if self._current_name is None or self._current_start is None:
+            return None
+        return {
+            "phase": self._current_name,
+            "elapsed": round(time.perf_counter() - self._current_start, 1),
+        }
+
+    def _announce_stage(self) -> None:
+        """阶段开始时向进度通道广播状态行（回调异常静默，不影响计时）。"""
+        if self._stage_announcer is None:
+            return
+        try:
+            self._stage_announcer(self)
+        except Exception:
+            logger.debug("[perf] 阶段状态广播失败，已忽略", exc_info=True)
 
     def stop(self) -> float | None:
         """结束当前阶段计时。
@@ -291,3 +328,77 @@ def load_history(path: str | None = None) -> list[dict[str, Any]]:
                 except json.JSONDecodeError:
                     logger.warning("[perf] 忽略损坏行: %s", line[:80])
     return records
+
+
+# ── 阶段 ETA 预估（事中进度显示） ────────────────────────
+
+_ETA_LOOKBACK_RUNS = 20  # 预估取最近 N 次运行的同阶段样本
+
+
+def estimate_stage_eta(
+    phase_name: str,
+    elapsed_seconds: float,
+    *,
+    history: list[dict[str, Any]] | None = None,
+    report_type: str | None = None,
+) -> float | None:
+    """基于 perf 历史同阶段中位数，估算当前阶段剩余秒数。
+
+    口径：取最近 ``_ETA_LOOKBACK_RUNS`` 次运行中同名阶段的耗时中位数，
+    剩余 = 中位数 − 已耗时（下限 0）。
+
+    Args:
+        phase_name: 阶段名（与 PerfCollector.start 传入一致）。
+        elapsed_seconds: 当前阶段已耗时秒数。
+        history: 历史记录注入（测试用）；None 时读 perf_history.jsonl。
+        report_type: 限定样本的报告类型（None = 不限定）。
+
+    Returns:
+        预计剩余秒数；历史无该阶段样本（含 history 缺失、report_type 不匹配）
+        返回 None；**任何异常静默返回 None**（调用方降级为无 ETA，不打断生成）。
+    """
+    try:
+        records = load_history() if history is None else history
+        samples: list[float] = []
+        for rec in records[-_ETA_LOOKBACK_RUNS:]:
+            if report_type is not None and rec.get("report_type") != report_type:
+                continue
+            sec = _phase_seconds(rec.get("phases"), phase_name)
+            if sec is not None:
+                samples.append(sec)
+        if not samples:
+            return None
+        return max(0.0, round(statistics.median(samples) - float(elapsed_seconds), 1))
+    except Exception:
+        logger.debug("[perf] 阶段 ETA 预估失败（%s），静默降级为无 ETA", phase_name, exc_info=True)
+        return None
+
+
+def _phase_seconds(phases: Any, phase_name: str) -> float | None:
+    """从历史记录的 phases 字段取指定阶段耗时（兼容 dict / 早期 list 两种形状）。"""
+    if isinstance(phases, dict):
+        sec = phases.get(phase_name)
+    elif isinstance(phases, list):
+        sec = next(
+            (p.get("seconds") for p in phases if isinstance(p, dict) and p.get("name") == phase_name),
+            None,
+        )
+    else:
+        return None
+    if isinstance(sec, bool) or not isinstance(sec, (int, float)) or sec < 0:
+        return None
+    return float(sec)
+
+
+def format_stage_status(status: dict[str, Any], eta: float | None) -> str:
+    """阶段状态单行文案 — 所有进度通道共用的唯一格式化点（同源）。
+
+    形如 ``「LLM+新闻」· 已耗时 12s · 预计剩余 ~284s``；eta 为 None 时仅显示
+    已耗时。Web 前端展示时外层自带「当前阶段（第 N 步）：」前缀。
+    """
+    phase = status.get("phase") or ""
+    elapsed = float(status.get("elapsed") or 0.0)
+    line = f"「{phase}」· 已耗时 {elapsed:.0f}s"
+    if eta is not None:
+        line += f" · 预计剩余 ~{eta:.0f}s"
+    return line

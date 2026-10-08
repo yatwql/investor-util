@@ -604,7 +604,7 @@ def generate_report(
         from src.python.report._report_generation import _collect_health_checks, _spawn_health_checks
         from src.python.report.excel_generator import generate_excel_report
 
-        perf = PerfCollector(report_type="basic", holdings=holdings)
+        perf = PerfCollector(report_type="basic", holdings=holdings, stage_announcer=reporter.stage_progress)
         sec_order = get_report_section_order(config)
         output = output_dir or config.get("output_dir", "reports")
 
