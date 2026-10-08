@@ -102,7 +102,12 @@ def _parse_svg(path: Path):
     for el in root.iter():
         tag = el.tag.split("}")[-1]
         if tag == "text":
-            box = _text_box(el)
+            try:
+                box = _text_box(el)
+            except (TypeError, ValueError):
+                # 缺 x/y/font-size 等数值属性的 <text>：与 rect 同口径跳过，
+                # 单个坏元素不应中断整轮几何审查（缺属性本身不产生几何可判据）
+                continue
             if box[4]:
                 texts.append((tag, box))
         elif tag == "rect":

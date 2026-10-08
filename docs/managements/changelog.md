@@ -9,6 +9,8 @@
 
 ## [0.12.7-dev] - 开发中（未发布）
 
+- **测试/缺陷**：**四个零测脚本补齐直接单测**——`check-svg`（字符档位/锚点包围盒/最小面积容器归属/越界·贴边·重叠·越画布四类 finding/同列底部提示/`geom` 退出码 0·2）、`check-test-markers`（AST 三来源提取/`_get_relative_dir`/八类判定分支）、`perf-view`（均值极值降级/阶段跨记录合并/分组过滤·截尾·排序/趋势报告结构与过滤参数）、`collect-test-coverage`（收集退出码 0/4/5 原样传递与插件记录清空、`_target_files` 目录展开与 live 套件排除、模式与子标记计数、`main()` 出口 0/5 正常·非零原样 `sys.exit`）共 87 项；同批修复 `check-svg._text_box` 缺 x/y 时直接崩溃（rect 有 try/except 而 text 无，防御不对称 → 补同口径跳过）与 `perf-view` 明细时间列 `[-16:]` 截掉年份首位（`2026-01-01 10:00:00` → `6-01-01 10:00:00`）→ 改 `[:16]`；回归验证 = 摘防御 3 红 / 回退时间列 2 红 | rf-632
+
 - **工具/缺陷**：**性能基准报告三处缺陷修复**——测试时间随运行时刻动态生成（`_test_time_text`）；持仓规模文案按实际样本派生（新增 `PerfSample` + 账户口径 `_sample_of`，概述/表格/结论三处同源出数，港股不再被按代码位数误计为基金），股票样本池扩到 50 支使 `_PHASE3_STOCK_COUNT` 被覆盖、`[:N]` 静默截断消失；LLM mock patch 目标改为包属性 `src.python.llm.generate_all_llm`（与 `_llm_news` 函数内 import 读取点一致）+ 返回值对齐 `generate_all_llm` 8 元组契约（经核查 both 路径 `enable_llm=False`、原 patch 本就无效）；回归测试 18 项（摘除修复后 16 项红） | rf-631
 
 - **工程效能/缺陷**：**scripts 退出码 docstring 契约族补正**——`check-test-markers` 声明「0/1」而实现走 `_checklib.report()` 实为 0/2；`check-file-length` / `check-style-guardrails` / `check-version-consistency` 缺「退出码」声明节（后者 usage 还错写「不一致退出 1」）；`check-requirement-trace` 的 0/2 同行不成节；CLAUDE「scripts 共享设施与契约」段未涵盖 `check-doc-traces` 的 1=HIGH 分级——逐处补正，并把分级退出码特例（code-traces / doc-traces / svg / version-consistency 事实源不可读）写进契约段与 plan-110 白名单；防再犯由 plan-110 机检承接 | rf-630

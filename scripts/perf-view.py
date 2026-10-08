@@ -153,7 +153,7 @@ def build_trend_report(
         lines.append("| 时间 | 总耗时 | 持仓数 | 阶段数 | 错误 |")
         lines.append("|:-----|------:|------:|------:|-----:|")
         for r in group_records[-5:]:
-            ts = r.get("timestamp", "?")[-16:]  # 简化为 HH:MM
+            ts = r.get("timestamp", "?")[:16]  # 日期+时:分（去秒）
             lines.append(
                 f"| {ts} | {r.get('total_seconds', 0):.1f}s | "
                 f"{r.get('holdings_count', '?')} | "
