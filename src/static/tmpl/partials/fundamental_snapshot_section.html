@@ -111,7 +111,7 @@
     </div>
     {% else %}
     <div class="section-content">
-        <div class="empty-note placeholder-note">
+        <div class="empty-note">
             <p><strong>财务指标暂不可用</strong></p>
             <p style="margin-top:8px;font-size: var(--fs-table);color:var(--text-muted);">
                 {{ _fi.get("reason") or "暂无 A 股标的或未取到指标" }}。
@@ -184,7 +184,7 @@
     </div>
     {% else %}
     <div class="section-content">
-        <div class="empty-note placeholder-note">
+        <div class="empty-note">
             <p><strong>持仓个股财报摘要暂不可用</strong></p>
             <p style="margin-top:8px;font-size: var(--fs-table);color:var(--text-muted);">
                 {{ _frd.get("reason") or "暂无 A 股标的或未取到财报" }}。

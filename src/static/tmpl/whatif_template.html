@@ -209,8 +209,8 @@
         .badge-unchanged { background: var(--badge-unchanged-bg); color: var(--badge-unchanged-text); }
 
         .notice-banner { background: var(--notice-bg); border-left: 4px solid var(--notice-border); padding: 10px 14px; font-size: var(--fs-table); border-radius: 4px; }
-        .empty-note { padding: 20px; text-align: center; color: var(--text-faint); }
-        .placeholder-note { background: var(--empty-section-bg); border: 1px dashed var(--border-dashed); border-radius: 6px; }
+        /* 单元级空态/提示（三档空态族之单元级；占位框并入） */
+        .empty-note { padding: 20px; text-align: center; color: var(--text-faint); background: var(--empty-section-bg); border: 1px dashed var(--border-dashed); border-radius: 6px; }
         .chart-export-btn { position: absolute; top: 6px; right: 6px; z-index: 5; font-size: var(--fs-footnote); }
         /* ── 触屏档（≤768）：触控目标 ≥44px（DESIGN Responsive 契约）── */
         @media (max-width: 768px) {
@@ -488,7 +488,7 @@
         <div class="section-title">⑧ 交易成本对比（调仓回放，申赎成本口径）</div>
         <div class="section-content">
             {% if not _tc.get("available") %}
-            <div class="empty-note placeholder-note"><p>{{ _tc.get("reason") or _cost.get("reason") or "交易成本对比暂不可用" }}</p></div>
+            <div class="empty-note"><p>{{ _tc.get("reason") or _cost.get("reason") or "交易成本对比暂不可用" }}</p></div>
             {% else %}
             <div class="summary-grid">
                 <div class="summary-card">
@@ -609,7 +609,7 @@
     {% else %}
     <div class="section">
         <div class="section-content">
-            <div class="empty-note placeholder-note">
+            <div class="empty-note">
                 <p><strong>调仓对比数据暂不可用</strong></p>
                 <p style="margin-top:8px;font-size: var(--fs-table);color:var(--text-muted);">
                     {% if whatif_data and whatif_data.get("reason") %}{{ whatif_data["reason"] }}{% else %}基准或目标持仓为空，无法对比{% endif %}。

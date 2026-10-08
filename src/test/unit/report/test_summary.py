@@ -842,7 +842,7 @@ class TestWriteSummarySheet(unittest.TestCase):
         self.assertEqual(pairs[start_yest + 1], ["  上证指数", "3200.00"])
 
     def test_a_indices_none(self):
-        """a_indices=None -> '暂无数据'。"""
+        """a_indices=None -> '暂无指数数据'（空态口径：暂无+具体对象）。"""
         mocks = self._call_summary_sheet(
             self.ws,
             self.mv,
@@ -854,7 +854,7 @@ class TestWriteSummarySheet(unittest.TestCase):
             us_indices=None,
         )
         pairs = self._data_pairs(mocks["mock_data"])
-        self._assert_pairs_contain(pairs, "── A股指数 ──", "暂无数据")
+        self._assert_pairs_contain(pairs, "── A股指数 ──", "暂无指数数据")
 
     # ════════════════════════════════════════════════════════
     #  市场指数 — 美股
@@ -921,7 +921,7 @@ class TestWriteSummarySheet(unittest.TestCase):
         self.assertEqual(pairs[start + 3], ["  标普500", "--"])
 
     def test_us_indices_none(self):
-        """us_indices=None -> '暂无数据'。"""
+        """us_indices=None -> '暂无指数数据'（空态口径：暂无+具体对象）。"""
         mocks = self._call_summary_sheet(
             self.ws,
             self.mv,
@@ -932,7 +932,7 @@ class TestWriteSummarySheet(unittest.TestCase):
             us_indices=None,
         )
         pairs = self._data_pairs(mocks["mock_data"])
-        self._assert_pairs_contain(pairs, "── 美股指数 ──", "暂无数据")
+        self._assert_pairs_contain(pairs, "── 美股指数 ──", "暂无指数数据")
 
     # ════════════════════════════════════════════════════════
     #  同时包含 A 股和美股

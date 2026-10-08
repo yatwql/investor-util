@@ -117,7 +117,7 @@
             {# 量化指标 Radar：3 张摘要卡片 + 雷达图增强（三级降级，同改造前） #}
             <div class="chart-box" style="height:320px;margin-top:16px;">
                 {% if data_unavailable %}
-                <div class="chart-empty-note">持仓市值数据不可用，量化指标暂停计算</div>
+                <div class="chart-empty-note">数据不可用：未获取持仓市值数据，量化指标暂停计算</div>
                 {% elif chart_datasets and chart_datasets.get("radar", {}).get("labels") %}
                 <canvas id="chart_radar" width="480" height="320" style="width:100%;height:100%;" aria-label="量化指标雷达图（悬停查看指标值）" role="img">图表无法显示，数据见智囊团复盘页</canvas>
                 {% else %}
@@ -342,7 +342,7 @@
         {% endif %}
         {% else %}
         <div class="section-content">
-            <div class="empty-note placeholder-note">
+            <div class="empty-note">
                 <p><strong>组合历史走势与回撤数据暂不可用</strong></p>
                 <p style="margin-top:8px;font-size: var(--fs-table);color:var(--text-muted);">
                     模块说明：基于当前持仓份额假设历史持仓不变（as-if 模拟），使用历史股价/净值
