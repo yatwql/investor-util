@@ -65,6 +65,8 @@ class ReportRunSnapshot:
     phases: list[_PhaseRecord] = field(default_factory=list)
     errors: list[str] = field(default_factory=list)
     warnings_count: int = 0
+    status: str = "completed"  # 运行状态：completed / interrupted（中断收口写入）
+    interrupted_stage: str | None = None  # 中断时活跃阶段名（仅 status=interrupted）
 
     @property
     def total_seconds(self) -> float:
@@ -80,6 +82,8 @@ class ReportRunSnapshot:
             "total_seconds": round(self.total_seconds, 3),
             "errors": self.errors,
             "warnings_count": self.warnings_count,
+            "status": self.status,
+            "interrupted_stage": self.interrupted_stage,
         }
 
 
@@ -121,6 +125,9 @@ class PerfCollector:
         self._current_name: str | None = None
         self._current_start: float | None = None
         self._stage_announcer = stage_announcer
+        self._interrupted = False
+        self._interrupted_stage: str | None = None
+        self._saved = False
 
     @property
     def report_type(self) -> str:
@@ -177,6 +184,14 @@ class PerfCollector:
 
     # ── 辅助记录 ──
 
+    def mark_interrupted(self) -> None:
+        """标记本次运行为「已中断」（快照 status=interrupted，随附活跃阶段名）。
+
+        由 run_integrity 中断收口调用；阶段间隙中断时活跃阶段为 None。
+        """
+        self._interrupted = True
+        self._interrupted_stage = self._current_name
+
     def add_error(self, message: str) -> None:
         """记录一条错误。"""
         self._errors.append(message)
@@ -197,12 +212,21 @@ class PerfCollector:
             phases=list(self._phases),
             errors=list(self._errors),
             warnings_count=self._warnings_count,
+            status="interrupted" if self._interrupted else "completed",
+            interrupted_stage=self._interrupted_stage if self._interrupted else None,
         )
 
     def save(self) -> None:
-        """将本次运行耗时追加到 perf_history.jsonl（遵循原子写入）。"""
+        """将本次运行耗时追加到 perf_history.jsonl（遵循原子写入）。
+
+        幂等：一次运行只落一条记录（正常完成先落、随后中断收口再落时跳过）。
+        """
+        if self._saved:
+            logger.debug("[perf] 本次运行已记录，跳过重复落盘")
+            return
         line = json.dumps(self.snapshot().to_json(), ensure_ascii=False) + "\n"
         _append_jsonl_atomic(_PERF_HISTORY_FILE, line)
+        self._saved = True
         logger.info("[perf] 耗时已记录到 %s", _PERF_HISTORY_FILE)
 
 

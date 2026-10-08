@@ -14,6 +14,7 @@
 - **运行体验**：**生成进行中阶段 ETA 预估**——`core/perf` 新增同阶段历史中位数预估 `estimate_stage_eta`（最近 20 次运行同名阶段减已耗时、严格同报告类型筛样本、无样本与读档/计算异常一律静默降级）与阶段状态唯一格式器；`PerfCollector` 可选阶段广播回调（回调异常隔离，basic/both/full 三处管线构造点零调用点改动）；`ProgressReporter.stage_progress` 基类单一实现，CLI verbose / Web / TUI 同源（瞬时阶段不刷屏、历史不足先静默后仅显已耗时） | plan-97
 - **运行体验**：**主菜单页头常驻状态仪表盘**——新增 `tui/status_line` 五项本地单源组装（上次报告时间 ← perf 历史末条 / 缓存过期数 ← 与 [4] 同口径统计 / 数据新鲜度 ← 最新价格缓存数据日期与自然日龄 / 降级源数 ← 健康历史末条 fail_count / LLM 状态点 ← llm_status 同源 ●○），逐项异常降级为「—」、整行永不抛、TTL 45s 记忆化随页头重绘零外部调用（新鲜度刻意不取交易日历：日历缓存未命中会走 akshare 触网），`print_header` 标题下常驻一行并附详情菜单指引 | plan-96
 - **报告呈现**：**月度收益日历（近 24 个月年 × 月红绿格）**——`analysis/monthly_returns` 按月聚合（月末/上月末−1、首月 inception 基线、截窗保真实上窗基线、胜亏平与最长连亏统计；as-if 现行 + realized 预留的双口径并排结构），`history_data.monthly_returns` 三处返回点单源注入；HTML 端纯表格热力格（正值红/负值绿，无 JS 天然具备无脚本回退）+ Excel 页签第四区块（FMT_PERCENT 小数 + profit_font 红绿字 + 口径统计说明行），区块注册表/矩阵/语义表/需求/手册/faq 目录树同步 | plan-86
+- **运行保障**：**生成中断一致性收口**——新增 `report/run_integrity`（`guard_run` 装饰 `generate_report`，ContextVar 线程隔离）：KeyboardInterrupt 安全落点清理未完成临时产物 + 进度通道提示「已写盘/未完成已丢弃/已清理临时文件」明细 + `status=interrupted`（含 `interrupted_stage`）落 perf_history（`save` 幂等一次一录，页头状态行显「（已中断）」不误判成功）+ 健康检查收敛；HTML/Excel 产物改同目录 `.tmp` + `os.replace` 原子落盘（中断不再产生半写文件，遗留预清扫），收口不吞 KI（CLI 退出码 130/菜单「操作已取消」语义不变）；新需求 R-OUT-13 + faq 中断问答改写 | plan-98
 
 （本次发布内容见下方归档索引）
 

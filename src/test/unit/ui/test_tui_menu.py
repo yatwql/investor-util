@@ -371,6 +371,16 @@ class TestStatusLine(unittest.TestCase):
 
             self.assertEqual(_last_report_part(), "上次报告 10-07 09:55")
 
+    def test_last_report_interrupted_marker(self) -> None:
+        """末条 status=interrupted → 时间戳带「（已中断）」，下次启动不误判为成功。"""
+        with patch(
+            "src.python.core.perf.load_history",
+            return_value=[{"timestamp": "2026-10-07T09:55:00", "status": "interrupted"}],
+        ):
+            from src.python.tui.status_line import _last_report_part
+
+            self.assertEqual(_last_report_part(), "上次报告 10-07 09:55（已中断）")
+
     def test_last_report_empty_and_broken(self) -> None:
         """无历史 / 读取异常 → 逐项降级为 —。"""
         from src.python.tui.status_line import _last_report_part

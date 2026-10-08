@@ -39,7 +39,11 @@ def _last_report_part() -> str:
         if not records:
             return "上次报告 —"
         ts = str(records[-1].get("timestamp") or "")
-        return f"上次报告 {datetime.fromisoformat(ts):%m-%d %H:%M}"
+        stamp = f"{datetime.fromisoformat(ts):%m-%d %H:%M}"
+        # 中断收口落的 status=interrupted 记录：下次启动明确显示，不误判为成功
+        if str(records[-1].get("status") or "") == "interrupted":
+            return f"上次报告 {stamp}（已中断）"
+        return f"上次报告 {stamp}"
     except Exception:
         logger.debug("状态行「上次报告」取数失败，降级为 —", exc_info=True)
         return "上次报告 —"

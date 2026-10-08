@@ -30,6 +30,7 @@ from src.python.report._report_output import (  # noqa: F401  # 产物落盘子�
 from src.python.report._chart_dataset_factory import _build_chart_datasets_for_report  # noqa: F401
 from src.python.report._full_risk_metrics import _prepare_full_risk_metrics  # noqa: F401
 from src.python.report._report_health import _collect_health_checks, _spawn_health_checks  # noqa: F401
+from src.python.report.run_integrity import bind_health, bind_perf
 from src.python.report._report_helpers import (  # noqa: F401
     _action_holdings_details,
     _compute_details,
@@ -89,11 +90,13 @@ def _generate_report_both(
     from src.python.report.orchestrator import ReportResult
 
     perf = PerfCollector(report_type="both", holdings=holdings, stage_announcer=reporter.stage_progress)
+    bind_perf(perf)
     result = ReportResult()
     result.holdings_ok = True
 
     # 后台启动健康检查（与数据获取并行）
     _health_fut = _spawn_health_checks()
+    bind_health(_health_fut, "both", holdings)
 
     _enable_fund_deep_analysis = is_enable_fund_deep_analysis(config)
     _enable_news = is_enable_news(config)
@@ -406,9 +409,11 @@ def _generate_report_full(
     from src.python.report.orchestrator import ReportResult, prepare_report_data
 
     perf = PerfCollector(report_type="full", holdings=holdings, stage_announcer=reporter.stage_progress)
+    bind_perf(perf)
     result = ReportResult()
     result.holdings_ok = True
     _health_fut = _spawn_health_checks()
+    bind_health(_health_fut, "full", holdings)
 
     _enable_fund_deep_analysis = is_enable_fund_deep_analysis(config)
     _enable_news = is_enable_news(config)

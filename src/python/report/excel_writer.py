@@ -14,6 +14,7 @@ from openpyxl.styles import Alignment, Font, PatternFill
 from openpyxl.utils import get_column_letter
 
 from src.python.core.constants import LATEST_XLSX_NAME, REPORT_FILE_BASE
+from src.python.report.run_integrity import TEMP_SUFFIX, note_artifact, note_temp
 from src.python.report.styles import (
     BOLD_FONT,
     CENTER_ALIGN,
@@ -104,6 +105,19 @@ def _cleanup_old_archives(output_dir: str, max_days: int = _REPORT_RETENTION_DAY
         logger.warning("归档清理过程异常（非关键），跳过", exc_info=True)
 
 
+def _save_workbook_atomic(wb: Workbook, path: str) -> None:
+    """Workbook 原子落盘：同目录临时文件 + os.replace（单文件原子）。
+
+    中断（Ctrl+C）只可能留下 `<目标>.tmp`，最终文件不会半写截断；
+    临时文件由 run_integrity 中断收口（登记 + 产物前缀兜底）清扫。
+    """
+    tmp = f"{path}{TEMP_SUFFIX}"
+    note_temp(tmp)
+    wb.save(tmp)
+    os.replace(tmp, path)
+    note_artifact("xlsx", path)
+
+
 def save_workbook(wb: Workbook, output_dir: str = "reports") -> str:
     """保存 workbook 到最新路径和存档路径，返回最新文件路径。
 
@@ -126,14 +140,14 @@ def save_workbook(wb: Workbook, output_dir: str = "reports") -> str:
     archive = _archive_path(output_dir)
 
     try:
-        wb.save(latest)
+        _save_workbook_atomic(wb, latest)
         logger.info("最新报告已保存: %s", latest)
     except PermissionError:
         logger.error("文件被占用: %s", latest)
         raise
 
     try:
-        wb.save(archive)
+        _save_workbook_atomic(wb, archive)
         logger.info("存档报告已保存: %s", archive)
     except (PermissionError, OSError) as e:
         logger.warning("存档报告写入失败: %s", e)

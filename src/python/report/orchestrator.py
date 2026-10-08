@@ -15,6 +15,7 @@ from datetime import datetime
 from typing import Any
 
 from src.python.report.progress import ProgressReporter
+from src.python.report.run_integrity import bind_health, bind_perf, guard_run
 
 # ── 子模块 re-export ────────────────────────────────────
 from src.python.report._report_aux_metrics import (  # noqa: F401
@@ -553,6 +554,7 @@ def artifacts_for_report_type(report_type: str) -> tuple[str, ...]:
 # ── generate_report ──
 
 
+@guard_run
 def generate_report(
     holdings: list,
     config: dict,
@@ -605,11 +607,13 @@ def generate_report(
         from src.python.report.excel_generator import generate_excel_report
 
         perf = PerfCollector(report_type="basic", holdings=holdings, stage_announcer=reporter.stage_progress)
+        bind_perf(perf)
         sec_order = get_report_section_order(config)
         output = output_dir or config.get("output_dir", "reports")
 
         # 后台启动健康检查（与 Excel 生成并行）
         _health_fut = _spawn_health_checks()
+        bind_health(_health_fut, "basic", holdings)
 
         try:
             perf.start("Excel 生成")

@@ -1290,7 +1290,7 @@ sh .githooks/install-hooks.sh --off   # 停用
 | 最短/最长 | 该阶段历史最小/最大耗时 |
 | 次数 | 该阶段出现次数（条件阶段如历史走势仅在启用时出现） |
 
-**数据来源**：每次 `generate_report()` 调用时自动记录到 `data/state/perf_history.jsonl`，无需手动触发。
+**数据来源**：每次 `generate_report()` 调用时自动记录到 `data/state/perf_history.jsonl`，无需手动触发；中断运行以 `status=interrupted` 记录（含 `interrupted_stage`），与成功完成（`completed`）区分，页头状态行据显「已中断」。
 
 **`probe.py` — 探测统一入口（target 分发 registry）**
 

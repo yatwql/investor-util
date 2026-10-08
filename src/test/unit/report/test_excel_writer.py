@@ -87,13 +87,24 @@ class TestSaveWorkbook(unittest.TestCase):
         self.assertTrue(path.endswith(".xlsx"))
 
     def test_archive_failure_still_returns_latest(self):
-        """存档权限异常 → 降级，最新版仍保存成功。"""
-        with patch("openpyxl.Workbook.save") as mock_save:
-            # 第一次调用（最新版）成功，第二次（存档）失败
-            mock_save.side_effect = [None, PermissionError("denied")]
+        """存档权限异常 → 降级，最新版仍保存成功（原子落盘：写临时再替换）。"""
+        calls = {"n": 0}
+
+        def _fake_save(_wb, path):
+            # 模拟真实 Workbook.save 落盘：首次写文件成功，存档那次抛权限异常
+            calls["n"] += 1
+            if calls["n"] > 1:
+                raise PermissionError("denied")
+            with open(path, "wb") as f:
+                f.write(b"PK\x03\x04stub")
+
+        with patch("openpyxl.Workbook.save", _fake_save):
             # 不应抛异常
             path = ew.save_workbook(self.wb, output_dir=self.tmp.name)
             self.assertIsNotNone(path)
+            # 原子落盘：最终文件在，临时文件无残留
+            self.assertTrue(os.path.exists(path))
+            self.assertFalse(os.path.exists(path + ".tmp"))
 
 
 class TestWriteRows(unittest.TestCase):
