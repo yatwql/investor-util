@@ -13,8 +13,17 @@
   W2 圆角档位（护栏 2）      ``border-radius`` 档外字面值（**观察项**，统计不判 finding）
 
 **观察期口径**（样式护栏先例，2026-10-08 立）：W 级仅统计与 ``-v`` 明细供分诊，
-**不判 finding**、不入 pre-commit 钩子域与 CI guards；E 级 finding 退出码 2。
-待误报率稳定后再评估入域。检查域：两份报告模板 + partials + Web 工作台样式表。
+**不判 finding**、不入 pre-commit 钩子域与 CI guards；待误报率稳定后再评估入域。
+检查域：两份报告模板 + partials + Web 工作台样式表。
+
+用法：
+  python scripts/check-style-guardrails.py           # 检查全部
+  python scripts/check-style-guardrails.py -v        # 详细输出（含 W 级观察清单）
+  python scripts/check-style-guardrails.py --ci      # CI 模式（只输出 文件:描述）
+
+退出码：
+  0 — 全部通过（无 E 级 finding；W 级观察项不判 finding）
+  2 — 发现 E 级 finding（强调色越权 / 明暗同步缺失 / 双面 token 对表不一致）
 """
 
 from __future__ import annotations

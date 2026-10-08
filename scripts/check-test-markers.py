@@ -17,7 +17,7 @@
 
 退出码：
   0 — 全部通过
-  1 — 存在违规
+  2 — 存在违规（与 _checklib.report 返回值域一致）
 """
 
 from __future__ import annotations

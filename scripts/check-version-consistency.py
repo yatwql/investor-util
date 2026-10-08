@@ -16,10 +16,18 @@
 
 用法：
   python scripts/check-version-consistency.py
-    检查所有文件，不一致时报错退出（exit code 1）。
+    检查所有文件，不一致时按契约退出（退出码 2）。
 
   python scripts/check-version-consistency.py --fix
-    自动同步 pyproject.toml 的 version 字段（其他文件需手动更新）。
+    自动同步 pyproject.toml 的 version 字段（其他文件需手动更新）；仍有未同步项时退出 2。
+
+  python scripts/check-version-consistency.py --ci
+    CI 模式（只输出 文件:描述）。
+
+退出码：
+  0 — 全部一致（含 --fix 已全部修正）
+  1 — 事实源不可读（constants.py 中未找到 APP_VERSION）
+  2 — 发现不一致
 """
 
 import re

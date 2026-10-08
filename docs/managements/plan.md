@@ -141,7 +141,7 @@
 
 **现状与问题**（2026-10-08 scripts 核查）：退出码 docstring 声明与实现的契约（rf-629/rf-630 两例实错）、检查类 CLI 面（`-v`/`--ci`/`add_common_args`）、文本 I/O 显式 encoding、脚本↔测试映射，全靠人肉与逐案修复；一次核查即发现退出码声明 5 例不齐
 
-**动作**：新增 check-script-contract（复用 `_checklib`，`-v/--ci`、退出 0/2；观察期不入钩子与 CI，模式同 check-style-guardrails）：① docstring 退出码声明码集 ⊆ `_checklib.report` 返回值域 {0,2}（特例白名单：check-code-traces 0/1/2/3、check-doc-traces 0/1/2、check-svg 含 1=环境缺失）② 顶层 check-* 必须 `add_common_args` ③ 脚本文本 I/O 显式 encoding ④ 顶层脚本须有对应测试（一次性工具白名单豁免）；配单测覆盖规则命中与白名单
+**动作**：新增 check-script-contract（复用 `_checklib`，`-v/--ci`、退出 0/2；观察期不入钩子与 CI，模式同 check-style-guardrails）：① docstring 退出码声明码集 ⊆ `_checklib.report` 返回值域 {0,2}（特例白名单：check-code-traces 0/1/2/3、check-doc-traces 0/1/2、check-svg 含 1=环境缺失、check-version-consistency 含 1=事实源不可读）② 顶层 check-* 必须 `add_common_args` ③ 脚本文本 I/O 显式 encoding ④ 顶层脚本须有对应测试（一次性工具白名单豁免）；配单测覆盖规则命中与白名单
 
 #### 🔲 `plan-112` collect modes 与 test-runner MODES 单源化
 

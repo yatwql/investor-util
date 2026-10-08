@@ -9,6 +9,8 @@
 
 ## [0.12.7-dev] - 开发中（未发布）
 
+- **工程效能/缺陷**：**scripts 退出码 docstring 契约族补正**——`check-test-markers` 声明「0/1」而实现走 `_checklib.report()` 实为 0/2；`check-file-length` / `check-style-guardrails` / `check-version-consistency` 缺「退出码」声明节（后者 usage 还错写「不一致退出 1」）；`check-requirement-trace` 的 0/2 同行不成节；CLAUDE「scripts 共享设施与契约」段未涵盖 `check-doc-traces` 的 1=HIGH 分级——逐处补正，并把分级退出码特例（code-traces / doc-traces / svg / version-consistency 事实源不可读）写进契约段与 plan-110 白名单；防再犯由 plan-110 机检承接 | rf-630
+
 - **报告安全/缺陷**：**持仓匿名化代码面改在渲染点掩码**——HTML 自由文本清扫剥离代码（原实现把真码并入整份 HTML 子串替换，与「数字串全局替换有金额误伤风险、刻意不在 HTML 自由文本换代码」的前提相悳，实测 `1600519.00` 会被改成 `1000XXX.00` 破坏金额与 JSON 数值；summary 模式映射不含代码，明细以外章节真码裸奔）；新增 `build_code_display_map` / `mask_holding_code` / `code_masking_enabled` / `mask_code_text`（**边界安全**精确键替换，相邻非数字/小数点/冒号才认作独立代码 token）与模板 `anon_code` pass_context 过滤器，9 份 partial 代码列在渲染点键控折叠（列表型 codes 逐项 map），演进图表 `top_holdings` 代码在数据层折叠，LLM 提示词组装点折叠且代码白名单块改写为「真码一律不写」反幻觉约束；数值面评估：派生章节数值为公开市场/财报数据、保留原值，仓位面已由明细层 full 千位模糊 / summary 大类聚合覆盖；回归 = 产物级 HTML 真码断言 + 匿名化映射/边界安全替换/过滤器/图表数据层/提示词五组单测，手册 §L 改写 | rf-628
 
 - **LLM/缺陷**：**串行后置模块 http_client 缺省兜底**——`run_holding_change_review` / `run_self_review` 全链不注入 http_client，None 直达 provider 层 `assert client is not None` 秒败且被 `call_llm` per-provider `except` 吞成「provider 异常」整链连环失败（实测四 provider 各 ~2ms、归因整章静默丢失）；修复收敛在多链与 legacy 唯一汇聚点 `call_single_provider`：None 且 provider 受支持时经 `core.http_client.make_http_client` 自建一次性客户端、`with` 用后关闭（守 HTTP 客户端统一工厂约束）；回归测试 9 项（漏斗 7 + 端到端 2，摘除修复后 7 项全红） | rf-634

@@ -13,7 +13,16 @@
   - 豁免文件回落至阈值内 → ``-v`` 提示「可移除豁免」（不判 finding）。
 
 豁免语义名登记（相对路径 → 挂账位置与处理要求；豁免必须与 review-findings
-待处理区条目同步存在）：
+待处理区条目同步存在）：见 ``EXEMPTIONS`` 常量。
+
+用法：
+  python scripts/check-file-length.py            # 检查全部
+  python scripts/check-file-length.py -v         # 详细输出（含可选优化区间清单与豁免状态）
+  python scripts/check-file-length.py --ci       # CI 模式（只输出 文件:描述）
+
+退出码：
+  0 — 全部通过（无破线、豁免项均在阈值内）
+  2 — 发现 finding（非豁免文件超红线）
 """
 
 import argparse
