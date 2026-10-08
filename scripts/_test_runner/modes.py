@@ -232,6 +232,24 @@ _MODE_TABLE_ORDER: tuple[str, ...] = (
 _BENCH_MODES: tuple[str, ...] = tuple(m for m in _MODE_TABLE_ORDER if m != "all") + ("all",)
 
 
+#: 功能域中文标签 ↔ unit 子标记（单一来源）：collect-test-coverage 的功能域聚合
+#: 与 check-doc-drift 的 test-coverage.md 功能域表核对共用同一张表，增删 unit
+#: 子标记时两边自动跟随，不得各自维护副本。
+UNIT_DOMAIN_LABELS: dict[str, str] = {
+    "unit_providers": "数据源 Provider",
+    "unit_fetcher": "数据获取调度",
+    "unit_news": "新闻处理",
+    "unit_report": "报告生成",
+    "unit_llm": "LLM 智能分析",
+    "unit_config": "配置管理",
+    "unit_core": "核心基础设施",
+    "unit_analysis": "分析计算",
+    "unit_cli": "CLI 命令行",
+    "unit_ui": "TUI 交互",
+    "unit_web": "Web 服务",
+}
+
+
 def _resolve_modes(modes_to_run: list[str]) -> list[str]:
     """展开模式列表：将 bench 别名替换为基准模式序列，按首次出现去重保序。
 

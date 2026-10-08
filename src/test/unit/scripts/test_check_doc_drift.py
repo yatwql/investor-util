@@ -405,6 +405,59 @@ class TestTestCoverageCounts:
     def test_unknown_name_skipped(self, drift):
         assert drift.check_test_coverage_counts("| `ghost_marker` | **1** |\n", {"unit": 1}) == []
 
+    def test_domain_row_matching_passes(self, drift):
+        """功能域中文加粗标签行参与核对（标签 → unit 子标记经共享映射）。"""
+        row = "| **数据源 Provider** | `providers/` | `unit/providers/` | 545 |\n"
+        assert drift.check_test_coverage_counts(row, {"unit_providers": 545}) == []
+
+    def test_domain_row_mismatch_reported(self, drift):
+        row = "| **LLM 智能分析** | `llm/` | `unit/llm/` | 1,169 |\n"
+        findings = drift.check_test_coverage_counts(row, {"unit_llm": 1183})
+        assert len(findings) == 1 and "标记 `unit_llm` 覆盖项数 1169" in findings[0]
+
+    def test_scenario_alias_row_maps_to_parent_marker(self, drift):
+        """表内聚合行「端到端业务场景」经别名映射到 scenario 父标记计数。"""
+        row = "| **端到端业务场景** | 多模块组合 | `scenario/` | 257 |\n"
+        assert drift.check_test_coverage_counts(row, {"scenario": 257}) == []
+        findings = drift.check_test_coverage_counts(row, {"scenario": 999})
+        assert len(findings) == 1 and "标记 `scenario` 覆盖项数 257" in findings[0]
+
+    def test_bold_row_outside_domain_section_skipped(self, drift):
+        """功能域章外的加粗行（其它表）不属本核对域，未登记也不报。"""
+        row = "| **任意加粗标签** | 说明 | 1 |\n"
+        assert drift.check_test_coverage_counts(row, {"unit": 1}) == []
+
+    def test_unregistered_label_in_domain_section_reported(self, drift):
+        """功能域章内出现未登记标签 → 报出而非静默跳过（行加了但映射没跟上）。"""
+        from _test_runner.modes import UNIT_DOMAIN_LABELS
+
+        doc = "## 功能域对应测试源\n\n" + "".join(
+            f"| **{label}** | `x/` | `unit/` | {i} |\n" for i, label in enumerate(UNIT_DOMAIN_LABELS.values(), 1)
+        )
+        snapshot = {m: i for i, m in enumerate(UNIT_DOMAIN_LABELS, 1)}
+        doc += "| **新功能域** | `x/` | `unit/x/` | 5 |\n"
+        findings = drift.check_test_coverage_counts(doc, snapshot)
+        assert len(findings) == 1 and "标签 `新功能域` 未登记" in findings[0]
+
+    def test_domain_section_missing_rows_reported(self, drift):
+        """映射中的功能域在表中缺行 → 反查报出（以映射集动态遍历，不写死条数）。"""
+        from _test_runner.modes import UNIT_DOMAIN_LABELS
+
+        doc = "## 功能域对应测试源\n\n| **数据源 Provider** | `providers/` | `unit/providers/` | 545 |\n"
+        findings = drift.check_test_coverage_counts(doc, {"unit_providers": 545})
+        for marker, label in UNIT_DOMAIN_LABELS.items():
+            if marker == "unit_providers":
+                assert not any(label in f for f in findings)
+            else:
+                assert any(label in f and marker in f for f in findings), label
+
+    def test_domain_labels_single_source_with_collect(self, drift):
+        """功能域标签映射与 collect-test-coverage 同一对象（防双处定义漂移）。"""
+        from _test_runner.modes import UNIT_DOMAIN_LABELS
+
+        collect = load_script("collect-test-coverage.py")
+        assert collect.UNIT_DOMAIN_LABELS is UNIT_DOMAIN_LABELS
+
 
 # ═══ 构建产物排除 ═══
 

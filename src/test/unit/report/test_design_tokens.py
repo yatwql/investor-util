@@ -56,16 +56,19 @@ def _root_defs(text: str) -> set[str]:
     return set(re.findall(r"(--[a-z0-9-]+)\s*:", m.group(1)))
 
 
+# 类作用域 fixture 置于模块级（类内实例方法形式不被 pytest 接受）
+@pytest.fixture(scope="class")
+def report_defs():
+    return _root_defs(REPORT_TMPL.read_text(encoding="utf-8"))
+
+
+@pytest.fixture(scope="class")
+def web_defs():
+    return _root_defs(WEB_CSS.read_text(encoding="utf-8"))
+
+
 class TestSharedRoleParity:
     """共享角色两面同名定义。"""
-
-    @pytest.fixture(scope="class")
-    def report_defs(self):
-        return _root_defs(REPORT_TMPL.read_text(encoding="utf-8"))
-
-    @pytest.fixture(scope="class")
-    def web_defs(self):
-        return _root_defs(WEB_CSS.read_text(encoding="utf-8"))
 
     def test_shared_roles_defined_on_both_sides(self, report_defs, web_defs):
         missing_report = [r for r in SHARED_ROLES if f"--{r}" not in report_defs]

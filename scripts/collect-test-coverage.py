@@ -31,7 +31,12 @@ _SCRIPTS_DIR = Path(__file__).resolve().parent
 if str(_SCRIPTS_DIR) not in sys.path:  # noqa: E402
     sys.path.insert(0, str(_SCRIPTS_DIR))  # 同目录共享模块（_test_runner）
 
-from _test_runner.modes import MODES, compile_marker_expr, mode_marker_expr  # noqa: E402
+from _test_runner.modes import (  # noqa: E402
+    MODES,
+    UNIT_DOMAIN_LABELS,
+    compile_marker_expr,
+    mode_marker_expr,
+)
 
 # 不列入输出的模式及理由（其余模式随 MODES 增删自动跟随，不手维护清单）：
 #   all   — 全量已由「总收集: N」行表达，文档按别名 all → _总收集 对表
@@ -171,22 +176,9 @@ def main() -> None:
     for s in ["llm", "smoke", "edge", "data"]:
         print(f"{s}: {count(lambda m, s=s: s in m)}")
 
-    # ── 功能域（unit 子标记聚合）──
-    domain_map = {
-        "unit_providers": "数据源 Provider",
-        "unit_fetcher": "数据获取调度",
-        "unit_news": "新闻处理",
-        "unit_report": "报告生成",
-        "unit_llm": "LLM 智能分析",
-        "unit_config": "配置管理",
-        "unit_core": "核心基础设施",
-        "unit_analysis": "分析计算",
-        "unit_cli": "CLI 命令行",
-        "unit_ui": "TUI 交互",
-        "unit_web": "Web 服务",
-    }
+    # ── 功能域（unit 子标记聚合，标签映射单一来源见 _test_runner.modes）──
     print("\n### 功能域（unit 子标记聚合）")
-    for s, label in domain_map.items():
+    for s, label in UNIT_DOMAIN_LABELS.items():
         print(f"{label}: {count(lambda m, s=s: s in m)}")
 
     # ── unit 文件分布（供功能域表文件级参考）──
