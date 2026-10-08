@@ -5,7 +5,7 @@ from __future__ import annotations
 import os
 from typing import Any
 
-from jinja2 import Environment, FileSystemLoader
+from jinja2 import Environment, FileSystemLoader, pass_context
 
 from src.python.core.code_utils import is_qdii_extended
 from src.python.core.registry import _REPORT_SECTION_DEFAULT
@@ -116,6 +116,28 @@ def _jinja_sentiment_colorize(text: str) -> str:
 
 # ── 注册过滤器 & 全局函数 ────────────────────────────────────
 
+
+@pass_context
+def _jinja_anon_code(ctx, value: Any) -> Any:
+    """匿名化代码列掩码：在模板渲染点把持仓真码折叠为显示掩码。
+
+    与产物自由文本全文替换不同，这里是**精确键控**查找（真码是完整键），
+    因此不会误伤金额/JSON 数值；指数、基准等非持仓代码不在映射内、原样通过。
+    上下文无 ``anon_code_map`` 或未命中时返回原值，off/code_display 零副作用。
+
+    Args:
+        ctx: Jinja 渲染上下文（pass_context 注入）。
+        value: 待渲染的代码（非 str 或空值原样返回）。
+
+    Returns:
+        折叠后的显示代码。
+    """
+    if not isinstance(value, str) or not value:
+        return value
+    code_map = ctx.get("anon_code_map") or {}
+    return code_map.get(value, value)
+
+
 _ENV.filters["money"] = _jinja_money
 _ENV.filters["pct"] = _jinja_pct
 _ENV.filters["price"] = _jinja_price
@@ -125,6 +147,7 @@ _ENV.filters["profit_color"] = _jinja_profit_color
 _ENV.filters["price_type_color"] = _jinja_price_type_color
 _ENV.filters["thousands"] = _jinja_thousands
 _ENV.filters["sentiment_colorize"] = _jinja_sentiment_colorize
+_ENV.filters["anon_code"] = _jinja_anon_code
 
 _ENV.globals["section_visible"] = lambda key: False  # fail-closed 默认值，生产环境由 context 变量覆盖
 

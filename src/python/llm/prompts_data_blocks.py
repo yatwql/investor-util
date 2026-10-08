@@ -6,6 +6,7 @@
 
 from __future__ import annotations
 
+from src.python.config.anonymizer import mask_holding_code
 from src.python.core.code_utils import is_qdii_extended
 
 
@@ -43,10 +44,10 @@ def _build_difpipeline_data_block(pipeline_data: dict | None) -> str:
     decreased = diff.get("decreased", [])
 
     if added:
-        _a = "、".join(f"{a['name']}({a['code']})" for a in added[:3])
+        _a = "、".join(f"{a['name']}({mask_holding_code(a['code'])})" for a in added[:3])
         lines.append(f"新增持仓: {_a}")
     if removed:
-        _r = "、".join(f"{r['name']}({r['code']})" for r in removed[:3])
+        _r = "、".join(f"{r['name']}({mask_holding_code(r['code'])})" for r in removed[:3])
         lines.append(f"清仓: {_r}")
     if increased:
         _i = "、".join(f"{i['name']}+{i['shares_diff']:.0f}份" for i in increased[:3])
@@ -180,7 +181,7 @@ def _build_rebalance_block(holdings_details: list[dict] | None, total_mv: float)
             weight_pct = s["weight"] * 100
             threshold_pct = s["threshold"] * 100
             lines.append(
-                f"- {s['name']}({s['code']}) 持仓占比 {weight_pct:.1f}%，"
+                f"- {s['name']}({mask_holding_code(s['code'])}) 持仓占比 {weight_pct:.1f}%，"
                 f"超出建议上限 {threshold_pct:.0f}%，{s['action']}"
             )
 
@@ -311,7 +312,7 @@ def _fmt_wan(num: float) -> str:
 
 def _fmt_holding_line(h: dict, show_cost: bool = False, compact: bool = False) -> str:
     """格式化单条持仓明细行，含净值日期 / QDII 标注。"""
-    code = h.get("code", "")
+    code = mask_holding_code(h.get("code", ""))
     mv = h.get("market_value", 0)
     profit = h.get("profit", 0)
     rate = h.get("profit_rate")

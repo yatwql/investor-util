@@ -9,6 +9,8 @@
 
 ## [0.12.7-dev] - 开发中（未发布）
 
+- **报告安全/缺陷**：**持仓匿名化代码面改在渲染点掩码**——HTML 自由文本清扫剥离代码（原实现把真码并入整份 HTML 子串替换，与「数字串全局替换有金额误伤风险、刻意不在 HTML 自由文本换代码」的前提相悳，实测 `1600519.00` 会被改成 `1000XXX.00` 破坏金额与 JSON 数值；summary 模式映射不含代码，明细以外章节真码裸奔）；新增 `build_code_display_map` / `mask_holding_code` / `code_masking_enabled` / `mask_code_text`（**边界安全**精确键替换，相邻非数字/小数点/冒号才认作独立代码 token）与模板 `anon_code` pass_context 过滤器，9 份 partial 代码列在渲染点键控折叠（列表型 codes 逐项 map），演进图表 `top_holdings` 代码在数据层折叠，LLM 提示词组装点折叠且代码白名单块改写为「真码一律不写」反幻觉约束；数值面评估：派生章节数值为公开市场/财报数据、保留原值，仓位面已由明细层 full 千位模糊 / summary 大类聚合覆盖；回归 = 产物级 HTML 真码断言 + 匿名化映射/边界安全替换/过滤器/图表数据层/提示词五组单测，手册 §L 改写 | rf-628
+
 - **LLM/缺陷**：**串行后置模块 http_client 缺省兜底**——`run_holding_change_review` / `run_self_review` 全链不注入 http_client，None 直达 provider 层 `assert client is not None` 秒败且被 `call_llm` per-provider `except` 吞成「provider 异常」整链连环失败（实测四 provider 各 ~2ms、归因整章静默丢失）；修复收敛在多链与 legacy 唯一汇聚点 `call_single_provider`：None 且 provider 受支持时经 `core.http_client.make_http_client` 自建一次性客户端、`with` 用后关闭（守 HTTP 客户端统一工厂约束）；回归测试 9 项（漏斗 7 + 端到端 2，摘除修复后 7 项全红） | rf-634
 
 - **报告呈现**：**报告空状态与降级呈现统一**——占位样式归并三档族（章节 `empty-section` / 单元 `empty-note` / 图表 `chart-empty-note`）：原 `placeholder-note` 同义修饰类并入 `empty-note` 基底（20 处双类清零，两模板定义合并）；文案二元口径落地（合法空「暂无+具体对象」——summary 指数占位双端改「暂无指数数据」、降级空「数据不可用：<原因>」——数据源状态行×2 与历史图空态加标准前缀，与 data_freshness 词根同源）；豁免表（哨兵值/拼接缀/条件说明句）入档；状态→观感映射与空态中性分工约束入 DESIGN Data States 节（含 20 partial 核对结论）；脆窗 print 断言改括号平衡解析；契约测试 11 项 | plan-109

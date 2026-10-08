@@ -74,7 +74,7 @@
                 {% for r in _fi.get("rows", []) %}
                 <tr>
                     <td class="text-left">{{ r.get("name", "") }}</td>
-                    <td>{{ r.get("code", "") }}</td>
+                    <td>{{ r.get("code", "") | anon_code }}</td>
                     <td>{{ r.get("report_period", "") }}<br><span style="font-size: var(--fs-footnote);color:var(--text-faint);">{{ r.get("doc_type_label", "") }}</span></td>
                     <td>{{ yi(r.get("revenue")) }}</td>
                     <td>{{ yi(r.get("net_profit")) }}</td>
@@ -98,7 +98,7 @@
         <div class="penetration-notes" style="margin-top: 12px;">
             <div><strong>以下标的未取到指标</strong>（不影响其余标的）：</div>
             {% for f in _fi.get("failures", []) %}
-            <div>* {{ f.get("name") or f.get("code") }}（{{ f.get("code") }}）：{{ f.get("reason") }}</div>
+            <div>* {{ (f.get("name") or f.get("code")) | anon_code }}（{{ f.get("code") | anon_code }}）：{{ f.get("reason") }}</div>
             {% endfor %}
         </div>
         {% endif %}
@@ -154,7 +154,7 @@
                 {% for r in _frd.get("rows", []) %}
                 <tr>
                     <td class="text-left">{{ r.get("name", "") }}</td>
-                    <td>{{ r.get("code", "") }}</td>
+                    <td>{{ r.get("code", "") | anon_code }}</td>
                     <td>{{ r.get("report_period", "") }}</td>
                     <td>{{ r.get("doc_type", "") }}</td>
                     <td>{{ r.get("announcement_date", "") }}</td>
@@ -173,7 +173,7 @@
         <div class="penetration-notes" style="margin-top: 12px;">
             <div><strong>未取到财报的标的</strong></div>
             {% for f in _frd_failures %}
-            <div>* {{ f.get("name") or f.get("code") }}（{{ f.get("code") }}）：{{ f.get("reason", "") }}</div>
+            <div>* {{ (f.get("name") or f.get("code")) | anon_code }}（{{ f.get("code") | anon_code }}）：{{ f.get("reason", "") }}</div>
             {% endfor %}
         </div>
         {% endif %}

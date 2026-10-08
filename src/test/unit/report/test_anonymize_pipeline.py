@@ -388,3 +388,54 @@ class TestNewsDisplayMask:
         items = [{"matched_keywords": ["贵州茅台"], "enriched_keywords": [{"label": "贵州茅台"}]}]
         _mask_news_display_fields(items, _SAMPLE_HOLDINGS, "off")
         assert items[0]["matched_keywords"] == ["贵州茅台"]
+
+
+class TestAnonCodeRenderMask:
+    """模板渲染点代码掩码：anon_code 过滤器（键控）+ 产物清扫的代码面分工。"""
+
+    def test_anon_code_masks_only_mapped_codes(self):
+        from src.python.report.html_jinja_env import _ENV
+
+        tpl = _ENV.from_string('{{ a }}|{{ b | anon_code }}|{{ lst | map("anon_code") | join(",") }}')
+        out = tpl.render(anon_code_map={"600519": "000XXX"}, a="x", b="600519", lst=["600519", "000300"])
+        # 持仓码折叠；指数码不在映射内原样（列表逐项 map 覆盖 join 展示面）
+        assert out == "x|000XXX|000XXX,000300"
+
+    def test_anon_code_identity_without_map(self):
+        """上下文无 anon_code_map（off/code_display 或其它模板）→ 恒等。"""
+        from src.python.report.html_jinja_env import _ENV
+
+        tpl = _ENV.from_string("{{ b | anon_code }}")
+        assert tpl.render(b="600519") == "600519"
+        assert tpl.render(anon_code_map={}, b="600519") == "600519"
+
+    def test_anon_code_ignores_non_string_values(self):
+        """非字符串/空值原样返回（过滤器只负责代码列）。"""
+        from src.python.report.html_jinja_env import _ENV
+
+        tpl = _ENV.from_string("{{ v | anon_code }}")
+        assert tpl.render(anon_code_map={"600519": "000XXX"}, v="") == ""
+        assert tpl.render(anon_code_map={"600519": "000XXX"}, v=123) == "123"
+
+    def test_html_sweep_names_only_code_covered_separately(self):
+        """HTML 自由文本清扫只含名称；代码面由 mask_code_text 边界安全替换兑底。"""
+        from src.python.config.anonymizer import (
+            build_code_display_map,
+            build_report_alias_map,
+            mask_code_text,
+            mask_display_text,
+        )
+
+        details = [{"code": "600519", "name": "贵州茅台"}, {"code": "600036", "name": "招商银行"}]
+        mode = "full_anonymous"
+        html = "<td>贵州茅台</td><td>600519</td><span>1600519.00</span><i>600036</i>"
+        swept = mask_display_text(html, build_report_alias_map(details, mode, include_codes=False))
+        # 名称已折叠；金额含真码数字片段但名称清扫不含代码 → 绝不被破坏
+        assert "贵州茅台" not in swept
+        assert "600519" in swept
+        assert "1600519.00" in swept
+        final = mask_code_text(swept, build_code_display_map(details, mode))
+        # 代码面由边界安全替换折叠：独立代码 token 折叠、JSON 数值片段原样
+        assert "600519" not in final.replace("1600519.00", "")
+        assert "600036" not in final
+        assert "1600519.00" in final

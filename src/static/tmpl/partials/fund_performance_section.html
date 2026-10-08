@@ -13,7 +13,7 @@
                     {% for p in perf_data %}
                     <tr>
                         <td class="text-left">{{ p["name"] }}</td>
-                        <td>{{ p["code"] }}</td>
+                        <td>{{ p["code"] | anon_code }}</td>
                         <td>{{ p["type_label"] }}</td>
                         <td class="{% if p.get('syl_3m_raw') is defined and p['syl_3m_raw'] is number %}{% if p['syl_3m_raw'] >= 0 %}profit{% else %}loss{% endif %}{% endif %}">{{ p["syl_3m"] }}</td>
                         <td class="{% if p.get('syl_6m_raw') is defined and p['syl_6m_raw'] is number %}{% if p['syl_6m_raw'] >= 0 %}profit{% else %}loss{% endif %}{% endif %}">{{ p["syl_6m"] }}</td>
@@ -47,7 +47,7 @@
                     {% if c.get("available") %}
                     <tr>
                         <td class="text-left">{{ c["name"] }}</td>
-                        <td>{{ c["code"] }}</td>
+                        <td>{{ c["code"] | anon_code }}</td>
                         <td class="text-left" style="font-size: var(--fs-table-sm);">{{ c["rating"] }}</td>
                         <td class="{% if c.get('syl_近1月_raw') is number %}{% if c['syl_近1月_raw'] >= 0 %}profit{% else %}loss{% endif %}{% endif %}">{{ c["syl_近1月"] }}</td>
                         <td class="{% if c.get('syl_近3月_raw') is number %}{% if c['syl_近3月_raw'] >= 0 %}profit{% else %}loss{% endif %}{% endif %}">{{ c["syl_近3月"] }}</td>
@@ -60,8 +60,8 @@
                     </tr>
                     {% else %}
                     <tr>
-                        <td class="text-left">{{ c.get("name", c["code"]) }}</td>
-                        <td>{{ c["code"] }}</td>
+                        <td class="text-left">{{ (c.get("name", c["code"])) | anon_code }}</td>
+                        <td>{{ c["code"] | anon_code }}</td>
                         <td colspan="9" class="text-left" style="font-size: var(--fs-table-sm); color: #b0413e;">数据获取失败（排名接口不可用），该候选跳过</td>
                     </tr>
                     {% endif %}
@@ -124,7 +124,7 @@
                 {% set _alert = r.get("alert_level", "") %}
                 <tr class="{% if _alert == '紧急' %}row-danger{% elif _alert == '关注' %}row-warning{% elif _alert == '首检' %}row-first-check{% endif %}">
                     <td class="text-left">{{ r["name"] }}</td>
-                    <td>{{ r["code"] }}</td>
+                    <td>{{ r["code"] | anon_code }}</td>
                     <td class="text-left">{{ r["current_manager"] }}</td>
                     <td>{{ r["tenure_days"] }}</td>
                     <td>{{ "—" if r["is_first_check"] else ("🔴 是" if r["changed_1m"] else "✅ 否") }}</td>

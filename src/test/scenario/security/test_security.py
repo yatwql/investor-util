@@ -299,6 +299,9 @@ def _mask_api_key(text: str, visible_chars: int = 4) -> str:
 
 _NON_OFF_MODES = ["code_display", "full_anonymous", "summary"]
 _REAL_NAME_TOKENS = ("招商银行", "贵州茅台", "易方达蓝筹")
+# 代码折叠模式（full_anonymous/summary）下产物不得出现的样例真码；
+# code_display 契约保留代码，故不入此表
+_REAL_CODE_TOKENS = ("600036", "600519", "005827")
 
 
 def _mk_product_rows() -> list:
@@ -359,10 +362,16 @@ class TestAnonymizedReportProducts:
         html = html_files[0].read_text(encoding="utf-8")
         for token in _REAL_NAME_TOKENS:
             assert token not in html, f"HTML 产物泄漏真实名称: {token}"
+        if mode in ("full_anonymous", "summary"):
+            for token in _REAL_CODE_TOKENS:
+                assert token not in html, f"HTML 产物泄漏真实代码: {token}"
         if mode == "summary":
             assert "股票汇总" in html, "summary 明细渲染层应输出大类聚合行"
         else:
             assert "品种A" in html, "匿名模式产物应包含代号（正向对照）"
+        if mode == "code_display":
+            # 契约保留代码：代码列原样（正向对照，防过度掩码）
+            assert "600519" in html, "code_display 模式应保留真码"
 
     @pytest.mark.scenario_security
     @pytest.mark.parametrize("mode", _NON_OFF_MODES)

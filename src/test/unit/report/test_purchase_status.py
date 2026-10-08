@@ -362,6 +362,7 @@ class TestPurchaseStatusTemplate:
         from jinja2 import Environment
 
         from src.python.report.html_jinja_env import (
+            _ENV,
             _jinja_money,
             _jinja_pct,
             _jinja_price,
@@ -377,6 +378,8 @@ class TestPurchaseStatusTemplate:
                 "profit_color": _jinja_profit_color,
             }
         )
+        # 片段取自真实模板 partials，须继承生产过滤器（含匿名化代码列 anon_code）
+        self.env.filters.update(_ENV.filters)
         tmpl_path = os.path.normpath(
             os.path.join(os.path.dirname(__file__), "..", "..", "..", "static", "tmpl", "report_template.html")
         )
@@ -698,6 +701,7 @@ class TestCategoryPurchaseTemplate:
         from jinja2 import Environment
 
         from src.python.report.html_jinja_env import (
+            _ENV,
             _jinja_money,
             _jinja_pct,
             _jinja_price,
@@ -713,6 +717,8 @@ class TestCategoryPurchaseTemplate:
                 "profit_color": _jinja_profit_color,
             }
         )
+        # 片段取自真实模板 partials，须继承生产过滤器（含匿名化代码列 anon_code）
+        self.env.filters.update(_ENV.filters)
         tmpl_path = os.path.normpath(
             os.path.join(os.path.dirname(__file__), "..", "..", "..", "static", "tmpl", "report_template.html")
         )

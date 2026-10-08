@@ -22,7 +22,7 @@
                         <tr>
                             <td class="text-left">{{ d.account }}</td>
                             <td class="text-left">{{ d.name }}</td>
-                            <td>{{ d.code }}</td>
+                            <td>{{ d.code | anon_code }}</td>
                             <td class="text-right">{{ d.price | price }}</td>
                             <td>{{ d.nav_date }}</td>
                             <td class="text-right">{{ d.yesterday_close | price }}</td>
@@ -106,7 +106,7 @@
                             <td class="text-left">{{ group["property"] }}</td>
                             <td class="text-left">{{ group["sub_category"] }}</td>
                             <td class="text-left">{{ item["name"] }}</td>
-                            <td>{{ item["code"] }}</td>
+                            <td>{{ item["code"] | anon_code }}</td>
                             <td class="text-right">{{ item["market_value"] | money }}</td>
                             <td class="text-right">{{ item["cost"] | money }}</td>
                             <td class="text-right" style="color: {{ item["profit"] | profit_color }}">{{ item["profit"] | money }}</td>

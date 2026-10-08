@@ -1,6 +1,6 @@
 # 投资复盘助手 - 自我审查问题记录
 > 文档版本：0.12.7-dev
-> **编号源**：`rf-next = 635`（新增问题取此编号，完成后更新为 +1；已用最大 rf-634，递增保证唯一，归档不回收。若与历史归档冲突，运行 `scripts/check-task-numbering.py` 校验）
+> **编号源**：`rf-next = 636`（新增问题取此编号，完成后更新为 +1；已用最大 rf-635，递增保证唯一，归档不回收。若与历史归档冲突，运行 `scripts/check-task-numbering.py` 校验）
 
 ---
 
@@ -30,11 +30,11 @@
 |---|------|----------|
 
 | **rf-114** | TD3/TD-L1：双渲染路径共存——模板保留 Canvas `drawSimpleChart()`（265 行内联 JS）+ Chart.js 渲染器，Flag OFF 时旧路径仍活 | plan-1 稳定 2 版本后（v0.10.0，阶段 2→3 切换，判定标准见 upgrade.md §4.15）删除 `drawSimpleChart()` + Canvas 回退分支 + Feature Flag 条件分支，Chart.js 成唯一渲染器。**2026-08-05 决策：先完成 rf-113 人工验证（确认 Chart.js 真机渲染可靠）后再执行删除** |
-| **rf-628** | 持仓匿名化剩余衍生面——full 模式 HTML 各章节代码列与交互图表标签（自由文本数字全局替换有金额误伤风险，刻意未清扫）、LLM 提示词持仓块代码字段（字段层为键控链路保留真值所致）、summary 模式明细以外章节的单只数值与演进快照/财报摘要/估值分位等派生章节数据集内部真值（名称面已由产物清扫全覆盖，数值/代码面未覆盖） | 按面在渲染点做结构化掩码：HTML 代码列在模板/渲染器输出点换显示值、派生章节数据契约增加展示值字段、提示词组装点对代码做结构化替换；数值面按分享场景评估是否需聚合/模糊后注入 |
 | **rf-630** | scripts 退出码 docstring 契约族不齐——check-test-markers 声明「0/1」而实现走 `_checklib.report()` 实为 0/2（与 rf-629 同类实错）；check-file-length / check-style-guardrails / check-version-consistency 缺「退出码」声明节；check-requirement-trace 的 0/2 同行不成节；CLAUDE「scripts 共享设施与契约」段未涵盖 check-doc-traces 的 1=HIGH 语义 | 逐脚本补正 docstring（0/2 为基线，特例注明码义）；CLAUDE 契约段补 doc-traces 分级说明；防再犯由 plan-110 机检承接 |
 | **rf-631** | perf-report.py 三处缺陷——① 报告硬编码「测试时间 2026-07-20」不随运行更新 ② Phase3「50 品种」实为 27（`_STOCKS` 仅 24 支，`[:50]` 截断）、Phase1「20 品种」实为 23（20 股 + 3 基金），文案与实际不符 ③ `generate_all_llm` patch 到 `src.python.llm.generators_orchestrator` 子模块，而调用点 `_llm_news` 为函数内 `from src.python.llm import generate_all_llm` 读包属性——patch 不生效，Phase2 实跑会真调 LLM（费用/稳定性风险） | ① 动态 `datetime.now()` ② 按 `len(holdings)` 实际出文案或扩充样本池到 50 ③ patch 改 `src.python.llm.generate_all_llm`（包属性，与函数内 import 解析点一致）；补 `_generate_holdings`/`_verdict`/报告文案单测 |
 | **rf-632** | scripts 无测试/弱测试欠账——check-svg.py（307 行，字符宽度估算/容器归属/重叠判定纯函数零测）、check-test-markers.py（224 行，AST 提取/目录期望/未注册判定零测）、perf-view.py（199 行，分组聚合/趋势报告零测）、collect-test-coverage.py（`_collect` 退出码传递、`_target_files` 展开、modes 计数无直接单测，仅被 drift crosscheck 间接覆盖）；附带 check-svg `_text_box` 对缺 x/y 的 `<text>` 无防护（rect 有 try/except 而 text 无，防御不对称） | 按「纯函数优先」补测试：geom 字符宽度/容器归属/重叠判定、marker AST 提取与判定矩阵、trend 分组与空数据、collect 退出码白名单（0/5 过、非零拒收）与 modes 计数；`_text_box` 补缺失属性默认或跳过 |
 | **rf-633** | check-test-markers 双源与自相矛盾——KNOWN_MARKERS 手写 42 项与 conftest `addinivalue_line` 注册集人肉同步（当前双向零漂移，但 conftest 新增标记后本脚本不知情即误判「未注册」）、EXPECTED_DIR_MARKERS 目录期望表同理；docstring「已移除的标记（如 integration）」与 KNOWN_MARKERS 实际包含 integration 家族矛盾（DEPRECATED_MARKERS 为空集） | KNOWN 从 conftest 动态提取（AST 解析 addinivalue_line），EXPECTED 与目录结构绑定注释；docstring 按现状改写（integration 现为注册标记，已移除清单以 DEPRECATED 为准） |
+| **rf-635** | 调仓模拟产物无匿名化层——`whatif_writer` 生成的 HTML（明细对比/变更明细/可行性/成本面板）直接用真名真码渲染，既无字段层 `apply_report_anonymization`，也无产物清扫（名称/代码均裸奔），与主报告的匿名化契约不一致；主报告已把代码面收在渲染点与清扫层，whatif 模板预留了 `anon_code` 渲染点但未接映射 | 按主报告同一分层接入：装配边注入 `apply_report_anonymization` → 渲染点/`anon_code` 映射 + 名称清扫 → 产物输出；离线场景补 whatif 产物端到端真名/真码断言 |
 
 ### P3 — 持续监控：文件过长登记表（>500 行观察 / **>800 行为硬上限必须拆分**；按距红线余量升序）
 
@@ -54,6 +54,8 @@
 | **rf-78** | `fetcher/batch.py` | 520 | 维持现状（BatchDispatcher 本身内聚，复核确认不拆；2026-10-02 实测 520，回落至登记值附近（rf-522 重试退避原语收编后下降）） | BatchDispatcher 本身内聚，可维持现状（不拆） |
 
 ## 已解决问题
+
+- rf-628 已修复（2026-10-08，匿名化剩余衍生面自查，当批修复）：**代码面改为渲染点结构化掩码，HTML 自由文本清扫剥离代码**——原实现把「真码→000XXX」并入 `build_report_alias_map` 后对整份 HTML 做子串替换，与代码注释/登记前提（数字串全局替换有金额误伤风险、刻意不在 HTML 自由文本换代码）相悳，实测会把 `1600519.00` 改成 `1000XXX.00`（破坏金额与 JSON 数值），而 summary 模式因映射根本不含代码、明细以外章节真码完全裸奔；修复 = ① `build_report_alias_map(..., include_codes=False)` 专供 HTML 名称清扫（Excel 字符串单元格清扫保持含代码）；② 匿名化层新增 `build_code_display_map`（真码→显示掩码，键控精确、指数基准码天然不在内）、`mask_holding_code` / `code_masking_enabled`（提示词单点折叠）、`mask_code_text`（**边界安全**替换：相邻非数字/小数点/冒号才认作独立代码 token，命中 `<td>600519</td>` 而跳过 `1600519.00`）；③ 模板新增 `anon_code` pass_context 过滤器，各章节代码列在渲染点按 `anon_code_map` 键控折叠（明细/持仓汇总/穿透/持仓结构/基本面/基金业绩/风格因子/演进/数据源状态/行动建议 9 份 partial，列表型 codes 用 `map("anon_code")` 逐项折叠）；④ 演进图表 `top_holdings` 代码在**数据层**折叠（JSON 负载模板过滤器够不到）；⑤ LLM 提示词组装点折叠（明细行/TOP3/数据速查表/穿透/新闻持仓摘要/自审摘要/行动建议/持仓变动差异），代码白名单块在折叠模式改写为「真码一律不写」反幻觉约束（避免全列 000XXX 自相矛盾），无代码明细时跳过「共 0 个」退化块；**数值面评估结论**：派生章节（财报摘要/估值分位/风格因子/基金业绩）数值全部是公开市场与财报数据、与持仓身份仓位无关，保留原值以维持指标口径可复核；仓位面已由明细层覆盖（full 千位模糊 / summary 大类聚合）；调仓模拟产物无匿名化层超出本次范围，另立 rf-635；回归 = 产物级 HTML 真码断言（full/summary，摘除渲染点与清扫后 summary 立即红）+ 匿名化映射/边界安全替换/渲染点过滤器/图表数据层/提示词五组单测，手册 §L 按实现口径改写
 
 - rf-634 已修复（2026-10-08，线上持仓变动复盘归因静默丢失自查，当批修复）：**串行后置模块以 `http_client=None` 直达 provider 层**——`run_holding_change_review`（含孪生 `run_self_review`）经 `generate_llm_module` 全链不注入客户端，而客户端装配只在分发层 `_llm_dispatch._execute` 为并行 worker 做；None 触发 `_api_claude/_api_openai/_api_gemini` 的 `assert client is not None` 秒败，AssertionError 又被 `call_llm` 多链循环的 per-provider `except Exception` 吞成「provider 异常，切换下一 provider」——日志实测四 provider 各 ~2ms 内连环失败（2026-10-07/10-08 两次），归因整章静默丢失（plan-76 落地后从未成功过）；修复 = 在多链与 legacy 两路的唯一汇聚点 `call_single_provider` 收口：`http_client is None` 且 provider 受支持时经 `core.http_client.make_http_client`（HTTP 客户端统一工厂约束）自建一次性客户端、`with` 调用后关闭；回归 = 漏斗层 7 项（三 provider 兜底建/关客户端、调用方自备客户端透传不代关、未知 provider 不建、多链 `http_client=None` 贯通、链上每 entry 各建独立客户端）+ 端到端 2 项（归因全链跑通且 provider 收到已关闭真实客户端 / provider 拒绝时返回 False 并登记原因），**摘除修复后 7 项全红**验证回归有效性
 

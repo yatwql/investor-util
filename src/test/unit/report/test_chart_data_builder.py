@@ -684,6 +684,27 @@ class TestEvolutionChartData:
         ]
         assert "present_count" not in payload["top_holdings"][0]
 
+    def test_code_map_masks_top_holding_codes(self) -> None:
+        """code_map → top_holdings.code 在**数据层**折叠（JSON 负载模板过滤器够不到）。"""
+        src = self._evo(top_holdings=[{"code": "600519", "name": "品种A", "weights": [60.0], "present_count": 1}])
+        payload = build_evolution_chart_data(src, code_map={"600519": "000XXX"})
+        assert payload["top_holdings"][0]["code"] == "000XXX"
+        assert payload["top_holdings"][0]["weights"] == [60.0]
+        # 源数据不被改动
+        assert src["top_holdings"][0]["code"] == "600519"
+
+    def test_without_code_map_keeps_codes(self) -> None:
+        """无 code_map（off/code_display 契约）→ 真码原样。"""
+        src = self._evo(top_holdings=[{"code": "600519", "name": "A", "weights": [1.0]}])
+        payload = build_evolution_chart_data(src)
+        assert payload["top_holdings"][0]["code"] == "600519"
+
+    def test_code_map_leaves_unlisted_codes(self) -> None:
+        """不在映射内的代码（指数/基准）→ 原样通过。"""
+        src = self._evo(top_holdings=[{"code": "000300", "name": "沪深300", "weights": [1.0]}])
+        payload = build_evolution_chart_data(src, code_map={"600519": "000XXX"})
+        assert payload["top_holdings"][0]["code"] == "000300"
+
     def test_none_returns_none(self) -> None:
         """evolution_data=None → None（章节不可见，模板不输出数据段）。"""
         assert build_evolution_chart_data(None) is None

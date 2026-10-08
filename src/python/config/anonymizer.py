@@ -24,10 +24,31 @@ from __future__ import annotations
 
 import copy
 import logging
+import re
 from typing import Any
 
 from src.python.core.code_utils import is_fund_holding
 from src.python.core.models import Holding
+
+#: 代码显示掩码：匿名模式下持仓代码在「展示面」的统一显示值。
+CODE_DISPLAY_MASK = "000XXX"
+
+#: 会把持仓代码折叠掉的模式（真码不出现在任何展示面）。
+CODE_MASKING_MODES = frozenset({"full_anonymous", "summary"})
+
+
+def is_code_masked_mode(mode: str | None) -> bool:
+    """给定匿名化模式，判断持仓代码是否应折叠为显示掩码。
+
+    Args:
+        mode: 匿名化模式名（"off"/"code_display"/"full_anonymous"/"summary"）。
+
+    Returns:
+        True 表示代码需掩码（full_anonymous / summary），False 表示保留真码
+        （off 原样 / code_display 契约保留代码）。
+    """
+    return (mode or "") in CODE_MASKING_MODES
+
 
 logger = logging.getLogger("invest")
 
@@ -186,9 +207,9 @@ def _blur_shares(holdings: list[Holding]) -> None:
 
 
 def _mask_codes(holdings: list[Holding]) -> None:
-    """将代码替换为掩码 '000XXX'。"""
+    """将代码替换为掩码 CODE_DISPLAY_MASK。"""
     for h in holdings:
-        h.code = "000XXX"
+        h.code = CODE_DISPLAY_MASK
 
 
 def _blur_value(value: float, precision: int = 1000) -> float:
@@ -310,7 +331,7 @@ def _entry_value(item: Any, key: str, default: str = "") -> str:
     return getattr(item, key, default) or default
 
 
-def build_report_alias_map(details: list[Any], mode: str = "off") -> dict[str, str]:
+def build_report_alias_map(details: list[Any], mode: str = "off", *, include_codes: bool = True) -> dict[str, str]:
     """构建真值 → 展示值映射（字段层与产物清扫共用，保证代号编号一致）。
 
     编号规则与 ``anonymize_holdings_details`` 一致（code 首次见序 → 字母序），
@@ -319,9 +340,13 @@ def build_report_alias_map(details: list[Any], mode: str = "off") -> dict[str, s
     Args:
         details: 明细/持仓序列（dict、DetailRow、Holding 均可）
         mode: 匿名化模式；off → 空映射
+        include_codes: 是否把真码纳入映射。HTML 自由文本清扫必须传 False——
+            代码是纯数字串，全文子串替换会误伤金额与 JSON 数值；代码面改由
+            渲染点结构化掩码（build_code_display_map）与 mask_code_text 负责。
+            Excel 侧只动字符串单元格、金额是数值单元格，可保持 True。
 
     Returns:
-        {真名: "品种X", ...}；full_anonymous 追加 {真码: "000XXX"}
+        {真名: "品种X", ...}；full_anonymous 且 include_codes 时追加 {真码: 掩码}
     """
     mode = _resolve_mode(mode)
     if mode == "off":
@@ -340,9 +365,92 @@ def build_report_alias_map(details: list[Any], mode: str = "off") -> dict[str, s
             name_map[name] = code_label[code]
 
     alias_map = dict(name_map)
-    if mode == "full_anonymous":
-        alias_map.update({code: "000XXX" for code in code_label})
+    if mode == "full_anonymous" and include_codes:
+        alias_map.update({code: CODE_DISPLAY_MASK for code in code_label})
     return alias_map
+
+
+def build_code_display_map(details: list[Any], mode: str = "off") -> dict[str, str]:
+    """构建 {真码: 代码显示掩码} 映射（渲染点结构化替换用，精确键控命中）。
+
+    与 :func:`build_report_alias_map` 的区别：只含代码、不含名称，且覆盖
+    full_anonymous 与 summary 两种折叠代码面的模式（code_display 契约保留真码、
+    off 原样，均返回空映射）。键是实际持仓代码，指数/基准等非持仓代码天然
+    不在映射内、不会被误掩。
+
+    Args:
+        details: 明细/持仓序列（dict、DetailRow、Holding 均可）
+        mode: 匿名化模式；off → 空映射
+
+    Returns:
+        {真码: CODE_DISPLAY_MASK}；无需折叠代码面时返回空映射
+    """
+    if not is_code_masked_mode(mode):
+        return {}
+    return {_entry_value(item, "code"): CODE_DISPLAY_MASK for item in details if _entry_value(item, "code")}
+
+
+def code_masking_enabled(mode: str | None = None) -> bool:
+    """当前（或指定）匿名化模式是否折叠持仓代码面。
+
+    Args:
+        mode: 匿名化模式；None → 读取当前配置模式。
+
+    Returns:
+        True 表示代码面应折叠为显示掩码（full_anonymous / summary）
+    """
+    if mode is None:
+        mode = get_anonymization_mode()
+    return is_code_masked_mode(mode)
+
+
+def mask_holding_code(code: str, mode: str | None = None) -> str:
+    """把持仓代码折为展示层显示值（提示词组装点等单点展示替换）。
+
+    Args:
+        code: 持仓代码原文。
+        mode: 匿名化模式；None → 读取当前配置模式。
+
+    Returns:
+        折叠模式返回 :data:`CODE_DISPLAY_MASK`，否则原样返回；空值原样返回
+    """
+    if not code:
+        return code
+    if mode is None:
+        mode = get_anonymization_mode()
+    return CODE_DISPLAY_MASK if is_code_masked_mode(mode) else code
+
+
+_MASKED_CODE_PATTERNS: dict[str, re.Pattern[str]] = {}
+
+
+def mask_code_text(text: str | None, code_map: dict[str, str] | None) -> str | None:
+    """在自由文本中按 {真码: 显示掩码} 做**边界安全**的精确键替换。
+
+    代码是数字串，无条件子串替换会误伤金额与 JSON 数值（``1600519.0`` 内含
+    ``600519``）。这里要求真码两侧都不是数字/小数点/冒号才认定它是独立代码：
+
+      - ``<td>600519</td>``、``"code":"600519"``、``、600519、`` → 命中
+      - ``1600519.0``、``600519.0``、``{"mv":600519}``、``12.600519%`` → 不命中
+
+    Args:
+        text: 待处理文本（None/空串原样返回）。
+        code_map: {真码: 显示掩码}，来自 :func:`build_code_display_map`。
+
+    Returns:
+        替换后的文本；无映射或无命中时原样返回
+    """
+    if not text or not code_map:
+        return text
+    for code, masked in code_map.items():
+        if not code or code not in text:
+            continue
+        pattern = _MASKED_CODE_PATTERNS.get(code)
+        if pattern is None:
+            pattern = re.compile(rf"(?<![\d.:]){re.escape(code)}(?![\d.])")
+            _MASKED_CODE_PATTERNS[code] = pattern
+        text = pattern.sub(masked, text)
+    return text
 
 
 def mask_display_text(text: str, alias_map: dict[str, str]) -> str:

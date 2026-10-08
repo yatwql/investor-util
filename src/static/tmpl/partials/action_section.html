@@ -42,7 +42,7 @@
             <tbody>
                 {% for s in _rb %}
                 <tr>
-                    <td>{{ s.get("code", "") }}</td>
+                    <td>{{ s.get("code", "") | anon_code }}</td>
                     <td class="text-left">{{ s.get("name", "") }}</td>
                     <td style="text-align:right;">{{ "%.1f"|format((s.get("weight", 0) or 0) * 100) }}%</td>
                     <td style="text-align:right;">{{ "%.0f"|format((s.get("threshold", 0) or 0) * 100) }}%</td>
@@ -68,7 +68,7 @@
             <tbody>
                 {% for s in _ds %}
                 <tr>
-                    <td>{{ s.get("code", "") }}</td>
+                    <td>{{ s.get("code", "") | anon_code }}</td>
                     <td class="text-left">{{ s.get("name", "") }}</td>
                     <td class="text-left">{{ s.get("rule", "") }}</td>
                     <td style="text-align:right;">{{ s.get("value", "") }}</td>
@@ -94,7 +94,7 @@
             <tbody>
                 {% for s in _adv %}
                 <tr>
-                    <td>{{ s.get("code", "") }}</td>
+                    <td>{{ s.get("code", "") | anon_code }}</td>
                     <td class="text-left">{{ s.get("name", "") }}</td>
                     <td class="text-left">{{ s.get("operation", "") }}</td>
                     <td style="text-align:right;">{{ s.get("shares", "") }}</td>
@@ -170,7 +170,7 @@
                 {% for r in _ms.get("rows", []) %}
                 <tr>
                     <td class="text-left">{{ r.get("name", "") }}</td>
-                    <td>{{ r.get("code", "") }}</td>
+                    <td>{{ r.get("code", "") | anon_code }}</td>
                     <td>{{ r.get("holding_kind", "") }}</td>
                     <td>{{ r.get("event_type", "") }}</td>
                     <td class="text-left" style="font-size: var(--fs-table-sm);">
@@ -241,7 +241,7 @@
             <tbody>
                 {% for item in _pf.get("holdings_view", [])[:10] %}
                 <tr>
-                    <td class="text-left">{{ item.get("name", "") }}（{{ item.get("code", "") }}）</td>
+                    <td class="text-left">{{ item.get("name", "") }}（{{ item.get("code", "") | anon_code }}）</td>
                     <td>{{ item.get("weight_pct", 0) }}%</td>
                     <td class="text-left">{{ item.get("sector", "") }}</td>
                     <td class="text-left" style="font-size: var(--fs-table-sm);">
@@ -274,7 +274,7 @@
             <tbody>
                 {% for s in (_rev.get("recent_settled") or []) %}
                 <tr>
-                    <td>{{ s.get("code", "") }}</td>
+                    <td>{{ s.get("code", "") | anon_code }}</td>
                     <td class="text-left">{{ s.get("name", "") }}</td>
                     <td class="text-left">{{ s.get("direction", "") }}</td>
                     <td>
@@ -290,7 +290,7 @@
                 {% endfor %}
                 {% for p in (_rev.get("recent_pending") or []) %}
                 <tr>
-                    <td>{{ p.get("code", "") }}</td>
+                    <td>{{ p.get("code", "") | anon_code }}</td>
                     <td class="text-left">{{ p.get("name", "") }}</td>
                     <td class="text-left">{{ p.get("direction", "") }}</td>
                     <td>待结算</td>

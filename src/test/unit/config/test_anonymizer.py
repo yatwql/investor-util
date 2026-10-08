@@ -30,11 +30,15 @@ from src.python.config.anonymizer import (
     ANONYMIZATION_MODE_DESCRIPTIONS,
     anonymize_holdings,
     anonymize_holdings_details,
+    build_code_display_map,
     build_report_alias_map,
     fold_details_summary,
     get_anonymization_mode,
     is_anonymization_enabled,
+    is_code_masked_mode,
+    mask_code_text,
     mask_display_text,
+    mask_holding_code,
     set_anonymization_mode,
 )
 from src.python.core.models import Holding
@@ -426,6 +430,73 @@ class TestReportAliasMaskFold(unittest.TestCase):
         labels = [r["name"] for r in rows]
         self.assertEqual(labels[0], "股票汇总")
         self.assertIn("基金汇总", labels)
+
+
+class TestCodeDisplayMaskFold(unittest.TestCase):
+    """build_code_display_map / mask_holding_code / mask_code_text（代码面渲染点掩码）。"""
+
+    def test_code_map_covers_only_code_masking_modes(self):
+        """full/summary → {真码: 掩码}；code_display/off → 空（契约保留真码）。"""
+        details = _mk_details()
+        expected = {"600036": "000XXX", "600519": "000XXX"}
+        self.assertEqual(build_code_display_map(details, "full_anonymous"), expected)
+        self.assertEqual(build_code_display_map(details, "summary"), expected)
+        self.assertEqual(build_code_display_map(details, "code_display"), {})
+        self.assertEqual(build_code_display_map(details, "off"), {})
+
+    def test_code_map_excludes_non_holding_codes(self):
+        """映射只含实际持仓代码——指数/基准代码天然不在其中、不会被误掩。"""
+        mapping = build_code_display_map(_mk_details(), "full_anonymous")
+        self.assertNotIn("000300", mapping)
+        self.assertNotIn("510300", mapping)
+
+    def test_alias_map_exclude_codes_is_names_only(self):
+        """include_codes=False → 仅名称（HTML 自由文本清扫用，杜绝数字替换金额）。"""
+        details = _mk_details()
+        names_only = build_report_alias_map(details, "full_anonymous", include_codes=False)
+        self.assertEqual(names_only["招商银行"], "品种A")
+        self.assertNotIn("600036", names_only)
+        self.assertNotIn("600519", names_only)
+        # 默认仍含代码（Excel 字符串单元格清扫等键控面行为不变）
+        self.assertIn("600036", build_report_alias_map(details, "full_anonymous"))
+
+    def test_mask_holding_code_per_mode(self):
+        """full/summary → 掩码；code_display/off → 原样；空值原样返回。"""
+        self.assertEqual(mask_holding_code("600036", "full_anonymous"), "000XXX")
+        self.assertEqual(mask_holding_code("600036", "summary"), "000XXX")
+        self.assertEqual(mask_holding_code("600036", "code_display"), "600036")
+        self.assertEqual(mask_holding_code("600036", "off"), "600036")
+        self.assertEqual(mask_holding_code("", "full_anonymous"), "")
+
+    def test_is_code_masked_mode(self):
+        """is_code_masked_mode：full/summary → True；off/code_display/None → False。"""
+        self.assertTrue(is_code_masked_mode("full_anonymous"))
+        self.assertTrue(is_code_masked_mode("summary"))
+        self.assertFalse(is_code_masked_mode("off"))
+        self.assertFalse(is_code_masked_mode("code_display"))
+        self.assertFalse(is_code_masked_mode(None))
+
+    def test_mask_code_text_replaces_standalone_tokens(self):
+        """独立代码 token（HTML 单元格 / JSON 字符串 / 枚举列表）→ 折叠。"""
+        mapping = {"600036": "000XXX"}
+        self.assertEqual(mask_code_text("<td>600036</td>", mapping), "<td>000XXX</td>")
+        self.assertEqual(mask_code_text('{"code":"600036"}', mapping), '{"code":"000XXX"}')
+        self.assertEqual(mask_code_text("600036、999999", mapping), "000XXX、999999")
+        both = {"600036": "000XXX", "600519": "000XXX"}
+        self.assertEqual(mask_code_text("600036,600519", both), "000XXX,000XXX")
+
+    def test_mask_code_text_skips_numeric_substrings(self):
+        """金额 / JSON 数值 / 相邻数字中的同数字片段不被替换（数字子串误伤防护）。"""
+        mapping = {"600036": "000XXX"}
+        for text in ("金额 1600036.00", "600036.0", '{"mv":600036}', "12.600036%", "06000360", "1,600,036.00"):
+            self.assertEqual(mask_code_text(text, mapping), text, text)
+
+    def test_mask_code_text_empty_inputs_identity(self):
+        """None / 空文本 / 空映射 → 恒等。"""
+        self.assertIsNone(mask_code_text(None, {"600036": "000XXX"}))
+        self.assertEqual(mask_code_text("", {"600036": "000XXX"}), "")
+        self.assertEqual(mask_code_text("600036", None), "600036")
+        self.assertEqual(mask_code_text("600036", {}), "600036")
 
 
 class TestModeDescriptions(unittest.TestCase):

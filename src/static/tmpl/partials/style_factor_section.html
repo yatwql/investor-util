@@ -26,7 +26,7 @@
                     {% set _drift = r.get("drift_level", "") %}
                     <tr class="{% if _drift == '严重' %}row-danger{% elif _drift == '中度' %}row-warning{% elif _drift == '基准确立中' %}row-first-check{% endif %}">
                         <td class="text-left">{{ r["name"] }}</td>
-                        <td>{{ r["code"] }}</td>
+                        <td>{{ r["code"] | anon_code }}</td>
                         <td>{{ r.get("current_style", "--") }}</td>
                         <td>{{ r.get("prev_style", "--") }}</td>
                         <td class="{% if _drift == '严重' %}red-text{% elif _drift == '中度' %}orange-text{% elif _drift == '基准确立中' %}gray-text{% endif %}">

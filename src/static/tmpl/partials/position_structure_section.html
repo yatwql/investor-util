@@ -90,7 +90,7 @@
                             {% if p.common_stocks %}
                             {% set stock_names = [] %}
                             {% for s in p.common_stocks %}
-                            {% set _ = stock_names.append(s.name or s.code) %}
+                            {% set _ = stock_names.append(s.name or (s.code | anon_code)) %}
                             {% endfor %}
                             {{ stock_names | join("、") }}
                             {% else %}
@@ -115,7 +115,7 @@
             {% if _corr_pairs %}
             {% set _corr_top = _corr_pairs[0] %}
             <div class="notice-banner" style="margin-bottom: 12px;">
-                🔔 相关度最高：<strong>{{ _corr_top.name_a }}({{ _corr_top.code_a }})</strong> × <strong>{{ _corr_top.name_b }}({{ _corr_top.code_b }})</strong>
+                🔔 相关度最高：<strong>{{ _corr_top.name_a }}({{ _corr_top.code_a | anon_code }})</strong> × <strong>{{ _corr_top.name_b }}({{ _corr_top.code_b | anon_code }})</strong>
                 — r={{ "%.2f"|format(_corr_top.pearson) }}，p={{ "%.4f"|format(_corr_top.p_value) }}{% if _corr_top.significant %}（显著）{% else %}（不显著）{% endif %}
             </div>
             {% endif %}
@@ -208,8 +208,8 @@
                     {% for p in _corr_pairs %}
                     <tr>
                         <td>{{ loop.index }}</td>
-                        <td class="text-left">{{ p.name_a }}({{ p.code_a }})</td>
-                        <td class="text-left">{{ p.name_b }}({{ p.code_b }})</td>
+                        <td class="text-left">{{ p.name_a }}({{ p.code_a | anon_code }})</td>
+                        <td class="text-left">{{ p.name_b }}({{ p.code_b | anon_code }})</td>
                         <td style="color: {% if p.pearson >= 0.5 %}#C00000{% elif p.pearson > 0 %}#E65C00{% elif p.pearson <= -0.5 %}#1F4E79{% else %}var(--primary){% endif %}; font-weight: 600;">
                             {{ "%.2f"|format(p.pearson) }}
                         </td>
@@ -224,7 +224,7 @@
 
             {% if position_relationship_data.get("insufficient_codes") %}
             <div class="penetration-notes">
-                <div style="color:var(--warn-text);">* 下列品种重叠样本不足 {{ position_relationship_data["window"] }} 期，相关性格标为 N/A（灰色）：{{ position_relationship_data["insufficient_codes"] | join("、") }}</div>
+                <div style="color:var(--warn-text);">* 下列品种重叠样本不足 {{ position_relationship_data["window"] }} 期，相关性格标为 N/A（灰色）：{{ position_relationship_data["insufficient_codes"] | map("anon_code") | join("、") }}</div>
             </div>
             {% endif %}
             <div class="penetration-notes">
@@ -261,7 +261,7 @@
                     {% set _alert = r.get("alert_level", "") %}
                     <tr class="{% if _alert == '紧急' %}row-danger{% elif _alert == '关注' %}row-warning{% endif %}">
                         <td class="text-left">{{ r["name"] }}</td>
-                        <td>{{ r["code"] }}</td>
+                        <td>{{ r["code"] | anon_code }}</td>
                         <td style="font-size: var(--fs-table-sm); {{ 'color: #b06a00;' if r.get('report_stale') }}">
                             {{ r.get("report_period", "") }}{% if r.get("report_stale") %}（陈旧）{% endif %}
                         </td>

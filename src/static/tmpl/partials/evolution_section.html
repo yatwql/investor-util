@@ -140,7 +140,7 @@
                 {% for th in _evo_top %}
                 <tr>
                     <td>{{ loop.index }}</td>
-                    <td class="text-left">{{ th.name }}({{ th.code }})</td>
+                    <td class="text-left">{{ th.name }}({{ th.code | anon_code }})</td>
                     {% for w in th.weights %}<td style="text-align:right;">{{ "%.2f"|format(w) }}</td>{% endfor %}
                     <td style="text-align:right;">{{ th.present_count }} / {{ _evo_n }}</td>
                 </tr>

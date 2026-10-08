@@ -116,7 +116,7 @@
                     </tr>
                     {% for item in position_status.get("items") %}
                     <tr>
-                        <td style="text-align:left;">{{ item.code }}</td>
+                        <td style="text-align:left;">{{ item.code | anon_code }}</td>
                         <td style="text-align:left;">{{ item.name }}</td>
                         <td style="text-align:left;">{{ item.account }}</td>
                         <td>
@@ -148,7 +148,7 @@
                     </tr>
                     {% for item in data_freshness.get("items") %}
                     <tr>
-                        <td style="text-align:left;">{{ item.code }}</td>
+                        <td style="text-align:left;">{{ item.code | anon_code }}</td>
                         <td style="text-align:left;">{{ item.name }}</td>
                         <td style="text-align:left;">{{ item.account }}</td>
                         <td>

@@ -5,6 +5,8 @@
 
 from __future__ import annotations
 
+from src.python.config.anonymizer import mask_holding_code
+
 
 _SYSTEM_SELF_REVIEW = """你是严格的投资复盘内容复核员。你会收到同一次报告中若干个分析模块的产出文本，
 以及持仓/穿透数据摘要。你的唯一任务是**复核这些产出与数据是否自洽**，而不是重新做一遍分析。
@@ -81,7 +83,7 @@ def _self_review_holdings_digest(holdings_details: list | None) -> str:
         rows.append(
             "- {name}({code}) 市值 {mv} 盈亏 {profit} 占比 {ratio}".format(
                 name=get("name") or "?",
-                code=get("code") or "?",
+                code=mask_holding_code(get("code")) or "?",
                 mv=get("market_value") if get("market_value") is not None else get("mv"),
                 profit=get("profit"),
                 ratio=get("weight_pct") if get("weight_pct") is not None else get("ratio_pct"),
