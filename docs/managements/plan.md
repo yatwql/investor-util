@@ -1,6 +1,6 @@
 # 投资复盘助手 — 实现计划
 > 文档版本：0.12.7-dev
-> **编号源**：`plan-next = 103`（新增计划项取此编号，完成后更新为 +1；已用最大 plan-102，递增保证唯一，归档不回收。若与历史归档冲突，运行 `scripts/check-task-numbering.py` 校验）
+> **编号源**：`plan-next = 109`（新增计划项取此编号，完成后更新为 +1；已用最大 plan-108，递增保证唯一，归档不回收。若与历史归档冲突，运行 `scripts/check-task-numbering.py` 校验）
 
 ---
 
@@ -8,7 +8,7 @@
 
 本文档记录项目的实现计划。已完成的历史版本计划已归档，此处仅跟踪当前迭代中的工作。
 
-**当前迭代**：在办 19 项按「价值 / 收益 / 风险」分三档（2026-10-07 重排，档位定义见「当前迭代待办」）——P1 五项（**plan-71** 转正判据先行 + 风险/核心价值改进 **plan-99/85/91/95**）、P2 十项（**plan-49/55/83** 等待条件型 + 改进批 **plan-88/89/90/92/93/100/101**）、P3 四项（**plan-70** 死线观察，已有落地设计 `decision-reflection-shadow-design.md`；择机 **plan-87/94/102**）；**plan-85 ~ plan-102** 为 2026-10-07 自审改进盘点迁入批（18 项）；历史批次（**plan-59 ~ plan-84**，含 Vibe-Trading / gs-quant / 工程效能 / TradingAgents-CN 借鉴批）已全部收口，完成态与未采纳记录随档见 [`archived_plan.0.11.x.md`](../archive/v0.11.x/archived_plan.0.11.x.md) 与 [`archived_plan.0.12.x.md`](../archive/v0.12.x/archived_plan.0.12.x.md)，借鉴批研究文档随档在 `docs/archive/v0.12.x/`（plan-66 ~ plan-68 候选现状见「P3」）。
+**当前迭代**：在办 25 项按「价值 / 收益 / 风险」分三档（2026-10-07 重排，档位定义见「当前迭代待办」）——P1 五项（**plan-71** 转正判据先行 + 风险/核心价值改进 **plan-99/85/91/95**）、P2 十四项（**plan-49/55/83** 等待条件型 + 改进批 **plan-88/89/90/92/93/100/101** + Web 展示借鉴批 **plan-103/104/105/106**）、P3 六项（**plan-70** 死线观察，已有落地设计 `decision-reflection-shadow-design.md`；择机 **plan-87/94/102** + 借鉴批择机 **plan-107/108**）；**plan-85 ~ plan-102** 为 2026-10-07 自审改进盘点迁入批（18 项）；**plan-103 ~ plan-108** 为 2026-10-07 Web 展示借鉴批（awesome-design-md 研究 6 项，立项映射见 [`awesome-design-md-borrow-candidates-research.md`](../plan/awesome-design-md-borrow-candidates-research.md)）；历史批次（**plan-59 ~ plan-84**，含 Vibe-Trading / gs-quant / 工程效能 / TradingAgents-CN 借鉴批）已全部收口，完成态与未采纳记录随档见 [`archived_plan.0.11.x.md`](../archive/v0.11.x/archived_plan.0.11.x.md) 与 [`archived_plan.0.12.x.md`](../archive/v0.12.x/archived_plan.0.12.x.md)，借鉴批研究文档随档在 `docs/archive/v0.12.x/`（plan-66 ~ plan-68 候选现状见「P3」）。
 
 > **命名纪律（强制）**：重构/新增的变量名、函数名、注释与文档表述必须与新章节语义相关（如 `position_relationship`/`portfolio_history_drawdown`/`style_factor`/`action`），**绝对禁止用任务编号命名**（F 系列、plan-N、rf-N 等）。任务编号仅在本表作链接锚点，不进入实现层。
 
@@ -137,6 +137,30 @@
 
 **动作**：可配置通知钩子（webhook URL / 邮件 / 桌面通知，失败必发、成功可选发），载荷含报告类型、产物路径、降级摘要、错误数；未配置时静默跳过（默认关，符合「配置文件不必须存在」惯例）
 
+#### 🔲 `plan-103` Web/报告设计语言契约立档（DESIGN.md）
+
+**现状与问题**（2026-10-07 Web 展示借鉴批）：报告 HTML（`report_template.html` 内联 179 个 CSS 变量 + `theme.js` 明暗双主题）与 Web 工作台（`src/static/web/style.css` 1,070 行 / 19 个变量、仅浅色）各持一套样式词汇（`--bg` vs `--color-bg`），全仓无设计语言文档——30+ 章节 partial 与面板新增时无观感真值可依，AI 辅助改动尤易两面漂移；上游 `VoltAgent/awesome-design-md` 的 73 份 Stitch 规范 DESIGN.md 提供了可套用的文档骨架（研究见 [`awesome-design-md-borrow-candidates-research.md`](../plan/awesome-design-md-borrow-candidates-research.md)）
+
+**动作**：按其节骨架（Overview 基调 / Colors 语义角色 / Typography 字阶 / Components 全状态 / Layout 间距 / 阴影 / Do-Don't 护栏 / Responsive 断点 / Iteration Guide / Known Gaps）裁剪项目自有 `DESIGN.md`，数值取两侧既有 token 提案值而非推倒重来；落仓库根，由 CLAUDE.md 与 developer-guide 链入，作为后续一切 Web/报告 UI 改动（含 AI 生成）的首个读取入口
+
+#### 🔲 `plan-104` 双面设计 token 统一（语义角色单源）
+
+**现状与问题**（2026-10-07 Web 展示借鉴批）：同一语义（页面底/卡面/边框/正文层级/成功-警告-错误/主色）在报告侧与工作台侧用两套变量名各自维护，改色不联动；`--chart-*` 与页面变量的职责边界仅散落注释——按 DESIGN.md 的「语义角色 + hex + 功能」方法对照，现状没有角色表
+
+**动作**：立语义角色表（surface 阶梯 / ink 层级 / status 三色 / 涨跌正负 / 强调色单一 / chart 专用），收敛为单一定义源供两份样式表消费（或同名变量双面对齐），旧名保留一版兼容映射；角色表写入 DESIGN.md Colors 节并与实现互为校验（机检见 plan-108）
+
+#### 🔲 `plan-105` Web 工作台组件状态矩阵与暗色主题补齐
+
+**现状与问题**（2026-10-07 Web 展示借鉴批）：`web/style.css` 文件头自注「阶段 3 打磨视觉（design-quality 完整落地）」仍为规划态；工作台仅浅色（报告侧 `theme.js` 已是完整暗色世界——样板 Do 明言「明暗是两个完整世界，不做半吊子混搭」），按钮/输入/卡片/标签页/进度的 hover/focus/disabled/加载/空态/错误态未成矩阵
+
+**动作**：按 DESIGN.md 组件节补齐五区工作台状态矩阵（含 focus 可见性、加载与空态占位）；接入 `theme.js` 同款双主题（偏好持久化、变量回读），暗色下状态色按角色表重调对比度；完成后同步 how-to-use-web-mode 相关描述
+
+#### 🔲 `plan-106` 报告 HTML 阅读版式与数字排版升级
+
+**现状与问题**（2026-10-07 Web 展示借鉴批）：报告是「长文 + 密集数字表」阅读场景，但字阶/行高/章节节奏散落模板内联 CSS 未表化；数值列未统一等宽数字与列对齐，几十张表扫读费力——阅读型样板（notion/mintlify）的字阶表与数据密度样板（sentry）的表格规范可直接对照
+
+**动作**：立字阶与行高表（正文/小标题/表格/脚注/图表题注五类）并在模板落地；数值列统一 `font-variant-numeric: tabular-nums` 右对齐 + 正负号语义色（与涨跌口径一致）；章节间距节奏化；明暗两主题按 WCAG AA 过对比度
+
 ### P3 — 预期实施，有空时安排
 
 > **候选与历史批说明**：源 TradingAgents-CN 仓库研究的 10 项候选（详细分析见 [`tradingagents-cn-borrow-candidates-research.md`](../archive/v0.11.x/tradingagents-cn-borrow-research/tradingagents-cn-borrow-candidates-research.md)）中 plan-59 ~ plan-65 已完成（2026-10-01）：前四项见 [`archived_plan.0.11.x.md`](../archive/v0.11.x/archived_plan.0.11.x.md)，plan-63/64/65 见同文档「LLM 成本调节 / 生成后自检 / 调用级源指定」段；整体设计见 [`report-depth-selfreview-source-override-design.md`](../archive/v0.11.x/llm-depth-selfreview-source-override/report-depth-selfreview-source-override-design.md)。
@@ -170,6 +194,18 @@
 **现状与问题**（2026-10-07 自审迁入）：归档 `better-investment-advice` §4.2 放弃「反问引导/对话式」的理由是「单向报告无法承载交互」，并明注「**若未来增加交互式报告或对话式 TUI 可重新考虑**」——现 Web 交互渠道已落地，该条件已成立；读者看完报告想追问（「为什么说集中度偏高？」）目前只能重跑 LLM 模块
 
 **动作**：按新 plan 立项评估（不直接实现）：Web 报告页「就本期报告追问」输入框，会话内多轮，上下文 = 报告关键数据 + 首问摘要，复用既有 provider 链/预算/降级/事实校验；成本与缓存策略先行设计，TUI 侧后置。**明确不做**：仓位硬建议、全市场筛选仍守归档边界
+
+#### 🔲 `plan-107` 响应式断点与触控契约
+
+**现状与问题**（2026-10-07 Web 展示借鉴批，择机）：报告与工作台各有零散 @media，无断点表/触控目标/塌缩策略三件套（各样板 DESIGN.md 均带 Breakpoints / Touch Targets / Collapsing Strategy）；手机浏览器开报告时宽表溢出、目录与折叠组行为不系统
+
+**动作**：立四档断点（≥1280 / 1024 / 768 / 480）与触控目标 ≥44px 契约、宽表横滚 + 首列冻结、目录/折叠组窄屏塌缩规则，写入 DESIGN.md Responsive 节并逐一落地报告模板与工作台（依赖 plan-103/104 先行）
+
+#### 🔲 `plan-108` 设计护栏机检（Do/Don't → 样式检查）
+
+**现状与问题**（2026-10-07 Web 展示借鉴批，择机）：DESIGN.md 的 Do/Don't 若仅靠人审，AI 辅助改动下会失守——项目已有 check-svg/模板结构机检先例，样式面是空白
+
+**动作**：复用 `scripts/_checklib` 立样式护栏检查（候选规则：新增 CSS 禁裸色值必须走角色变量、圆角/间距只取档位值、强调色越权、两面 token 名对表），先 `--ci` 观察模式统计误报，稳定后评估入钩子域与 CI guards；规则文本与 DESIGN.md Do/Don't 逐条同源（依赖 plan-103/104 先行）
 
 ## 归档
 
