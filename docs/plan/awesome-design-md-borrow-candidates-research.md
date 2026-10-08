@@ -1,6 +1,8 @@
 # awesome-design-md Web 展示借鉴候选研究
 
 > 2026-10-07 · 借鉴批研究（plan-103 ~ plan-108 立项依据）· 材料：`docs/tmp/awesome-design-md`（临时研究材料，上游 `https://github.com/VoltAgent/awesome-design-md`，浅克隆 73 份 DESIGN.md，tmp 清理后以上游 URL 为准）
+>
+> **状态（2026-10-08）**：plan-103 ~ plan-109 七项已全部实施完成并归档，见 `docs/archive/v0.12.x/archived_plan.0.12.x.md`「Web 展示借鉴批」段。
 
 ## 1. DESIGN.md 是什么
 

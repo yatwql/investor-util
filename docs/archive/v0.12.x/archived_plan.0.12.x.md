@@ -181,3 +181,61 @@
 ## plan-98 生成中断缺清理与产物一致性保障 — ✅ 已完成（2026-10-07）
 
 **动作**：新增 `report/run_integrity.py` 运行一致性守卫——`guard_run` 装饰 `generate_report`（ContextVar 线程隔离，Web 并行互不串扰）：`begin_run` 建上下文并**预清扫**上次崩溃遗留的产物 `.tmp` → 执行 → **KeyboardInterrupt 安全落点收口** → `finally clear_run`。收口四步（各步独立 best-effort，绝不吞 KI，原样 re-raise——CLI 退出码 130 与菜单「操作已取消」语义不变）：① 清理本次登记的在写临时文件 + 产物前缀兜底清扫；② `PerfCollector.mark_interrupted()` + `save()` 以 `status=interrupted`（含 `interrupted_stage` 中断时活跃阶段名）落 perf_history，`save` 改幂等（一次运行只落一条，正常完成后中断收口不重复记）；③ 经 reporter 输出「生成已中断（阶段：…）——已写盘：…；未完成已丢弃：…；已清理临时文件 N 个」明细；④ 健康检查 future 收敛（防线程残留）。**产物原子落盘**：`html_save._write_html_atomic` / `excel_writer._save_workbook_atomic`（同目录 `<目标>.tmp` + `os.replace`）——中断只留临时文件，最新版/归档版不再半写截断；写盘方经 `note_temp`/`note_artifact` 登记进运行上下文（无上下文空操作，whatif 等独立调用不受影响）。**防误判消费方**：TUI 页头状态行「上次报告」对 `status=interrupted` 末条显示「（已中断）」。basic/both/full 三路径 `bind_perf`/`bind_health` 接线（零调用点改动）。文档触点：新需求 **R-OUT-13** + testplan 批 9 载体、faq「Ctrl+C 会损坏数据吗」问答按新保障改写、technical 概要表「运行一致性」行 + 语义表 `run_integrity` 行、developer-guide perf-view 口径补 interrupted 说明。测试 26 项（`unit/report/test_run_integrity.py` 25 项：上下文生命周期/清扫/收口明细/原子落盘/中断状态幂等/装饰器/集成中断 + `test_tui_menu` 状态行已中断 1 项；`test_excel_writer` 存档降级用例改为真实模拟落盘）。
+
+### Web 展示借鉴批 — 已完成（plan-103 ~ plan-109 共 7 项，2026-10-08 归档）
+
+#### ✅ `plan-103` Web/报告设计语言契约立档（DESIGN.md） — 已完成（2026-10-08，`49a2ec46`）
+
+**现状与问题**（2026-10-07 Web 展示借鉴批）：报告 HTML（`report_template.html` 内联 179 个 CSS 变量 + `theme.js` 明暗双主题）与 Web 工作台（`src/static/web/style.css` 1,070 行 / 19 个变量、仅浅色）各持一套样式词汇（`--bg` vs `--color-bg`），全仓无设计语言文档——30+ 章节 partial 与面板新增时无观感真值可依，AI 辅助改动尤易两面漂移；上游 `VoltAgent/awesome-design-md` 的 73 份 Stitch 规范 DESIGN.md 提供了可套用的文档骨架（研究见 [`awesome-design-md-borrow-candidates-research.md`](../plan/awesome-design-md-borrow-candidates-research.md)）
+
+**动作**：按其节骨架（Overview 基调 / Colors 语义角色 / Typography 字阶 / Components 全状态 / Layout 间距 / 阴影 / Do-Don't 护栏 / Responsive 断点 / Iteration Guide / Known Gaps）裁剪项目自有 `DESIGN.md`，数值取两侧既有 token 提案值而非推倒重来；落仓库根，由 CLAUDE.md 与 developer-guide 链入，作为后续一切 Web/报告 UI 改动（含 AI 生成）的首个读取入口
+
+**完成态（2026-10-08，`49a2ec46`）**：`DESIGN.md` 11 节立档（色彩角色 8 族 / 五类字阶 / 组件六态 / 布局间距与宽度密度分治 / 降级两阶 / 四档断点 / 三档数据状态 / 十条护栏与机检同源 / 迭代指引 / Known Gaps）+ CLAUDE/developer-guide/folders 触点；契约测试 `test_design_doc` 6 项（必需节子集、角色族覆盖、护栏编号连续与 DO-DON'T 对偶、文内引用路径存在）。
+
+#### ✅ `plan-104` 双面设计 token 统一（语义角色单源） — 已完成（2026-10-08，`c191e7cf`）
+
+**现状与问题**（2026-10-07 Web 展示借鉴批）：同一语义（页面底/卡面/边框/正文层级/成功-警告-错误/主色）在报告侧与工作台侧用两套变量名各自维护，改色不联动；`--chart-*` 与页面变量的职责边界仅散落注释——按 DESIGN.md 的「语义角色 + hex + 功能」方法对照，现状没有角色表
+
+**动作**：立语义角色表（surface 阶梯 / ink 层级 / status 三色 / 涨跌正负 / 强调色单一 / chart 专用），收敛为单一定义源供两份样式表消费（或同名变量双面对齐），旧名保留一版兼容映射；角色表写入 DESIGN.md Colors 节并与实现互为校验（机检见 plan-108）
+
+**完成态（2026-10-08，`c191e7cf`）**：同名对齐路线（报告须离线自包含，不引外部共享文件）——报告侧 `:root` 注入品牌蓝/焦点/字体栈 token，模板 14 行 + partials 9 行品牌蓝裸值 → `var(--primary)`，状态域改名 `--ok/--warn/--info`（13 处）；工作台 104 处 `var(--color-*)` 切角色名 + 12 条旧名一版兼容映射；What-if 模板对称补齐；`test_design_tokens` 7 项（共享角色双面同名、旧名成对迁移、残留恒零）。
+
+#### ✅ `plan-105` Web 工作台组件状态矩阵与暗色主题补齐 — 已完成（2026-10-08，`4b517474`）
+
+**现状与问题**（2026-10-07 Web 展示借鉴批）：`web/style.css` 文件头自注「阶段 3 打磨视觉（design-quality 完整落地）」仍为规划态；工作台仅浅色（报告侧 `theme.js` 已是完整暗色世界——样板 Do 明言「明暗是两个完整世界，不做半吊子混搭」），按钮/输入/卡片/标签页/进度的 hover/focus/disabled/加载/空态/错误态未成矩阵
+
+**动作**：按 DESIGN.md 组件节补齐五区工作台状态矩阵（含 focus 可见性、加载与空态占位）；接入 `theme.js` 同款双主题（偏好持久化、变量回读），暗色下状态色按角色表重调对比度；完成后同步 how-to-use-web-mode 相关描述
+
+**完成态（2026-10-08，`4b517474`）**：工作台暗色主题（`[data-theme="dark"]` 与报告同值、与 `theme.js` 同键 `investor-theme-dark`、head 防闪脚本、tab-bar toggle）+ 组件状态矩阵（全局 `:focus-visible` 兜底、`btn[aria-busy]` 加载态、`.has-error/.field-error` 输入错误、`.empty-note` 空态挂点 4 处、主题/目录浮动钮）；`test_web_theme` 10 项（与 `theme.js` 存储键动态对表）；手册 §2 同步。
+
+#### ✅ `plan-106` 报告 HTML 阅读版式与数字排版升级 — 已完成（2026-10-08，`f9df5c78`）
+
+**现状与问题**（2026-10-07 Web 展示借鉴批）：报告是「长文 + 密集数字表」阅读场景，但字阶/行高/章节节奏散落模板内联 CSS 未表化；数值列未统一等宽数字与列对齐，几十张表扫读费力——阅读型样板（notion/mintlify）的字阶表与数据密度样板（sentry）的表格规范可直接对照
+
+**动作**：立字阶与行高表（正文/小标题/表格/脚注/图表题注五类）并在模板落地；数值列统一 `font-variant-numeric: tabular-nums` 右对齐 + 正负号语义色（与涨跌口径一致）；章节间距节奏化；明暗两主题按 WCAG AA 过对比度；宽度与密度分治（正文单列阅读宽、宽表/图表区独享横向密度——数据密度样板 binance「product surfaces where horizontal density matters」）；表格行态统一为族（粘性表头/行悬停/列对齐，斑马纹作可选档——minimax `data-table` 三件套 header/row/hairline 的组件化写法）
+
+**完成态（2026-10-08，`f9df5c78`）**：两模板 201 处字号字面量收敛 8 档字阶 token（`--fs-h1/kpi/h2/h3/body/table/table-sm/footnote`，图标 >24px 豁免）+ 3 档行高；表格全局 `tabular-nums` + 行高档；正文 78ch 限宽（宽表/图表保持章节横滚）；WCAG AA 亮色修值（muted/faint/loss 三色，暗色原已达标）；What-if 补品牌蓝/字体栈 token；`test_report_type_scale` 18 项（含亮暗对比度按 CSS 动态计算）。
+
+#### ✅ `plan-107` 响应式断点与触控契约 — 已完成（2026-10-08，`ce02bc00`）
+
+**现状与问题**（2026-10-07 Web 展示借鉴批，择机）：报告与工作台各有零散 @media，无断点表/触控目标/塌缩策略三件套（各样板 DESIGN.md 均带 Breakpoints / Touch Targets / Collapsing Strategy）；手机浏览器开报告时宽表溢出、目录与折叠组行为不系统
+
+**动作**：立四档断点（≥1280 / 1024 / 768 / 480）与触控目标 ≥44px 契约、宽表横滚 + 首列冻结、目录/折叠组窄屏塌缩规则，写入 DESIGN.md Responsive 节并逐一落地报告模板与工作台（依赖 plan-103/104 先行）；**以手机浏览器实测为验收**——用户高频在手机上看报告（安卓 Chrome / iOS Safari / 微信内置浏览器三端），新增/调整样式在 ≤480px 视口逐项核验（宽表横滚、触控目标、字号下限、暗色切换、目录折叠），iOS 防横屏字号放大，报告侧新增 JS 保持 ES5（微信 X5 旧内核）
+
+**完成态（2026-10-08，`ce02bc00`）**：三面断点收敛四档族（toc 侧栏边界 900/899 → 1024/1023，旧 899/900/375 残值零）；宽表首列冻结（sticky + 斑马/hover/kv 底色同步 + 打印归位）；触控 ≥44px（≤768 触屏档强制含表单控件，折叠组头与目录/主题/回顶浮动钮全局 44×44）；`text-size-adjust:100%` 防字号放大；`test_responsive_contract` 12 项（断点⊆DESIGN 档族动态提取、print 块括号平衡解析）。
+
+#### ✅ `plan-108` 设计护栏机检（Do/Don't → 样式检查） — 已完成（2026-10-08，`3c156102`）
+
+**现状与问题**（2026-10-07 Web 展示借鉴批，择机）：DESIGN.md 的 Do/Don't 若仅靠人审，AI 辅助改动下会失守——项目已有 check-svg/模板结构机检先例，样式面是空白
+
+**动作**：复用 `scripts/_checklib` 立样式护栏检查（候选规则：新增 CSS 禁裸色值必须走角色变量、圆角/间距只取档位值、强调色越权、两面 token 名对表），先 `--ci` 观察模式统计误报，稳定后评估入钩子域与 CI guards；规则文本与 DESIGN.md Do/Don't 逐条同源（依赖 plan-103/104 先行）
+
+**完成态（2026-10-08，`3c156102`）**：`scripts/check-style-guardrails.py`（复用 `_checklib`，`-v/--ci`、退出 0/2）——E 级判 finding（护栏 3 强调色越权，品牌蓝 hex 集从 `:root` 动态提取；护栏 5 明暗同步；Colors 同名对齐段双向对表），W 级观察统计不判 finding（护栏 1 裸色值 / 护栏 2 圆角档位，`-v` 明细供分诊）；顺手清 3 处品牌蓝 hover 字面量与 `--radius:12px` 出档值；测试 14 项。**观察期未入钩子与 CI**，稳定后评估入域。
+
+#### ✅ `plan-109` 报告空状态与降级呈现统一（空态样式族 + 文案口径） — 已完成（2026-10-08，`d867594f`）
+
+**现状与问题**（2026-10-08 Web 展示借鉴批·HTML 报告专项补研）：数据降级是本报告的核心常态面（数据降级治理体系的最终出口），但呈现层未统一——模板/partials 实测并存 4 种占位样式类（`.empty-section` ×19、`.empty-note placeholder-note` ×18 同义组合、`.chart-empty-note` ×5、`.empty-note` ×4）与 5 种近义文案（不可用 / 暂无 / 数据不可用 / 暂无数据 / 无数据），章节间占位观感与口径不一；上游样板的 empty-state 语义分层（状态色 + whisper 弱化文本，mastercard）与全样本「状态语义化」共性可直接对照
+
+**动作**：归并占位样式为一族（章节级 / 单元级 / 图表级三档 + 状态语义色阶）；降级文案口径单源化（「数据不可用 + 原因」句式，与健康检查降级原因同源，HTML/Excel 双端一致）；对照数据状态矩阵（data_status 契约）补「状态 → 观感」映射并写入 DESIGN.md 状态节（plan-103）；20 个 partial 逐一核对切换
+
+**完成态（2026-10-08，`d867594f`）**：三档空态族归并（章节 `empty-section` / 单元 `empty-note` / 图表 `chart-empty-note`，原 `placeholder-note` 并入基底、20 处双类清零）；文案二元口径（合法空「暂无+具体对象」——指数占位双端改「暂无指数数据」；降级空「数据不可用：<原因>」——数据源状态行×2 与历史图空态加前缀）+ 豁免表入档；DESIGN Data States 节改写（含 20 partial 核对结论与空态中性分工约束）；`test_report_empty_states` 11 项；脆窗 print 断言改括号平衡解析。
