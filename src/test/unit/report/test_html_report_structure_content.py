@@ -547,8 +547,8 @@ class TestSummaryDateTimeValueStyles(unittest.TestCase):
         )
         self.assertRegex(
             style,
-            r"color:\s*#2E75B6",
-            f"所属交易日值应为蓝色 2E75B6，style={style!r}",
+            r"color:\s*var\(--primary\)",
+            f"所属交易日值应使用品牌色 token，style={style!r}",
         )
 
     def test_kv_label_style_unaffected(self):

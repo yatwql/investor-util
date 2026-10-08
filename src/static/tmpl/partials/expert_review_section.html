@@ -46,7 +46,7 @@
         <!-- 行动摘要子块：引用行动建议结果（单源计算、两处呈现，渲染数据经context传递/数据契约） -->
         {% if section_visible("action") and action_data and action_data.available %}
         <div class="section-content" style="margin-top: 12px; padding: 12px 14px; background: var(--surface-2); border: 1px solid var(--border); border-radius: 6px;">
-            <div style="font-weight: bold; font-size: 14px; color: #2E75B6; margin-bottom: 6px;">
+            <div style="font-weight: bold; font-size: 14px; color: var(--primary); margin-bottom: 6px;">
                 行动摘要（详见第 {{ section_numbers['action'] }} 章「{{ section_names['action'] }}」）
             </div>
             <div class="summary-tag" style="margin-bottom: 0;">

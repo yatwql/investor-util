@@ -210,7 +210,7 @@
                         <td>{{ loop.index }}</td>
                         <td class="text-left">{{ p.name_a }}({{ p.code_a }})</td>
                         <td class="text-left">{{ p.name_b }}({{ p.code_b }})</td>
-                        <td style="color: {% if p.pearson >= 0.5 %}#C00000{% elif p.pearson > 0 %}#E65C00{% elif p.pearson <= -0.5 %}#1F4E79{% else %}#2E75B6{% endif %}; font-weight: 600;">
+                        <td style="color: {% if p.pearson >= 0.5 %}#C00000{% elif p.pearson > 0 %}#E65C00{% elif p.pearson <= -0.5 %}#1F4E79{% else %}var(--primary){% endif %}; font-weight: 600;">
                             {{ "%.2f"|format(p.pearson) }}
                         </td>
                         <td>{{ "%.4f"|format(p.p_value) }}</td>

@@ -19,20 +19,22 @@
 
 | 角色族 | 角色 | 报告侧实现 | 工作台侧实现 | 备注 |
 |---|---|---|---|---|
-| Surface 阶梯 | 页面底 / 卡面 / 次级面 | `--bg` / `--surface` / `--surface-2` | `--color-bg` / `--color-surface` / — | 层级不跳级；暗色各自成套 |
-| Ink 层级 | 正文 / 次要 / 三级 / 弱化 | `--text` / `--text-secondary` / `--text-tertiary` / `--text-muted`+`--text-faint` | `--color-text` / `--color-text-secondary` | 对比度按 WCAG AA（4.5:1 正文、3:1 大字） |
-| Border 阶 | 常规 / 强 / 虚线 | `--border` / `--border-strong` / `--border-dashed` | `--color-border` | hairline 分层代替阴影堆叠 |
-| 状态语义 | 成功 / 警告 / 错误 | `--status-ok` `--success` / `--status-warn` `--warn-*` / `--status-info` `--row-danger-*` | `--color-ok` / `--color-warn` / `--color-error` | **健康状态域**：绿=ok、黄=warn、红=error |
+| Surface 阶梯 | 页面底 / 卡面 / 次级面 | `--bg` / `--surface` / `--surface-2` | `--bg` / `--surface` / — | 层级不跳级；暗色各自成套 |
+| Ink 层级 | 正文 / 次要 / 三级 / 弱化 | `--text` / `--text-secondary` / `--text-tertiary` / `--text-muted`+`--text-faint` | `--text` / `--text-secondary` | 对比度按 WCAG AA（4.5:1 正文、3:1 大字） |
+| Border 阶 | 常规 / 强 / 虚线 | `--border` / `--border-strong` / `--border-dashed` | `--border` | hairline 分层代替阴影堆叠 |
+| 状态语义 | 成功 / 警告 / 错误 | `--ok` `--success` / `--warn` `--warn-*` / `--info` `--row-danger-*` | `--ok` / `--warn` / `--error` | **健康状态域**：绿=ok、黄=warn、红=error；报告无通用 error 红，错误呈现走 danger 组件派生域（豁免对表） |
 | 涨跌语义 | 涨（红）/ 跌（绿） | `--profit` / `--loss` | —（工作台无行情色） | **A 股口径域**：与状态域红绿语义**相反**，两域禁互换 |
-| 强调与焦点 | 品牌蓝 / 焦点环 | `--chart-primary` 派生品牌蓝、按钮底 | `--color-primary`(-hover) / `--color-focus` | 单强调色；accent（`--color-accent`）仅用于次要正向标记 |
+| 强调与焦点 | 品牌蓝 / 焦点环 | `--primary`(-hover) / `--focus` | `--primary`(-hover) / `--focus` / `--accent` | 单强调色；accent 仅用于次要正向标记（报告无专有豁免） |
 | Chart 专用 | 系列色 / 网格 / 图文字 | `--chart-primary` `--chart-secondary` `--chart-success` `--chart-danger` `--chart-warning` `--chart-grid` `--chart-text` `--chart-bg` | —（工作台无图） | 仅图表使用；`theme.js` 切主题时重读烘焙 |
 | 组件派生面 | 表格斑马/小计/合计、行警示、徽标、辩论、来源标签、空态底 | `--table-*` `--subtotal-bg` `--grand-total-bg` `--row-*` `--notice-*` `--debate-*` `--source-tag-*` `--empty-section-bg` 等 | — | 组件级派生色，必须引用基础角色而非裸值 |
+
+**同名对齐（双面 token 统一）**：共享角色在两面 `:root` **同名定义**（验收见 `src/test/unit/report/test_design_tokens.py` 对表测试）；同名跨面允许按各自明暗世界取值（品牌蓝报告 `#2E75B6` / 工作台 `#1f6fb2`），对表**验名不验值**。工作台旧 `--color-*` 名保留**一版** `var()` 兼容映射（新代码一律用角色名，后续版本移除）。
 
 **双主题规则**：亮色为源，暗色为配对世界——新增/修改亮色角色时**必须同步** `[data-theme="dark"]` 覆盖（或在 Known Gaps 声明单主题豁免）。品牌蓝在暗色下保持原值（蓝底白字清晰，刻意不调）。
 
 ## Typography — 字阶表
 
-- **字体栈**（两面已一致）：`"PingFang SC", "Microsoft YaHei", "Noto Sans SC", system-ui, -apple-system, sans-serif`。
+- **字体栈**（两面已统一 `--font-stack` 同值）：`"PingFang SC", "Microsoft YaHei", "Noto Sans SC", system-ui, -apple-system, sans-serif`。
 - **目标字阶**（现状模板内 17 档散落，收敛为下表；由阅读版式任务落地）：
 
 | 类别 | 字号 | 行高 | 用途 |
@@ -123,7 +125,7 @@
 
 ## Known Gaps — 未覆盖面（随任务推进更新）
 
-- 双面 token 同义异名未收敛（token 统一在办）。
+- 工作台旧名 `--color-*` 兼容映射为一版过渡，后续版本移除；报告 `--primary`/`--focus` token 已就位但样式应用点待组件状态矩阵补齐。
 - 工作台暗色主题与组件状态矩阵未补（状态矩阵与暗色补齐在办）。
 - 报告字阶未表化、数值列未统一 `tabular-nums`（阅读版式在办）。
 - 断点/触控/塌缩未全落地（响应式契约在办）。

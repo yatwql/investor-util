@@ -18,7 +18,7 @@
                     <tr>
                         <td class="news-seq">{{ loop.index }}</td>
                         <td class="text-left news-title" data-label="新闻标题">
-                            <a href="{{ item.url }}" target="_blank" rel="noopener" style="color: #2E75B6; text-decoration: none;">{{ item.title }}</a>
+                            <a href="{{ item.url }}" target="_blank" rel="noopener" style="color: var(--primary); text-decoration: none;">{{ item.title }}</a>
                         </td>
                         <td class="text-left" data-label="摘要" style="font-size: 12px; max-width: 300px;">{{ item.intro }}</td>
                         <td data-label="来源">{{ item.media_name }}</td>
