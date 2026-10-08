@@ -91,3 +91,69 @@ class TestDevVerifySinglePhaseMerge:
     def test_timeout_budget_is_sum_of_legacy_phases(self):
         """超时预算 = 原两阶段 300s×2 之和（合并不缩总预算、不放宽单轮包络）。"""
         assert self._phase()["timeout_sec"] == 300 * 2
+
+
+@pytest.mark.unit_scripts
+class TestMarkerExprSingleSource:
+    """marker 表达式单源：MODES 是唯一定义处，编译谓词与 `-m` 实跑同源求值。"""
+
+    @staticmethod
+    def _modes():
+        return load_script("_test_runner/modes.py", module_name="_test_runner_modes_under_test")
+
+    def test_every_mode_resolves_compilable_expression(self):
+        """注册表里每个模式（含只有阶段 marker 的 dev-verify）都要能解析并编译。"""
+        modes = self._modes()
+        for name in modes.MODES:
+            expr = modes.mode_marker_expr(name)
+            assert isinstance(expr, str)
+            assert callable(modes.compile_marker_expr(expr))
+
+    def test_phase_marker_used_when_top_level_absent(self):
+        modes = self._modes()
+        assert "marker" not in modes.MODES["dev-verify"]
+        assert modes.mode_marker_expr("dev-verify") == modes.MODES["dev-verify"]["phases"][0]["marker"]
+
+    def test_top_level_marker_used_when_present(self):
+        modes = self._modes()
+        assert modes.mode_marker_expr("verify") == modes.MODES["verify"]["marker"]
+
+    def test_expression_follows_registry_edit(self, monkeypatch):
+        """改注册表里的表达式 → 解析结果跟着变（证明是读表而非抄写/缓存）。"""
+        modes = self._modes()
+        monkeypatch.setitem(modes.MODES, "unit", {**modes.MODES["unit"], "marker": "unit_report"})
+        pred = modes.compile_marker_expr(modes.mode_marker_expr("unit"))
+        assert pred({"unit_report"}) is True
+        assert pred({"unit_core"}) is False
+
+    def test_empty_expression_matches_everything(self):
+        """空表达式 = 不过滤（与 test-runner 空 marker 不传 -m 同口径）。"""
+        pred = self._modes().compile_marker_expr("")
+        assert pred({"live"}) is True
+        assert pred(set()) is True
+
+    @pytest.mark.parametrize(
+        ("expr", "markers", "expected"),
+        [
+            ("unit", {"unit"}, True),
+            ("unit", {"edge"}, False),
+            ("unit and not (edge or data)", {"unit"}, True),
+            ("unit and not (edge or data)", {"unit", "edge"}, False),
+            ("unit and not (edge or data)", {"unit", "data"}, False),
+            ("scenario or integration", {"integration"}, True),
+            ("scenario or integration", {"unit"}, False),
+            ("not unit and not live", {"scenario"}, True),
+            ("not unit and not live", {"live"}, False),
+            ("not unit and not live", {"unit"}, False),
+            ("scenario_extreme", {"scenario"}, False),
+            ("scenario_extreme", {"scenario_extreme"}, True),
+        ],
+    )
+    def test_boolean_semantics_match_dash_m(self, expr, markers, expected):
+        """真值表断言（与 -m 布尔语义逐项对拍，独立于实现写死期望）。"""
+        assert self._modes().compile_marker_expr(expr)(set(markers)) is expected
+
+    def test_malformed_expression_fails_loudly(self):
+        """语法错误在编译期暴露，不带病进入计数。"""
+        with pytest.raises(SyntaxError):
+            self._modes().compile_marker_expr("unit and")

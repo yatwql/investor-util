@@ -9,6 +9,8 @@
 
 ## [0.12.7-dev] - 开发中（未发布）
 
+- **工程质量**：**收集计数谓词与模式注册表单源化**——`_test_runner/modes.py` 新增 `mode_marker_expr()`（顶层 `marker` 缺省时回落到首阶段 marker）与 `compile_marker_expr()`（复用 pytest 自身的 `-m` 表达式求值器，把表达式编译成「对 marker 名集合」的谓词，空表达式恒真）；`collect-test-coverage.py` 删掉 15 项手写 lambda 字典与「双处定义——marker 变更必须同步本字典」的纯人肉纪律注释，改为按 `MODES` 键集现场编译（`all` 已由「总收集: N」表达、`live` 被默认收集宇宙排除，两项显式豁免并在脚本内注记理由，模式增删自动跟随），同步删掉只服务旧字典的 `_sel`；表达式语义由真值表参数化用例与注册表回读用例锁死，计数与 `-m` 实跑同源（对拍：`unit`/`not unit and not live`/`unit_scripts`/`scenario` 谓词计数与 `pytest -m` 收集数逐项相等） | plan-112
+
 - **工程质量/重构**：**测试域脚本加载样板收敛为共享实现**——新增 `src/test/_script_loader.py`（`load_script(name, module_name=None)`：按文件名/子路径加载 `scripts/` 下脚本，模块名缺省由文件名派生、可显式覆盖，每次调用重新执行返回新实例，注册进 `sys.modules` 保住 `@dataclass` 按 `cls.__module__` 回查），33 个测试文件的 4 种自建样板（模块级 `_load_script(name)` / 无参固定脚本 / 路径+模块名两参 / `_load_checklib`·`_load_release_module`·`_load_modes`·`_load_runner` 自定义名）全部迁移，顺带清 38 处失效路径常量与 importlib 导入，净 −362 行；样板唯一性由 `test_script_loader.py` 机检（除 loader 外不得再出现动态加载样板、不得再定义同名本地加载器），新测试强制复用共享 loader | plan-111
 
 - **工程质量/契约**：**scripts 顶层脚本契约机检上线（观察期）**——新增 `check-script-contract.py` 四条规则：退出码 docstring 声明 ⊆ `_checklib.report` 返回值域 {0,2}（白名单：code-traces 0/1/2/3、doc-traces/svg/version-consistency 的 1=HIGH/环境缺失/事实源不可读）、`check-*` 须统一 `add_common_args`（-v/--ci）、文本 I/O 显式 encoding（内建 open 非二进制模式 / Path.read_text·write_text / subprocess text=True，AST 全口径）、顶层脚本须被 `src/test/` 测试按文件名引用（一次性探测工具豁免）；同批把 `check-version-consistency` 手写 argv 解析改 argparse + `add_common_args`（补 `-v`）；当前唯一 finding 为 `check-code-traces` CLI 面（plan-114 收口后归零）；测试 39 项 | plan-110

@@ -2,7 +2,8 @@
 
 覆盖 `_collect` 对 pytest 退出码的原样传递（含收集期失败 4 与空收集 5）、
 `CollectPlugin` 的 nodeid+标记记录、`_target_files` 的目录展开与 live 套件排除、
-`_sel` 匹配，以及 `main()` 的退出码出口与模式/子标记计数输出。
+模式谓词与 `_test_runner/modes.py::MODES` 的绑定，以及 `main()` 的退出码出口与
+模式/子标记计数输出。
 """
 
 from __future__ import annotations
@@ -159,17 +160,23 @@ class TestTargetFiles:
         assert mod._target_files([str(mod.REPO_ROOT / "no_such_target_dir")]) == []
 
 
-class TestSel:
-    """`_sel`：任一名命中即为真。"""
+class TestModePredicateBinding:
+    """模式计数谓词绑定到 `_test_runner/modes.py::MODES`（无手写表达式字典）。"""
 
-    def test_any_name_matches(self, mod):
-        assert mod._sel({"unit", "unit_core"}, "unit_core", "unit_web") is True
+    def test_reported_modes_are_registry_minus_omitted(self, mod):
+        assert set(mod._MODE_PREDICATES) == set(mod.MODES) - set(mod._OMITTED_MODES)
 
-    def test_no_name_matches(self, mod):
-        assert mod._sel({"unit"}, "unit_core", "unit_web") is False
+    def test_omitted_modes_still_registered(self, mod):
+        """豁免表若残留已删模式，本断言报出，避免静默陈旧。"""
+        assert set(mod._OMITTED_MODES) <= set(mod.MODES)
 
-    def test_empty_markers(self, mod):
-        assert mod._sel(set(), "unit") is False
+    def test_omitted_modes_carry_reason(self, mod):
+        assert all(str(reason).strip() for reason in mod._OMITTED_MODES.values())
+
+    def test_every_reported_mode_resolves_expression(self, mod):
+        """每个上报模式都能从 MODES 解析出表达式并编译（dev-verify 走阶段 marker）。"""
+        for name in mod._MODE_PREDICATES:
+            assert callable(mod.compile_marker_expr(mod.mode_marker_expr(name)))
 
 
 class TestMainExitCode:

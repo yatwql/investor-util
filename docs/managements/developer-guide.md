@@ -1215,7 +1215,7 @@ sh .githooks/install-hooks.sh --off   # 停用
 
 **`collect-test-coverage.py` — 测试覆盖计数收集**
 
-只做 `.venv/bin/python -m pytest --collect-only`（收集测试项，**不执行测试**，耗时约 2s），按 `test-runner.py` MODES 的 marker 表达式本地归类计数，输出各模式 / unit 子标记 / scenario 分组 / 跨类标记 / 功能域 / 文件分布的项数，供 `docs/managements/test-coverage.md` 快照更新使用。
+只做 `.venv/bin/python -m pytest --collect-only`（收集测试项，**不执行测试**，耗时约 2s），模式计数谓词由 `_test_runner/modes.py::MODES` 的 marker 表达式现场编译，输出各模式 / unit 子标记 / scenario 分组 / 跨类标记 / 功能域 / 文件分布的项数，供 `docs/managements/test-coverage.md` 快照更新使用。
 
 ```bash
 .venv/bin/python scripts/collect-test-coverage.py
@@ -1224,7 +1224,7 @@ sh .githooks/install-hooks.sh --off   # 停用
 **说明**：
 - 只收集不执行——测试体不会运行，不影响测试结果，也不会触发真实数据源 / LLM 调用
 - 项数随版本迭代变化，属撰写时快照，精确计数以本脚本实时输出为准
-- 计数口径与 `test-runner.py` 的 `MODES` marker 表达式对齐（verify / dev-verify 等组合模式同样本地复现）
+- 计数口径直接取自 `MODES` 的 marker 表达式（复用 pytest 自身的 `-m` 求值器，`verify` / `dev-verify` 等组合模式与阶段 marker 回落同源），表达式只在 `modes.py` 定义一处、模式增删自动跟随；`all`（已由「总收集: N」表达）与 `live`（默认收集宇宙排除，计数恒 0）为显式豁免并在脚本内注记理由
 
 ### 质量类
 
