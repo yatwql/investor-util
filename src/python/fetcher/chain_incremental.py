@@ -61,7 +61,7 @@ def write_stale_with_version(
 
     链外手写降级路径（如 fetcher/index.py 的手写判断链）回写过期数据时**必须**
     经本助手——直接 ``cache_set`` 回写未盖戳载荷，语义版本机制上线后会成为
-    「版本缺失」的遮蔽点（rf-531）。返回盖戳后的载荷（调用方直接入结果字典）。
+    「版本缺失」的遮蔽点。返回盖戳后的载荷（调用方直接入结果字典）。
     """
     data = dict(data)
     data["_source"] = source

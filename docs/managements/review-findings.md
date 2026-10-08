@@ -1,6 +1,6 @@
 # 投资复盘助手 - 自我审查问题记录
 > 文档版本：0.12.7-dev
-> **编号源**：`rf-next = 636`（新增问题取此编号，完成后更新为 +1；已用最大 rf-635，递增保证唯一，归档不回收。若与历史归档冲突，运行 `scripts/check-task-numbering.py` 校验）
+> **编号源**：`rf-next = 637`（新增问题取此编号，完成后更新为 +1；已用最大 rf-636，递增保证唯一，归档不回收。若与历史归档冲突，运行 `scripts/check-task-numbering.py` 校验）
 
 ---
 
@@ -50,6 +50,8 @@
 | **rf-78** | `fetcher/batch.py` | 520 | 维持现状（BatchDispatcher 本身内聚，复核确认不拆；2026-10-02 实测 520，回落至登记值附近（rf-522 重试退避原语收编后下降）） | BatchDispatcher 本身内聚，可维持现状（不拆） |
 
 ## 已解决问题
+
+- rf-636 已修复（2026-10-09，历史痕迹守卫空转失效，当批修复）：`check-code-traces` 的实现拆包至 `scripts/_traces_code/` 后，`config.REPO_ROOT` 路径深度少算一级（落成 `scripts/`），`SCAN_DIRS` 四个路径全部不存在 → 遍历逐个跳过 → **守卫恒 exit 0 空转**，CI `guards` 档与 pre-commit 十守护连同它空跑多日；同时拆包把规则定义字面量（`R11`/`F-1`/`第X章`/`rf-117` 的模式与示例）搬入 `scripts/_traces_code/`，`_is_tool_self()` 只按 `check-*.traces.py` 文件名豁免，规则载体自身成为头号命中源。修复七项：① `REPO_ROOT = parents[2]`（代码内注记层级深度）；② 新增 `RULE_CARRIER_DIRS = {"_traces_code"}` 按**目录**跳过规则载体（与文件名无关，后续拆包子目录自动覆盖）；③ 裸版本号模式加 `(?<![\\d.])…(?!\\.\\d)` 逐 token 排除 IPv4 内嵌子串（`127.0.0.1`/`0.0.0.0` 的 `0.0.x` 是地址片段而非版本号；不采用整行放行，同侧真实版本痕迹照报）；④ `_magic_excludes()` 收录真实领域值（`F10` 基金费率页、`P0~P4` 门禁档位与公式价格符号、`T0` 事件窗口锚定、`S0`/`S1`/`MV0`、`Phase1`/`Phase3`、`E1~E3`/`W1~W2` 样式护栏编号），并同步修正 `test_magic_number_letter_digit_flagged` 的样例（`P1 优先级` → `K9 优先级`：原样例与门禁档位领域值直接冲突，其余 7 个暗号样例不变）；⑤ **分层倒置实质修复（不加豁免）**：`core/system_info.py::circuit_display` 函数内 lazy import `llm.circuit_breaker` 改走 core 网关新增的 `register_circuit_text()`/`circuit_text()`（晚绑定回调：展示层不反向 import 上层、也不复制上游 URL→域名归一规则；既有三处 patch `get_circuit_status` 的用例经晚绑定仍生效）；⑥ 其余 40 个被改文件为注释/文档串改写（任务编号、约束代号、历史叙述、迭代标记、章节暗号、待办误报、语义暗号），逐文件经 **AST 归一化比对**证明仅注释/文档串变化、代码语义零变动；⑦ 守卫自证回归：扫描目录存在性硬断言、tmp 种入式样本正/负双探针（种入必报、干净必过）、载体目录跳过而同字面量落在扫描域内仍报、领域值不误伤且同侧暗号照报、统一 CLI 面（`--help` 含 `-v`/`--ci`、`add_common_args` 即 `_checklib` 同一对象）。改前基线 167 条 → 改后 **0**，`--ci` exit 0；防再犯由扫描域自证用例与种入探针承接
 
 - rf-633 已修复（2026-10-08，check-test-markers 双源与自相矛盾，当批修复）：① `KNOWN_MARKERS` 由手写 42 项改为 `registered_markers()` 从 `src/test/conftest.py` 的 `addinivalue_line("markers", …)` **AST 派生**（多行调用与相邻字符串字面量拼接由 `ast` 天然处理，只认 `markers` 分组、忽略 `*args`），conftest 新增/删除标记自动跟随——**已实测到真实漂移**：`cassette` 早已在 conftest 注册却不在手写清单内（43 vs 42），`@pytest.mark.cassette(...)` 一旦写成裸属性即被误判「未注册」；② `EXPECTED_DIR_MARKERS` 补齐目录结构缺口（新增 `unit/cache`→unit_core、`unit/startup`→unit_ui、`unit/web`→unit_web、`scenario/perf`、`scenario/security`——原表有 5 个含测试文件的目录无期望、静默不查），表头补「目录结构绑定」注释；`src/test/unit/conftest.py` 的 `_DIR_TO_MARKER` 运行时提示表同步补齐 cache/scripts/startup（原缺 3 项，漏标报错文案会落到「unit_<未知模块>」）；③ 模块 docstring 通过标准按现状改写：删去「已移除的标记（如 integration）」这一与 `integration` 实为现行注册标记的矛盾表述，并把「scenario/ 下每个测试类」纠正为目录级期望；回归 = `src/test/unit/scripts/test_check_test_markers.py` 27 项，含三组**结构性**双向绑定断言（期望表键全部是真实目录 / 有测试的 `unit/*`·`scenario/*` 目录全部有期望 / `_DIR_TO_MARKER` 键集 ≡ 期望表 `unit/*` 键集，均不写死条数），标记清单等式断言在手写清单下即红（42≠43）
 

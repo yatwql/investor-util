@@ -58,7 +58,9 @@ import argparse
 import sys
 from pathlib import Path
 
-sys.path.insert(0, str(Path(__file__).resolve().parent))  # 同目录共享包（_traces_code）
+sys.path.insert(0, str(Path(__file__).resolve().parent))  # 同目录共享包（_traces_code / _checklib）
+from _checklib import add_common_args  # noqa: E402
+from _checklib import rel as rel_path  # noqa: E402,F401  # 统一相对路径展示（原面 re-export）
 from _traces_code import (  # noqa: E402
     EXCLUDE_LINE,  # noqa: F401
     IDENTIFIER_PATTERNS,  # noqa: F401
@@ -105,17 +107,9 @@ def main() -> None:
     parser = argparse.ArgumentParser(
         description="扫描代码注释中的历史变更痕迹",
     )
-    parser.add_argument(
-        "-v",
-        "--verbose",
-        action="store_true",
-        help="详细输出（含排除行信息）",
-    )
-    parser.add_argument(
-        "--ci",
-        action="store_true",
-        help="CI 模式：仅输出 文件名:行号，非零退出码",
-    )
+    # 统一 CLI 契约（-v/--verbose + --ci）由 _checklib 提供，本脚本不自定义面；
+    # 退出码仍走自身分级语义（0/1/2/3），见模块 docstring「退出码」。
+    add_common_args(parser)
     args = parser.parse_args()
 
     total_hits = 0
@@ -133,13 +127,13 @@ def main() -> None:
                 continue
             if fpath.name in ("chart.min.js",):
                 continue
-            rel = fpath.relative_to(REPO_ROOT)
+            file_ref = rel_path(fpath)
             hits = scan_file(fpath, args.verbose)
             if not hits:
                 continue
 
             if not args.ci:
-                print(f"\n  {rel}")
+                print(f"\n  {file_ref}")
 
             for lineno, cat, desc, text in hits:
                 total_hits += 1
@@ -153,7 +147,7 @@ def main() -> None:
                     low_count += 1
 
                 if args.ci:
-                    print(f"{rel}:{lineno} [{cat}] {desc} — {text}")
+                    print(f"{file_ref}:{lineno} [{cat}] {desc} — {text}")
                 else:
                     marker = "[ERR]" if is_high else "[!]"
                     print(f"    {marker} L{lineno:>4} [{cat}] {desc}")

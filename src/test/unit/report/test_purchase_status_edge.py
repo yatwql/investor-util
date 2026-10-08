@@ -36,7 +36,7 @@ class TestLimitEdgeCases:
 
     @pytest.mark.edge
     def test_zero_limit_shows_unknown_limit(self):
-        """0 元/缺失日限额 → 「限额未知」，绝不显示「日限 0 元」（风险 R4 回归）。"""
+        """0 元/缺失日限额 → 「限额未知」，绝不显示「日限 0 元」（限额未知口径回归）。"""
         rows = {
             "000216": {
                 "purchase_status": "限大额",

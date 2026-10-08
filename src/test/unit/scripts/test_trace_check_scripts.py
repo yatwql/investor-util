@@ -22,6 +22,7 @@ from __future__ import annotations
 
 import ast
 import os
+import sys
 import tempfile
 from pathlib import Path
 
@@ -899,9 +900,9 @@ class TestTaskCodeCommentPatterns:
             assert _code_hit(code_traces, line) is None, f"合法字母+数字被误伤: {line}"
 
     def test_magic_number_letter_digit_flagged(self, code_traces):
-        """MAGIC：注释中"字母+数字/连续字母+数字"（R11/P1/C26/AB14/HH6）属魔法编号须检出。"""
+        """MAGIC：注释中"字母+数字/连续字母+数字"（R11/C26/AB14/HH6）属魔法编号须检出。"""
         flagged = [
-            "P1 优先级",
+            "K9 优先级",  # P0~P4 已入合法领域值（门禁档位/公式价格符号），非此列
             "R17 兼容",
             "C26 兼容",  # 超出约束表编号范围仍是字母+数字，属魔法编号
             "AB14 兼容",  # 连续字母+数字（内嵌命中也是魔法编号）
@@ -1079,3 +1080,104 @@ class TestCoreLayeringGuard:
         fpath.write_text("from src.python.fetcher.gw import x\n", encoding="utf-8")
         assert code_traces._scan_core_layering(fpath) == []
         del tmp_path
+
+
+class TestScanDomainIntegrity:
+    """扫描域自证：扫描目录真实存在、规则载体目录被跳过、合法领域值不误伤。
+
+    关键回归：扫描目录路径一旦算错（深度不对），目录不存在 → 整轮扫描
+    静默跳过 → 永远“通过”。故此处对目录存在性做硬断言，并用种入式样本
+    （tmp 目录）验证扫描器确实会报事——两者合起来才排除“绿得没问题”。
+    """
+
+    def test_scan_dirs_exist_under_repo_root(self, code_traces):
+        assert (code_traces.REPO_ROOT / "src" / "python").is_dir()
+        assert (code_traces.REPO_ROOT / "scripts" / "_traces_code").is_dir()
+        missing = [str(p) for p in code_traces.SCAN_DIRS if not p.is_dir()]
+        assert missing == [], f"扫描目录不存在（会静默跳过整轮扫描）：{missing}"
+        outside = [str(p) for p in code_traces.SCAN_DIRS if not p.is_relative_to(code_traces.REPO_ROOT)]
+        assert outside == [], f"扫描目录跑出仓库根（路径深度算错）：{outside}"
+
+    def test_planted_violation_is_reported(self, code_traces, tmp_path, monkeypatch, capsys):
+        """种入式样本：扫描器必须真的报出违规（正面探针）。"""
+        src_dir = tmp_path / "src" / "python"
+        src_dir.mkdir(parents=True, exist_ok=True)
+        (src_dir / "demo_planted.py").write_text("# rf-999\n", encoding="utf-8")
+        monkeypatch.setattr(code_traces, "SCAN_DIRS", [src_dir])
+        monkeypatch.setattr(sys, "argv", ["check-code-traces.py", "--ci"])
+        with pytest.raises(SystemExit) as exc:
+            code_traces.main()
+        out = capsys.readouterr().out
+        assert exc.value.code != 0
+        assert "demo_planted.py:1" in out and "[CODE]" in out
+
+    def test_planted_clean_tree_passes(self, code_traces, tmp_path, monkeypatch, capsys):
+        """同样的扫描路径，无违规文件 → 必须通过（负面探针，防止“永远报事”）。"""
+        src_dir = tmp_path / "src" / "python"
+        src_dir.mkdir(parents=True, exist_ok=True)
+        (src_dir / "demo_clean.py").write_text("# 逐笔聚合后再分桶\n", encoding="utf-8")
+        monkeypatch.setattr(code_traces, "SCAN_DIRS", [src_dir])
+        monkeypatch.setattr(sys, "argv", ["check-code-traces.py", "--ci"])
+        with pytest.raises(SystemExit) as exc:
+            code_traces.main()
+        assert exc.value.code == 0
+        assert "未发现历史变更痕迹" in capsys.readouterr().out
+
+    def test_rule_carrier_dir_skipped(self, code_traces, tmp_path):
+        """规则定义载体目录（模式/豁免正则字面量所在）整文件跳过。"""
+        carrier = tmp_path / "_traces_code"
+        carrier.mkdir()
+        fpath = carrier / "patterns.py"
+        fpath.write_text("# 规则定义：rf-123 第X章 R11 F-1\n", encoding="utf-8")
+        assert code_traces.scan_file(fpath, False) == []
+
+    def test_identical_literal_outside_carrier_still_flagged(self, code_traces, tmp_path):
+        """同一字面量落在扫描域内（非载体目录）必须照报，豁免不外溢。"""
+        fpath = tmp_path / "demo_patterns.py"
+        # 每类各占一行：scan_file 每行首个命中即 break（任务编号还会提前 continue），
+        # 因此逐类分行才能验证四类全部仍被检出。
+        fpath.write_text(
+            "# 暗号代号 R11\n# 指代说明见第3章\n# 疑似任务 F-1\n# 任务号 rf-123\n",
+            encoding="utf-8",
+        )
+        cats = {cat for _, cat, _, _ in code_traces.scan_file(fpath, False)}
+        assert {"CODE", "CHAPTER", "MAGIC", "DASHTASK"} <= cats
+
+
+class TestLegitimateDomainValueExemption:
+    """合法领域值（门禁档位/页面/时序/阶段/网络地址）不误伤，且豁免不吞同侧违规。"""
+
+    def test_domain_values_do_not_flag(self, code_traces):
+        for line in (
+            "# F10 交易费率页取数",
+            "# P1 门禁档位",
+            "# T0 为事件窗口锚定交易日",
+            "# Phase1 基准与 Phase3 对照",
+            "# S0 起始市值 MV0",
+            "# 样式护栏 E1/W2 已机检",
+            "# 回环网段 127.0.0.0/8 覆盖全部本机地址",
+        ):
+            assert _code_hit(code_traces, line) is None, line
+
+    def test_neighbour_violation_on_same_line_still_flagged(self, code_traces):
+        """合法值与违规 token 同行 → 仍必须报出（行级豁免不吞 token）。"""
+        assert _code_hit(code_traces, "# F10 与 P1 之外还有 R11") is not None
+        assert _code_hit(code_traces, "# 127.0.0.1 另有 0.12.6 版本痕迹") is not None
+
+
+class TestSharedCliContract:
+    """本脚本采纳 _checklib 统一 CLI 契约（-v/--verbose + --ci）。"""
+
+    def test_help_exposes_shared_flags(self, code_traces, monkeypatch, capsys):
+        monkeypatch.setattr(sys, "argv", ["check-code-traces.py", "--help"])
+        with pytest.raises(SystemExit) as exc:
+            code_traces.main()
+        assert exc.value.code == 0
+        out = capsys.readouterr().out
+        assert "-v, --verbose" in out
+        assert "--ci" in out
+
+    def test_add_common_args_is_shared_helper(self, code_traces):
+        shared = sys.modules.get("_checklib")
+        assert shared is not None, "check-code-traces 应从 _checklib 引入共享 CLI 助手"
+        assert code_traces.add_common_args is shared.add_common_args

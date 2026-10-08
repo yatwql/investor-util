@@ -75,7 +75,7 @@ def _label_bounds(label: str) -> tuple[int | None, int | None] | None:
     支持来源实测形态：``小于7天`` / ``小于等于6天`` / ``大于等于7天，小于30天`` /
     ``大于等于30天，小于等于364天`` / ``大于等于7天`` / ``大于等于7天，小于1年`` /
     ``大于等于1年，小于2年`` / ``---``。整数交易日计数下「小于等于X」→ 上界 X+1，
-    「小于X」→ 上界 X（两者等价于 ≤X-1 / <X 的整数语义）。
+    「小于X」→ 上界 X（两者整数语义等价：上界取 X 减 1，或严格小于 X）。
     """
     t = (label or "").strip()
     if t.startswith("---"):
@@ -222,7 +222,7 @@ def build_single_purchase_schedule(rate: float, source: str = SRC_TABLE_SINGLE) 
 
 def _tiers_contiguous(tiers: list[dict[str, Any]], lo_key: str, hi_key: str) -> bool:
     """档位区间是否自 0 起连续覆盖全轴（无缺口、无交叠，顺序 = 来源顺序）。"""
-    cursor: float | None = None  # None = 尚未覆盖起点
+    cursor: float | None = None  # None = 未覆盖起点
     for t in tiers:
         lo, hi = t.get(lo_key), t.get(hi_key)
         if cursor is None:

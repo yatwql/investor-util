@@ -2,7 +2,8 @@
 
 **统一的检查脚本契约**（CLAUDE.md 的提交前/发布前门禁据此调用）：
   - 每个检查脚本支持 `-v/--verbose`（详细）与 `--ci`（仅输出 `文件:描述`）
-  - 退出码 **0 = 通过，2 = 发现 finding**（`check-code-traces.py` 另有 LOW 级别 1，属其自身分级语义）
+  - 退出码 **0 = 通过，2 = 发现 finding**（`check-code-traces.py` 另有分级语义：
+    HIGH/ORIGIN/VERSION=1、仅 LOW=3，其允许码集见 `check-script-contract.py` 白名单）
   - 通过时打印 `[OK] …`；失败时逐条 `[ERR] file:desc`（或 `--ci` 下仅 `file:desc`）+ `[!] 发现 N 处…`
 
 本模块提供**无副作用的原语**（例外：结论缓存 `conclusion_cache_*`——仅在调用方

@@ -30,7 +30,7 @@ _EXIT_SEVERE = 2
 _ALLOWED_REPORT_EXT = {"html", "js", "map", "css", "png", "svg", "json", "xlsx"}
 
 # 短缓存（健康 60s / 历史 5s）——防频繁轮询重复读文件/重复真实探测。
-# 并发边界（rf-528）：server 为 threaded=True，两 dict 的读写由同一把锁保护——
+# 并发边界：server 为 threaded=True，两 dict 的读写由同一把锁保护——
 # 锁只保护「读缓存/写缓存」两段，真实计算在锁外；两请求同时 miss 时可能重
 # 复计算一次（本地单人 Web 的低风险余量，不引入检查时间内串行化代价）。
 _health_cache: dict = {"ts": 0.0, "data": None}

@@ -440,7 +440,7 @@ class TestReportSheetNames:
         for key, name in _REPORT_SHEET_NAMES.items():
             entry = next(sec for sec in _REPORT_SECTION_DEFAULT if sec["key"] == key)
             assert name == entry["name"], f"{key} 页签名 {name!r} 与注册表显示名 {entry['name']!r} 不一致"
-        # LLM 章差集显式声明：走 get_llm_module_name() 第四条路径的五章恰好在此
+        # LLM 章差集显式声明：走 get_llm_module_name() 第四条路径的 5 个 LLM 章节恰好在此
         assert _LLM_SHEET_NAME_KEYS == {
             "news_correlation",
             "global_macro",
@@ -478,7 +478,7 @@ class TestNavGroupRegistry:
         assert len(labels) == len(set(labels))
 
     def test_llm_supported_pins_semantic_boundary(self):
-        """🧠 标记集合覆盖 LLM 语义边界：门控四章 + 新闻关联 + API 用量，且 llm 组 ⊆ 🧠。"""
+        """🧠 标记集合覆盖 LLM 语义边界：门控 4 个章节 + 新闻关联 + API 用量，且 llm 组 ⊆ 🧠。"""
         from src.python.core.registry import LLM_MODULE_GATED_SECTIONS
 
         llm_keys = {sec["key"] for sec in _REPORT_SECTION_DEFAULT if sec.get("llm_supported")}

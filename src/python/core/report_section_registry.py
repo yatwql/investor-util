@@ -235,7 +235,7 @@ _REPORT_SECTION_DEFAULT: list[dict] = [
 # ── 非 LLM 报表页签名称（章节注册表派生视图） ──────────────
 # 页签中文标题与章节显示名同源（单一真值 = 条目 name），改名只需改注册表；
 # LLM 模块页签（global_macro/expert_review/health_check/penetration_deep）
-# 以及 news_correlation 的页签 A1 标题走 get_llm_module_name() 路径，
+# 以及 news_correlation 的页签标题走 get_llm_module_name() 路径，
 # 差集在此显式声明——注册表新增章须归入其一（派生关系由测试锁定）。
 _LLM_SHEET_NAME_KEYS: frozenset[str] = frozenset(
     {"global_macro", "expert_review", "health_check", "penetration_deep", "news_correlation"}

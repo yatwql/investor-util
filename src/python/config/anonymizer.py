@@ -434,7 +434,7 @@ def mask_code_text(text: str | None, code_map: dict[str, str] | None) -> str | N
       - ``1600519.0``、``600519.0``、``{"mv":600519}``、``12.600519%`` → 不命中
 
     Args:
-        text: 待处理文本（None/空串原样返回）。
+        text: 待掩码文本（None/空串原样返回）。
         code_map: {真码: 显示掩码}，来自 :func:`build_code_display_map`。
 
     Returns:

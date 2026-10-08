@@ -1,6 +1,6 @@
 """fetcher/fund_fee.py 单元测试 — 双链路接线、准入、会话复用与费率索引装配。
 
-测试目标（whatif-cost-benchmark-design §11 迭代 2）：
+测试目标（whatif-cost-benchmark-design §11）：
   - 链注册：_DEFAULT_CHAINS 槽位与 provider 映射同构（同序同集）
   - 降级阶梯：主链路成功 → 备链路递补 → 过期缓存 → 暂不可用
   - 载荷准入：写侧失败不污染缓存；读侧 fee_schema 语义版本不符按未命中丢弃

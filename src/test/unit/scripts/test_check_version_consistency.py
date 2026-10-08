@@ -94,7 +94,7 @@ class TestAutoFixHeader:
         assert p.read_text(encoding="utf-8") == "> 文档版本：0.10.1-dev\n"
 
     def test_fix_preserves_blank_line_before_header(self, version_script, tmp_path):
-        # 行首空白类不得吞换行：H1 与版本头之间的空行改写后必须保留
+        # 行首空白类不得吞换行：一级标题与版本头之间的空行改写后必须保留
         p = tmp_path / "doc.md"
         p.write_text("# 标题\n\n> 文档版本：0.9.13-dev\n\n## 章节\n", encoding="utf-8")
         assert version_script._auto_fix_header(p, "0.10.0") is True

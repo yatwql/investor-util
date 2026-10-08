@@ -602,7 +602,7 @@ class TestBlockMatrix:
         assert any("Excel 区块清单与区块注册表不一致" in f for f in findings)
 
     def test_dash_row_not_counted(self, drift):
-        """「—」行不参与重算；把计数行改成「—」会被报出（双向而非单向放行）。"""
+        """「—」行不参与重算；计数行若写成「—」会被报出（双向而非单向放行）。"""
         doc = self._doc(drift)
         rows, _ = drift.parse_block_matrix(doc)
         target = next(r for r in rows if r["count"].isdigit())

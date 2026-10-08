@@ -1,6 +1,6 @@
 """tiantian_fund_fee F10 交易费率页 — 解析、准入与抓取单元测试。
 
-测试目标（whatif-cost-benchmark-design §11 迭代 2）：
+测试目标（whatif-cost-benchmark-design §11）：
   - 解析器：真实页面结构（9 表）中定位赎回阶梯表与申购档位表——优惠表优先于
     原生表、干扰表（申购状态/运作费用等）自动跳过、实体与空白归一
   - 准入：fee_schema 语义版本 + 赎回阶梯非空硬条件 + 行结构体检

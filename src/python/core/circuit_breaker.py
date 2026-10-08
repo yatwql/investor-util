@@ -46,6 +46,8 @@ __all__ = [
     "get_indicator_breaker_status",
     "BREAKER_CONFIG_DATA_SOURCE",
     "register_breaker_status",
+    "register_circuit_text",
+    "circuit_text",
 ]
 
 # ═══════════════════════════════════════════════════════════════
@@ -73,6 +75,32 @@ def _breaker_snapshot(category: str) -> Any:
     """取已注册的上游熔断快照；未注册返回 None（调用方按空态降级）。"""
     provider = _BREAKER_SNAPSHOT_PROVIDERS.get(category)
     return provider() if provider is not None else None
+
+
+#: 上游注册的「端点 → 熔断展示文案」判定。展示层要的是「这个端点此刻显示
+#: 什么词」，而快照按**归一后的域名**作键（URL → 域名的归一规则属上游私有），
+#: core 既不反向 import 上层，也不复制一份归一规则，故由上游把判定函数注册进来。
+_CIRCUIT_TEXT_PROVIDER: Callable[[str], str] | None = None
+
+
+def register_circuit_text(provider: Callable[[str], str]) -> None:
+    """注册上游的「端点 → 熔断展示文案」判定（上游模块导入时自行调用）。
+
+    Args:
+        provider: 接收 endpoint 原文（未归一），返回展示文案
+    """
+    global _CIRCUIT_TEXT_PROVIDER
+    _CIRCUIT_TEXT_PROVIDER = provider
+
+
+def circuit_text(endpoint: str) -> str:
+    """端点熔断展示文案（展示层唯一入口）。
+
+    上游未加载（未注册）→ 无熔断状态可言，按「正常」降级。
+    """
+    if _CIRCUIT_TEXT_PROVIDER is None:
+        return "正常"
+    return _CIRCUIT_TEXT_PROVIDER(endpoint)
 
 
 # ═══════════════════════════════════════════════════════════════

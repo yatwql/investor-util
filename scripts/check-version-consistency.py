@@ -138,7 +138,7 @@ def _auto_fix_header(path: Path, version: str) -> bool:
     r"""自动修正「文档版本：」头部版本行为目标版本。
 
     行首空白类只用同行字符（`[ \t]`）——`\s` 含换行，原 `^\s*>` 在 MULTILINE 下
-    会把版本头前的空行一并吞掉（H1 与版本头之间有空行的文档会丢格式）。
+    会把版本头前的空行一并吞掉（一级标题与版本头之间有空行的文档会丢格式）。
     本 docstring 为 raw 串：非 raw 时裸 `\s` 会触发 SyntaxWarning（invalid escape）。
     """
     text = path.read_text(encoding="utf-8")

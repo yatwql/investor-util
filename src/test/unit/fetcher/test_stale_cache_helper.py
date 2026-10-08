@@ -1,4 +1,4 @@
-"""测试：rf-529（HHI 计算收敛到 metrics_risk.hhi 唯一原语）+ rf-531（过期缓存降级回写统一助手）。
+"""测试：HHI 计算收敛到 metrics_risk.hhi 唯一原语 + 过期缓存降级回写统一助手。
 
 覆盖：
   - HHI 收敛：whatif/portfolio_evolution 与原语同输入同输出；空/零权重退化一致
@@ -15,7 +15,7 @@ import pytest
 pytestmark = [pytest.mark.unit, pytest.mark.unit_fetcher, pytest.mark.usefixtures("offline_external_sources")]
 
 
-# ═══ HHI 收敛（rf-529） ═══
+# ═══ HHI 收敛到唯一原语 ═══
 
 
 class TestHHIConvergence:
@@ -43,7 +43,7 @@ class TestHHIConvergence:
         assert _compute_hhi([0.5, 0.5]) == 0.5
 
     def test_empty_and_zero_weights_degrade_identically(self):
-        """旧实现的退化语义（空列表/全零 → 0.0）在全员收敛后保留。"""
+        """空列表/全零 → 0.0 的退化语义在收敛后保留。"""
         from src.python.analysis.metrics_risk import hhi
         from src.python.analysis.portfolio_evolution import _compute_hhi
         from src.python.analysis.whatif import _compute_hhi as whatif_hhi
@@ -53,7 +53,7 @@ class TestHHIConvergence:
         assert whatif_hhi({"a": {"weight": 0.0}}) == 0.0
 
 
-# ═══ 过期缓存降级回写助手（rf-531） ═══
+# ═══ 过期缓存降级回写助手 ═══
 
 
 class TestStaleCacheWriteHelper:

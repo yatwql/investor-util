@@ -186,7 +186,7 @@ class TestPromptEndToEndContainsBlock(unittest.TestCase):
 @patch("src.python.llm.skeleton.generate_llm_content", return_value=("<p>观点</p>", False))
 @patch("src.python.llm.skeleton.get_llm_config", return_value=dict(_ENABLED))
 class TestDebateCarriesBlock(unittest.TestCase):
-    """辩论三章 prompt 与指纹 inputs 的提示词块注入。"""
+    """辩论三个章节的 prompt 与指纹 inputs 的提示词块注入。"""
 
     @patch("src.python.llm.generators.generate_llm_module", return_value=("<p>x</p>", True))
     @patch("src.python.llm.generators.debate_procon_fingerprint", return_value="fp")

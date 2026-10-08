@@ -524,7 +524,7 @@ class TestHtmlTocGroupedNav(unittest.TestCase):
 
 
 class TestTocCrossGroupInterleave(unittest.TestCase):
-    """跨组交错回归：附录章插号段中间时目录展开仍严格线性 1..N（rf-561）。
+    """跨组交错回归：附录章插号段中间时目录展开仍严格线性 1..N。
 
     分组投影按报告号线性连续段分块——组在号序断点处拆块、同组可出现多块，
     展开序恒等于正文线性序（正文/Excel/锚点跳转不受分组影响）。
@@ -534,7 +534,7 @@ class TestTocCrossGroupInterleave(unittest.TestCase):
     def setUpClass(cls):
         from src.python.core.registry import get_report_section_order
 
-        # 生产真值全集（文件内本地常量是 13 章最小场景，不含附录章）
+        # 生产真值全集（文件内本地常量是 13 个章节的最小场景，不含附录章）
         cls.order = [dict(sec) for sec in get_report_section_order()]
         # 数据源可用性矩阵（附录组）从尾部插到第 5 位（劈开基金深度分析号段），按配置序重编号
         data_source = next(s for s in cls.order if s["key"] == "data_source_status")

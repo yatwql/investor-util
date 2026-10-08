@@ -127,7 +127,7 @@ def normalize_release_title(title: str) -> str:
 
 
 def archive_paths_for(release_version: str) -> tuple[Path, str]:
-    """按小版本推导归档目录与文件名（如 0.12.6 → docs/archive/v0.12.x/…）。"""
+    """按小版本推导归档目录与文件名（小版本号 → docs/archive/vX.Y.x/… 目录）。"""
     m = _RELEASE_VERSION_RE.match(release_version)
     if not m:
         raise ReleaseError(f"{release_version} 不是 X.Y.Z 发布版形态")
@@ -572,7 +572,7 @@ def update_case_note(text: str, stats: dict[str, int]) -> str:
     """用例口径注释中的 grep / 严格定义行数；pytest 收集口径留人工核对提示。
 
     目标短语在真实文档中位于行中（非行首），不做行首锚定；模式缺失即抛
-    `ReleaseError`（历史上行首锚定导致静默不更新、旧计数滞留）。
+    `ReleaseError`（不静默漏更、不留滞留计数）。
     """
     text, n_grep = re.subn(
         r"(最初 \d+ → 当前 )[\d,]+",

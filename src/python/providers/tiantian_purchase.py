@@ -259,7 +259,7 @@ def fetch_fund_purchase_table() -> dict[str, Any] | None:
     """直连端点抓取全量申购状态表（主链路，每日 1 次全量的使用模式）。
 
     传输级异常（超时/断连/非 2xx）**向上抛出**——由 ``fetch_with_fallback``
-    统一计为传输失败并累计天天基金熔断计数（R1 对策）；解析失败返回 None
+    统一计为传输失败并累计天天基金熔断计数（传输失败同样计入）；解析失败返回 None
     （代码级空结果，不计入熔断）。
     """
     with make_http_client(timeout=_TIMEOUT, follow_redirects=True) as client:
