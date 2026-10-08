@@ -14,12 +14,12 @@
 | 架构图示 | SVG | 3 | 337 | `src/static/` README 架构图（architecture 三渠道→引擎→双报告、llm-chain Provider 链式分发、capabilities 九大功能域总览）+ 报告实景截图 2 张 PNG（`report-overview`/`report-charts`，不计入本行） |
 | 辅助脚本 | Python | 58 | 14,836 | `scripts/`（启动脚本 + CLI 命令行包装、测试驱动、工具检查、任务编号检查、性能测试、LLM 幻觉率评估、测试覆盖计数、代码/文档历史痕迹检查、语义命名索引校验、Claude Code hook 安装/校验、Web 冒烟脚本、push2 连通性诊断、SVG 架构图检查） |
 | 源代码合计 | — | 427 | 110,142 | 主程序 + 模板 + 脚本 + SVG |
-| 测试代码 | Python | 489 | 142,598 | `src/test/` 所有 `.py` 文件（含近期 ruff format 全仓重排） |
-| 测试用例 | — | — | 9,430 个 | `pytest --collect-only` 统计（`scripts/collect-test-coverage.py` 实时收集快照，不含 opt-in live 套件） |
+| 测试代码 | Python | 490 | 142,709 | `src/test/` 所有 `.py` 文件（含近期 ruff format 全仓重排） |
+| 测试用例 | — | — | 9,436 个 | `pytest --collect-only` 统计（`scripts/collect-test-coverage.py` 实时收集快照，不含 opt-in live 套件） |
 | 用户文档 | Markdown | 11 | 5,602 | 含 README.md（184 行）；行数为 README + manuals 之和 |
 | ├ manuals/ | 用户手册分册 | 10 | 5,418 | 配置/faq/快速上手/TUI/CLI/Web 三种模式指南等 |
-| 项目文档 | Markdown | 163 | 60,974 | 含 CLAUDE.md（87 行）；md 口径（CLAUDE.md 1 + managements 10 + plan 4 + archive md 148），py/txt 不计行 |
-| ├ managements/ | 管理文档 | 10 | 11,548 | 变更日志/目录树/测试计划/技术设计/开发者指南等 |
+| 项目文档 | Markdown | 163 | 60,978 | 含 CLAUDE.md（87 行）；md 口径（CLAUDE.md 1 + managements 10 + plan 4 + archive md 148），py/txt 不计行 |
+| ├ managements/ | 管理文档 | 10 | 11,551 | 变更日志/目录树/测试计划/技术设计/开发者指南等 |
 | ├ archive/ | 版本归档 | 148 | 48,729 | 各版本 changelog/plan/review-findings 与设计文档归档（148 md 48,721 行，含 Vibe-Trading/gs-quant/TradingAgents 借鉴批候选研究、基金申购限购三份设计与 LLM 成本调节/自检/源指定设计） |
 | ├ plan/ | 中间设计文件 | 4 | 610 | 在办设计文档（扁平存放，完成后随完成态移入对应版本的归档子目录）：两份 Jev 新闻关联判定文档（对照评测方案 171 行 + 类型化判定通道接入设计 198 行）+ 决策跨期反思闭环设计 + Web 展示借鉴研究（awesome-design-md，Web 展示借鉴批立项依据） |
 | └ tmp/ | 临时文件 | — | — | 调试产物、迁移暂存（git 忽略，不计入统计） |
@@ -783,6 +783,7 @@ investor-util/
 │       │   │   └── test_tiantian_purchase_edge.py # 申购状态解析失败与载荷准入值域体检边缘场景
 │       │   ├── report/              #   报告单元测试
 │       │   │   ├── __init__.py      #       子包标记
+│       │   │   ├── test_design_doc.py #   设计语言契约（DESIGN.md 骨架/护栏对偶/引用存在）结构守卫
 │       │   │   ├── test_anonymize_pipeline.py #   报告管线匿名化接线（装配边界 pair/渲染层折叠/产物清扫/新闻标签脱敏）
 │       │   │   ├── test_benchmark.py              #   业绩基准测试
 │       │   │   ├── test_benchmark_edge.py         #   基准边缘场景
@@ -1380,6 +1381,7 @@ investor-util/
 │       ├── awesome-design-md-borrow-candidates-research.md # Web 展示借鉴研究（awesome-design-md 73 份 DESIGN.md 骨架与样板要点 + 我方两面样式差距映射 → 6 立项 plan-103~108 / 5 不采纳，立项依据）
 │       └── decision-reflection-shadow-design.md # 决策跨期反思闭环设计（Vibe 影子账户参照/转正路径，plan-70）
 │
+├── DESIGN.md                         # 设计语言契约（Web/报告 UI 改动首个读取入口：色彩角色/字阶/组件六态/断点/护栏）
 ├── CLAUDE.md                         # AI 编程助手指引
 ├── README.md                         # 用户文档总入口（三渠道交互 + 核心亮点总览）
 ├── LICENSE                           # MIT 开源协议
