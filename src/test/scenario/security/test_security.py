@@ -12,11 +12,14 @@
 
 from __future__ import annotations
 
+import html
 import json
 import logging
 import os
 import re
 import sys
+import zipfile
+from unittest.mock import patch
 
 import pytest
 
@@ -184,12 +187,15 @@ class TestSecurityBaseline:
 
     @pytest.mark.scenario_security
     def test_anonymized_details_no_real_names(self):
-        """完全匿名模式（明细格式）：名称和代码应被脱敏。"""
+        """完全匿名模式（明细格式）：名称脱敏；代码保留真值（键控链路），
+        「000XXX」显示由明细渲染层与产物清扫兑底（产物级断言见
+        TestAnonymizedReportProducts）。"""
         result = anonymize_holdings_details(_SAMPLE_DETAILS, mode="full_anonymous")
-        for d in result:
-            assert "招商" not in d["name"], f"明细真实名称未脱敏: {d['name']}"
-            assert d.get("code") == "000XXX", f"明细代码未掩码: {d.get('code')}"
-        logger.info("明细 full_anonymous 脱敏验证通过")
+        for original, d in zip(_SAMPLE_DETAILS, result, strict=True):
+            assert d["name"] != original["name"], f"明细真实名称未脱敏: {d['name']}"
+            assert d.get("code") == original["code"], "明细代码应保留真值（再平衡静默/决策账本等键控链路）"
+        assert "招商" not in result[0]["name"], "首条名称应为代号"
+        logger.info("明细 full_anonymous 名称脱敏验证通过")
 
     @pytest.mark.scenario_security
     def test_off_mode_shows_real_data(self):
@@ -287,3 +293,105 @@ def _mask_api_key(text: str, visible_chars: int = 4) -> str:
         return full_key
 
     return pattern.sub(_replacer, text)
+
+
+# ── 产物级端到端断言（config anonymization.mode → HTML/Excel 产物无样例真名） ──
+
+_NON_OFF_MODES = ["code_display", "full_anonymous", "summary"]
+_REAL_NAME_TOKENS = ("招商银行", "贵州茅台", "易方达蓝筹")
+
+
+def _mk_product_rows() -> list:
+    """构造样例明细行（真名；生成路径中由 mock 物化 → 装配边界匿名）。"""
+    from src.python.report.market_value import DetailRow
+
+    rows = []
+    for i, h in enumerate(_SAMPLE_HOLDINGS, start=1):
+        rows.append(
+            DetailRow(
+                account=h.account,
+                name=h.name,
+                code=h.code,
+                price=float(10 + i),
+                nav_date="2026-10-08",
+                yesterday_close=float(9 + i),
+                shares=h.shares,
+                market_value=float(h.shares * (10 + i)),
+                cost=float(h.shares * h.cost_price),
+                profit=float(h.shares * (10 + i) - h.shares * h.cost_price),
+                profit_rate=0.1 * i,
+                today_profit=float(i),
+            )
+        )
+    return rows
+
+
+class TestAnonymizedReportProducts:
+    """产物端到端：匿名模式下生成的 HTML/Excel 不含样例真实名称。
+
+    mock 行情物化（真名明细）→ 装配边界/渲染层/产物清扫逐层生效；
+    衍生章节由 offline 桩降级，不引入真实名称外数据源。
+    """
+
+    pytestmark = [pytest.mark.usefixtures("offline_external_sources")]
+
+    @pytest.mark.scenario_security
+    @pytest.mark.parametrize("mode", _NON_OFF_MODES)
+    def test_html_product_has_no_real_names(self, mode: str, tmp_path, monkeypatch):
+        monkeypatch.setattr("src.python.config.anonymizer.get_anonymization_mode", lambda: mode)
+        from contextlib import ExitStack
+
+        with ExitStack() as stack:
+            stack.enter_context(
+                patch("src.python.report.html_renderers._generate_details", return_value=_mk_product_rows())
+            )
+            # 仅断开真网络出口（分类/业绩等名称渲染面保持真实路径，
+            # 验证产物清扫兑底能力）；offline 桩兜底其余数据源
+            stack.enter_context(patch("src.python.report.html_renderers.fetch_indices", return_value={}))
+            stack.enter_context(patch("src.python.report.html_renderers.fetch_us_indices", return_value={}))
+            stack.enter_context(patch("src.python.report.html_renderers.compute_penetration_top10", return_value={}))
+            from src.python.report.html_writer import write_html_report
+
+            write_html_report(_SAMPLE_HOLDINGS, output_dir=str(tmp_path), include_news=False, enable_llm=False)
+
+        html_files = list(tmp_path.glob("*.html"))
+        assert html_files, "未生成 HTML 产物"
+        html = html_files[0].read_text(encoding="utf-8")
+        for token in _REAL_NAME_TOKENS:
+            assert token not in html, f"HTML 产物泄漏真实名称: {token}"
+        if mode == "summary":
+            assert "股票汇总" in html, "summary 明细渲染层应输出大类聚合行"
+        else:
+            assert "品种A" in html, "匿名模式产物应包含代号（正向对照）"
+
+    @pytest.mark.scenario_security
+    @pytest.mark.parametrize("mode", _NON_OFF_MODES)
+    def test_excel_product_has_no_real_names(self, mode: str, tmp_path, monkeypatch):
+        monkeypatch.setattr("src.python.config.anonymizer.get_anonymization_mode", lambda: mode)
+        from contextlib import ExitStack
+
+        with ExitStack() as stack:
+            stack.enter_context(
+                patch("src.python.report.market_value._generate_details", return_value=_mk_product_rows())
+            )
+            stack.enter_context(patch("src.python.fetcher.index.fetch_indices", return_value={}))
+            stack.enter_context(patch("src.python.fetcher.index.fetch_us_indices", return_value={}))
+            stack.enter_context(patch("src.python.report.penetration.compute_penetration_top10", return_value={}))
+            from src.python.report.excel_generator import generate_excel_report
+
+            generate_excel_report(_SAMPLE_HOLDINGS, output_dir=str(tmp_path))
+
+        xlsx_files = list(tmp_path.glob("*.xlsx"))
+        assert xlsx_files, "未生成 Excel 产物"
+        with zipfile.ZipFile(xlsx_files[0]) as zf:
+            text = html.unescape(
+                "".join(zf.read(name).decode("utf-8", "replace") for name in zf.namelist() if name.endswith(".xml"))
+            )
+        for token in _REAL_NAME_TOKENS:
+            assert token not in text, f"Excel 产物泄漏真实名称: {token}"
+        if mode == "summary":
+            assert "股票汇总" in text, "summary 明细页签应输出大类聚合行"
+        else:
+            assert "品种A" in text, "匿名模式产物应包含代号（正向对照）"
+            if mode == "full_anonymous":
+                assert "600519" not in text, "full 模式 Excel 产物应掩码真码（字符串单元格清扫）"

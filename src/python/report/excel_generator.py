@@ -619,6 +619,16 @@ def generate_excel_report(
             stamp_back_to_summary(sheets)
         except Exception:
             logger.debug("[excel] 返回汇总链接写入失败（非关键）", exc_info=True)
+        # 产物单元格清扫（匿名化）：字符串单元格统一真名→代号（full 另掩真码），
+        # 兑底字段层未覆盖的派生页签；数值单元格不动（无数字子串误伤）。
+        # off → 恒等零开销跳过。
+        from src.python.config.anonymizer import build_report_alias_map, get_anonymization_mode
+        from src.python.report.excel_writer import mask_workbook_text
+
+        _anon_mode = get_anonymization_mode()
+        if _anon_mode != "off":
+            mask_workbook_text(wb, build_report_alias_map(holdings, _anon_mode))
+
         prog.info("正在保存 Excel 报告...")
         path = save_workbook(wb, output_dir=output_dir)
         logger.info("Excel 报告已生成: %s", path)

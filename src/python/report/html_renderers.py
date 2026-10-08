@@ -54,6 +54,11 @@ def _render_market_value_section(
         logger.info("HTML 报告生成开始，共 %d 条持仓", len(holdings))
         prog.info("正在计算市值核算...")
         details = _generate_details(holdings, today_str)
+        # 持仓匿名化装配边界：内部生成路径就地匿名（write_html_report 传入
+        # details 时已在 prepare_report_data 脱敏）。off → 恒等零开销。
+        from src.python.report._report_helpers import apply_report_anonymization
+
+        _, details = apply_report_anonymization(None, details)
         logger.info("市值核算明细生成完成，共 %d 条", len(details))
 
     total_mv = sum(d.market_value for d in details)
@@ -72,6 +77,10 @@ def _render_account_grouping(
 ) -> tuple[dict[str, list[DetailRow]], dict[str, dict[str, float]]]:
     """按账户分组并计算小计。
 
+    明细渲染层匿名化拦截点：summary 模式在账户组内折叠为大类聚合行；
+    full_anonymous 模式将代码显示为 "000XXX"（字典/行字段层保留真值供
+    键控链路，显示掩码在渲染层兑现）。
+
     Returns:
         (accounts: {账户名: [DetailRow]},
          account_totals: {账户名: {market_value, cost, profit, profit_rate, today_profit}})
@@ -80,6 +89,18 @@ def _render_account_grouping(
     accounts: dict[str, list[DetailRow]] = {}
     for d in details:
         accounts.setdefault(d.account, []).append(d)
+
+    from src.python.config.anonymizer import get_anonymization_mode
+
+    _mode = get_anonymization_mode()
+    if _mode == "summary":
+        from src.python.report._report_helpers import fold_detail_rows_summary
+
+        accounts = {acc: fold_detail_rows_summary(rows) for acc, rows in accounts.items()}
+    elif _mode == "full_anonymous":
+        from dataclasses import replace
+
+        accounts = {acc: [replace(d, code="000XXX") for d in rows] for acc, rows in accounts.items()}
 
     account_totals: dict[str, dict[str, float]] = {}
     for acc_name, acc_details in accounts.items():

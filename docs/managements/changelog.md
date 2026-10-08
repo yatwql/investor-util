@@ -9,6 +9,8 @@
 
 ## [0.12.7-dev] - 开发中（未发布）
 
+- **报告呈现/隐私**：**持仓匿名化接入报告管线**——`anonymization.mode` 三档（code_display/full_anonymous/summary）落地：字段层 `report/_report_helpers.apply_report_anonymization` 在明细三处物化点（prepare 装配 / Excel basic 内部生成 / HTML 内部生成，off 恒等零开销）成对匿名明细字典与 DetailRow（同一代号映射；full 数值千位模糊且盈亏/收益率由模糊值派生保持行内恒等、代码保留真值供再平衡静默/决策账本/申购状态等键控链路）+ 明细渲染层（summary 账户组内大类折叠、full 代码列 000XXX）+ 产物清扫（HTML 名称文本 / Excel 字符串单元格 `mask_workbook_text`，只动字符串不动数值防数字子串误伤）+ LLM 同源（约束块与新闻关键词标签按映射掩码）；修 `_anonymize_detail_entry` full 盈亏输出字符串致下游合计/格式化崩溃缺陷；安全场景升级产物端到端断言（3 模式 × HTML/Excel 无样例真名）+ 管线接线单测 18 项；手册 §L 按实现口径改写，剩余衍生面登记 rf-628 | rf-627
+
 - **工程效能**：**中央注册表按注册职责域拆分**——`core/registry.py`（785 行临界，余 15 行）下沉 `core/data_registry.py`（数据模块/缓存 TTL/LLM 设置键派生，441 行）+ `core/report_section_registry.py`（报告章节/导航分组/页签名称派生，335 行），`registry.py` 收敛为 62 行门面（computation/section_block 单入口再导出保留，导入面与测试 patch 面不变）；两域零跨域引用、`__all__` 声明契约互不相交；`check-semantic-index` 章节 AST 解析改指持有子模块；门面同一性+域契约测试 3 项 | rf-75
 
 - **工程效能**：**临界文件按域拆分**——`llm/prompts_core.py`（800→350）按职责下沉三子模块（`failure_reasons` 失败原因常量 / `prompts_data_blocks` 上下文数据块与格式化辅助 / `prompts_review` 自审与持仓复盘提示词），`llm/generators.py`（787→444）按生成器域下沉 `generators_singletons`（单例四生成函数）；两文件保留门面 re-export（消费方导入面不变），仅 4 处测试 patch 按「测试指向持有子模块」纪律改指新域；llm-technical/folders 同步 + 门面同一性回归测试 4 项 | rf-626

@@ -275,6 +275,15 @@ def _write_account_groupings(
     for d in details:
         accounts.setdefault(d.account, []).append(d)
 
+    # 明细渲染层匿名化拦截点：summary 模式在账户组内折叠为大类聚合行
+    # （小计 = 各聚合行之和，口径不变；off/code_display/full 不折叠）
+    from src.python.config.anonymizer import get_anonymization_mode
+
+    if get_anonymization_mode() == "summary":
+        from src.python.report._report_helpers import fold_detail_rows_summary
+
+        accounts = {acc: fold_detail_rows_summary(rows) for acc, rows in accounts.items()}
+
     row = data_start
     grand_mv = grand_cost = grand_profit = grand_today = 0.0
 

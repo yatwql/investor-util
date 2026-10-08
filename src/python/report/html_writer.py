@@ -731,6 +731,17 @@ def write_html_report(
         # 不再依赖同目录松散 JS；_copy_js_assets 仍保留以兼容既有产物布局）
         html = _inline_js_assets(html)
 
+    # 产物文本清扫（匿名化）：字段层未覆盖的派生面（分类/业绩/管理人等从
+    # holdings 直取名称的区块）在最终 HTML 文本统一真名→代号；明细区块已
+    # 在字段层替换，重复命中无副作用。仅名称（中文串）全局安全；代码面
+    # 存在数字子串误伤风险，不在 HTML 自由文本中替换（由明细渲染层兑底）。
+    # off → 恒等零开销。
+    from src.python.config.anonymizer import build_report_alias_map, get_anonymization_mode, mask_display_text
+
+    _anon_mode = get_anonymization_mode()
+    if _anon_mode != "off":
+        html = mask_display_text(html, build_report_alias_map(holdings, _anon_mode))
+
     return _save_html_report(html, output_dir, total_mv, total_profit, prog)
 
 

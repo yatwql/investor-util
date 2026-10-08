@@ -30,8 +30,11 @@ from src.python.config.anonymizer import (
     ANONYMIZATION_MODE_DESCRIPTIONS,
     anonymize_holdings,
     anonymize_holdings_details,
+    build_report_alias_map,
+    fold_details_summary,
     get_anonymization_mode,
     is_anonymization_enabled,
+    mask_display_text,
     set_anonymization_mode,
 )
 from src.python.core.models import Holding
@@ -189,19 +192,25 @@ class TestAnonymizeHoldingsDetails(unittest.TestCase):
         self.assertEqual(result[0]["name"], "品种A")
         self.assertEqual(result[1]["name"], "品种B")
 
-    def test_full_anonymous_masks_value(self):
-        """full_anonymous → 代码掩码 + 金额模糊 + 盈亏文本。"""
+    def test_full_anonymous_blurs_values_and_keeps_code(self):
+        """full_anonymous → 代码保留（键控链路）+ 金额千位模糊 + 盈亏数值派生。"""
         result = anonymize_holdings_details(_mk_details(), "full_anonymous")
         self.assertIsInstance(result, list)
         entry = result[0]
-        self.assertEqual(entry["code"], "000XXX")
+        # 代码保留真值：再平衡静默/决策账本/申购状态等键控链路不跨品种碰撞；
+        # 「000XXX」显示由明细渲染层与产物清扫兑底
+        self.assertEqual(entry["code"], "600036")
         self.assertEqual(entry["market_value"], 216000.0)  # round(216400/1000)*1000
         self.assertEqual(entry["cost"], 200000.0)  # round(200000/1000)*1000
-        self.assertIsInstance(entry["profit"], str)
-        self.assertIn("%", entry["profit"])
+        # 盈亏保持数值型且行内恒等（盈亏 = 市值 − 成本），下游合计/格式化不崩
+        self.assertIsInstance(entry["profit"], float)
+        self.assertEqual(entry["profit"], 16000.0)
+        # 收益率由模糊值派生（百分比契约），不残留模糊前精度
+        self.assertEqual(entry["profit_rate"], 8.0)
+        self.assertEqual(entry["profit_rate_pct"], 8.0)
 
     def test_full_anonymous_zero_profit(self):
-        """full_anonymous + profit=0 → 盈亏文本 '±0.0%'。"""
+        """full_anonymous + 盈亏为 0 → 派生盈亏/收益率为数值 0。"""
         d = {
             "name": "招商银行",
             "code": "600036",
@@ -212,7 +221,8 @@ class TestAnonymizeHoldingsDetails(unittest.TestCase):
             "account": "测试账户",
         }
         result = anonymize_holdings_details([d], "full_anonymous")
-        self.assertEqual(result[0]["profit"], "±0.0%")
+        self.assertEqual(result[0]["profit"], 0.0)
+        self.assertEqual(result[0]["profit_rate"], 0.0)
 
     def test_summary_aggregates_details(self):
         """summary → 含 market_value/cost/profit 汇总。"""
@@ -350,6 +360,72 @@ class TestGetSetMode(unittest.TestCase):
         with self.assertRaises(ValueError):
             set_anonymization_mode("bogus")
         mock_set.assert_not_called()
+
+
+class TestReportAliasMaskFold(unittest.TestCase):
+    """build_report_alias_map / mask_display_text / fold_details_summary（报告管线接入面）。"""
+
+    def test_off_mode_yields_empty_map(self):
+        """off → 空映射（清扫/掩码恒等）。"""
+        self.assertEqual(build_report_alias_map(_mk_details(), "off"), {})
+
+    def test_alias_numbering_matches_details_anonymization(self):
+        """映射编号与 anonymize_holdings_details 的 code 首次见序一致（代号同源）。"""
+        details = _mk_details()
+        mapping = build_report_alias_map(details, "code_display")
+        anon = anonymize_holdings_details([dict(d) for d in details], "code_display")
+        for src, out in zip(details, anon, strict=True):
+            self.assertEqual(mapping[src["name"]], out["name"])
+        self.assertEqual(mapping["招商银行"], "品种A")
+        self.assertEqual(mapping["贵州茅台"], "品种B")
+        # code_display 不映射代码
+        self.assertNotIn("600036", mapping)
+
+    def test_full_map_includes_codes(self):
+        """full → 映射含真码 → 000XXX。"""
+        mapping = build_report_alias_map(_mk_details(), "full_anonymous")
+        self.assertEqual(mapping["600036"], "000XXX")
+        self.assertEqual(mapping["招商银行"], "品种A")
+
+    def test_mask_display_text_long_key_first(self):
+        """长键优先替换；空映射恒等。"""
+        mapping = {"招商银行": "品种A", "600036": "000XXX"}
+        text = "招商银行(600036) 限购 100 份"
+        self.assertEqual(mask_display_text(text, mapping), "品种A(000XXX) 限购 100 份")
+        self.assertEqual(mask_display_text(text, {}), text)
+
+    def test_fold_details_summary_rows_schema(self):
+        """折叠行保持明细 dict 同构键 + 大类聚合值。"""
+        rows = fold_details_summary(_mk_details())
+        self.assertEqual(len(rows), 1)  # 两条均股票/其他
+        row = rows[0]
+        self.assertEqual(row["name"], "股票汇总")
+        self.assertEqual(row["market_value"], 561400.0)
+        self.assertEqual(row["cost"], 500000.0)
+        self.assertEqual(row["profit"], 61400.0)
+        self.assertEqual(row["code"], "")
+        # 同构键：下游渲染/小计/LLM 零改动消费
+        for key in ("profit_rate", "shares", "change_pct", "nav_date", "source_api", "price", "channel"):
+            self.assertIn(key, row)
+        self.assertEqual(row["profit_rate"], 12.28)  # 61400/500000*100
+
+    def test_fold_keeps_first_seen_order_and_fund_label(self):
+        """类别按首见序；含基金时生成「基金汇总」行。"""
+        details = _mk_details() + [
+            {
+                "name": "沪深300ETF",
+                "code": "510300",
+                "market_value": 10000.0,
+                "cost": 9000.0,
+                "profit": 1000.0,
+                "profit_rate_pct": 11.1,
+                "account": "测试账户",
+            }
+        ]
+        rows = fold_details_summary(details)
+        labels = [r["name"] for r in rows]
+        self.assertEqual(labels[0], "股票汇总")
+        self.assertIn("基金汇总", labels)
 
 
 class TestModeDescriptions(unittest.TestCase):

@@ -38,6 +38,9 @@ _ANONYMIZATION_MODES = frozenset({"off", "code_display", "full_anonymous", "summ
 __all__ = [
     "anonymize_holdings",
     "anonymize_holdings_details",
+    "build_report_alias_map",
+    "fold_details_summary",
+    "mask_display_text",
     "is_anonymization_enabled",
     "get_anonymization_mode",
     "set_anonymization_mode",
@@ -189,33 +192,36 @@ def _mask_codes(holdings: list[Holding]) -> None:
 
 
 def _blur_value(value: float, precision: int = 1000) -> float:
-    """将数值四舍五入到指定精度（隐藏精确金额）。"""
+    """将数值四舍五入到指定精度（隐藏精确金额）；返回 float 保持字段类型契约。"""
     if value == 0:
         return 0.0
-    return round(value / precision) * precision
+    return round(value / precision, 0) * precision
 
 
 def _anonymize_detail_entry(d: dict[str, Any]) -> None:
-    """对单条明细条目执行 full_anonymous 处理。"""
-    code = d.get("code", "")
-    if code:
-        d["code"] = "000XXX"
+    """对单条明细条目执行 full_anonymous 处理（数值字段层）。
 
-    mv = d.get("market_value", 0)
+    - 数值保持**数值型**（下游合计/图表/格式化契约）：市值与成本按千位模糊，
+      盈亏与收益率由模糊值**派生**，保证行内恒等（盈亏 = 市值 − 成本）；
+      收益率沿用百分比契约，避免模糊前精度反推。
+    - **代码字段保留真值**：code 是再平衡静默、决策账本、申购状态等键控
+      链路的键，掩码会跨品种碰撞；「000XXX」的显示由明细渲染层与
+      产物文本清扫兜底（report 层匿名化接线）。
+    """
+    mv = d.get("market_value", 0) or 0
     if mv:
-        d["market_value"] = _blur_value(mv, 1000)
+        mv = _blur_value(mv, 1000)
+        d["market_value"] = mv
 
-    cost = d.get("cost", 0)
+    cost = d.get("cost", 0) or 0
     if cost:
-        d["cost"] = _blur_value(cost, 1000)
+        cost = _blur_value(cost, 1000)
+        d["cost"] = cost
 
-    profit = d.get("profit", 0)
-    if profit:
-        profit_rate = d.get("profit_rate_pct", 0)
-        sign = "+" if profit >= 0 else "-"
-        d["profit"] = f"{sign}{abs(profit_rate):.1f}%"
-    else:
-        d["profit"] = "±0.0%"
+    d["profit"] = round(mv - cost, 2)
+    d["profit_rate"] = round((mv - cost) / cost * 100, 1) if cost else 0.0
+    if "profit_rate_pct" in d:  # 旧键兼容：同步为派生值，避免残留原精度
+        d["profit_rate_pct"] = d["profit_rate"]
 
 
 def _categorize_holding(h: Holding) -> str:
@@ -292,6 +298,102 @@ def _aggregate_details_summary(details: list[dict[str, Any]]) -> dict[str, dict[
             cat_data["profit_rate_pct"] = round(cat_data["profit_rate_pct"] / cat_data["count"], 2)
 
     return summary
+
+
+# ── 报告管线匿名化公共入口（字段层映射 / 文本掩码 / 大类折叠） ──────
+
+
+def _entry_value(item: Any, key: str, default: str = "") -> str:
+    """按 dict / 对象两种形态取字段值（明细字典、DetailRow、Holding 通用）。"""
+    if isinstance(item, dict):
+        return item.get(key, default) or default
+    return getattr(item, key, default) or default
+
+
+def build_report_alias_map(details: list[Any], mode: str = "off") -> dict[str, str]:
+    """构建真值 → 展示值映射（字段层与产物清扫共用，保证代号编号一致）。
+
+    编号规则与 ``anonymize_holdings_details`` 一致（code 首次见序 → 字母序），
+    使字段层替换与产物文本清扫的「品种X」指向同一持仓。
+
+    Args:
+        details: 明细/持仓序列（dict、DetailRow、Holding 均可）
+        mode: 匿名化模式；off → 空映射
+
+    Returns:
+        {真名: "品种X", ...}；full_anonymous 追加 {真码: "000XXX"}
+    """
+    mode = _resolve_mode(mode)
+    if mode == "off":
+        return {}
+
+    code_label: dict[str, str] = {}
+    name_map: dict[str, str] = {}
+    counter = 0
+    for item in details:
+        code = _entry_value(item, "code")
+        name = _entry_value(item, "name")
+        if code and code not in code_label:
+            counter += 1
+            code_label[code] = f"品种{_num_to_label(counter)}"
+        if name and name not in name_map and code in code_label:
+            name_map[name] = code_label[code]
+
+    alias_map = dict(name_map)
+    if mode == "full_anonymous":
+        alias_map.update({code: "000XXX" for code in code_label})
+    return alias_map
+
+
+def mask_display_text(text: str, alias_map: dict[str, str]) -> str:
+    """按映射替换文本中的真值（键按长度降序，先长后短避免子串截断）。
+
+    用于约束块、新闻关键词标签、HTML 产物等自由文本面的匿名化清扫。
+    """
+    if not text or not alias_map:
+        return text
+    for real in sorted((k for k in alias_map if k), key=len, reverse=True):
+        if real in text:
+            text = text.replace(real, alias_map[real])
+    return text
+
+
+_CATEGORY_ROW_LABELS = {"基金": "基金汇总", "股票/其他": "股票汇总"}
+
+
+def fold_details_summary(details: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """summary 模式：明细字典按大类折叠为同构聚合行（保持 list[dict] 形态）。
+
+    聚合行携带与单条明细一致的键（缺失键补默认值），下游渲染、小计、
+    LLM 提示词与图表数据集零改动消费；不携带 holding_days（观察期按
+    「未知」处理，由行动建议层既有缺省防护承接）。
+    """
+    buckets: dict[str, list[dict[str, Any]]] = {}
+    for d in details:
+        buckets.setdefault(_categorize_detail(d), []).append(d)
+
+    rows: list[dict[str, Any]] = []
+    for cat, items in buckets.items():
+        mv = sum(i.get("market_value", 0) or 0 for i in items)
+        cost = sum(i.get("cost", 0) or 0 for i in items)
+        profit = sum(i.get("profit", 0) or 0 for i in items)
+        rows.append(
+            {
+                "name": _CATEGORY_ROW_LABELS.get(cat, f"{cat}汇总"),
+                "code": "",
+                "market_value": mv,
+                "cost": cost,
+                "profit": profit,
+                "profit_rate": round(profit / cost * 100, 2) if cost else 0.0,
+                "change_pct": 0.0,
+                "nav_date": "",
+                "source_api": "",
+                "shares": sum(i.get("shares", 0) or 0 for i in items),
+                "price": 0.0,
+                "channel": "",
+            }
+        )
+    return rows
 
 
 # ── 工具函数 ──────────────────────────────────────────────────────

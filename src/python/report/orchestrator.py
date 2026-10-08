@@ -228,6 +228,26 @@ def prepare_report_data(
 
     attach_holding_trading_days(holdings_details, transactions)
 
+    # 持仓匿名化（config anonymization.mode）：明细装配边界统一脱敏——行情
+    # 取数与派生计算（申购限购、价格更新状态）先用真值完成后，在此一次性
+    # 匿名明细字典与 DetailRow（off → 恒等零开销；summary 仅折叠字典供
+    # LLM/行动建议同源，行留给明细渲染层折叠以保持合计真值）；下方
+    # action/HTML/Excel 全部同源消费匿名明细。约束块文本随后按同一映射掩码
+    # （构建期已用真实名称渲染，进 LLM 提示词附录前脱敏）。
+    from src.python.config.anonymizer import build_report_alias_map, get_anonymization_mode, mask_display_text
+    from src.python.report._report_helpers import apply_report_anonymization
+
+    _anon_mode = get_anonymization_mode()
+    if _anon_mode != "off":
+        _alias_map = build_report_alias_map(holdings_details, _anon_mode)
+        holdings_details, details = apply_report_anonymization(
+            holdings_details, details, _anon_mode, alias_map=_alias_map
+        )
+        if purchase_status_data is not None and purchase_status_data.get("constraint_block"):
+            purchase_status_data["constraint_block"] = mask_display_text(
+                purchase_status_data["constraint_block"], _alias_map
+            )
+
     # 行动建议：组装 action_data（含再平衡信号；纪律/调仓/归因后续轮次填充）。
     # 此处为「中间占位构建」：组合历史峰值市值需等历史走势就绪（report 层
     # full 路径在 _prepare_full_risk_metrics 后重建），persist_silence=False

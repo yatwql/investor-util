@@ -158,6 +158,34 @@ def save_workbook(wb: Workbook, output_dir: str = "reports") -> str:
     return os.path.abspath(latest)
 
 
+def mask_workbook_text(wb: Workbook, alias_map: dict[str, str]) -> int:
+    """匿名化产物清扫：字符串单元格按映射替换真值，返回改写单元格数。
+
+    仅改写字符串单元格（名称列/代码列/文本说明），数值单元格不动——
+    避免数字子串误伤金额；由调用方在保存前显式调用（off 模式不调用）。
+    """
+    if not alias_map:
+        return 0
+    keys = sorted((k for k in alias_map if k), key=len, reverse=True)
+    changed = 0
+    for ws in wb.worksheets:
+        for row in ws.iter_rows():
+            for cell in row:
+                value = cell.value
+                if not isinstance(value, str) or not value:
+                    continue
+                masked = value
+                for key in keys:
+                    if key in masked:
+                        masked = masked.replace(key, alias_map[key])
+                if masked != value:
+                    cell.value = masked
+                    changed += 1
+    if changed:
+        logger.info("[anonymizer] Excel 产物清扫改写 %d 个单元格", changed)
+    return changed
+
+
 def create_workbook() -> Workbook:
     """创建并返回一个新的 Workbook。"""
     wb = Workbook()
