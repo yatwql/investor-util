@@ -8,7 +8,7 @@
 
 本文档记录项目的实现计划。已完成的历史版本计划已归档，此处仅跟踪当前迭代中的工作。
 
-**当前迭代**：在办 22 项按「价值 / 收益 / 风险」分三档（2026-10-07 重排，档位定义见「当前迭代待办」）——P1 六项（**plan-71** 转正判据先行 + 风险/核心价值改进 **plan-98/99/85/91/95**）、P2 十二项（**plan-49/55/83** 等待条件型 + 改进批 **plan-86/88/89/90/92/93/96/100/101**）、P3 四项（**plan-70** 死线观察，已有落地设计 `decision-reflection-shadow-design.md`；择机 **plan-87/94/102**）；**plan-85 ~ plan-102** 为 2026-10-07 自审改进盘点迁入批（18 项）；历史批次（**plan-59 ~ plan-84**，含 Vibe-Trading / gs-quant / 工程效能 / TradingAgents-CN 借鉴批）已全部收口，完成态与未采纳记录随档见 [`archived_plan.0.11.x.md`](../archive/v0.11.x/archived_plan.0.11.x.md) 与 [`archived_plan.0.12.x.md`](../archive/v0.12.x/archived_plan.0.12.x.md)，借鉴批研究文档随档在 `docs/archive/v0.12.x/`（plan-66 ~ plan-68 候选现状见「P3」）。
+**当前迭代**：在办 21 项按「价值 / 收益 / 风险」分三档（2026-10-07 重排，档位定义见「当前迭代待办」）——P1 六项（**plan-71** 转正判据先行 + 风险/核心价值改进 **plan-98/99/85/91/95**）、P2 十一项（**plan-49/55/83** 等待条件型 + 改进批 **plan-86/88/89/90/92/93/100/101**）、P3 四项（**plan-70** 死线观察，已有落地设计 `decision-reflection-shadow-design.md`；择机 **plan-87/94/102**）；**plan-85 ~ plan-102** 为 2026-10-07 自审改进盘点迁入批（18 项）；历史批次（**plan-59 ~ plan-84**，含 Vibe-Trading / gs-quant / 工程效能 / TradingAgents-CN 借鉴批）已全部收口，完成态与未采纳记录随档见 [`archived_plan.0.11.x.md`](../archive/v0.11.x/archived_plan.0.11.x.md) 与 [`archived_plan.0.12.x.md`](../archive/v0.12.x/archived_plan.0.12.x.md)，借鉴批研究文档随档在 `docs/archive/v0.12.x/`（plan-66 ~ plan-68 候选现状见「P3」）。
 
 > **命名纪律（强制）**：重构/新增的变量名、函数名、注释与文档表述必须与新章节语义相关（如 `position_relationship`/`portfolio_history_drawdown`/`style_factor`/`action`），**绝对禁止用任务编号命名**（F 系列、plan-N、rf-N 等）。任务编号仅在本表作链接锚点，不进入实现层。
 
@@ -130,12 +130,6 @@
 **现状与问题**（2026-10-07 自审迁入）：`force` 是布尔全局开关，全模块绕缓存重跑——只想重生成某一个不满意的模块（如 expert_review）做不到，只能全量烧钱或手改缓存文件
 
 **动作**：CLI `--llm-module expert_review`（可重复传参）、TUI [L] 交互多选、Web 勾选；沿用既有模块指纹缓存键，仅对指定模块置 force，其余照常命中缓存
-
-#### 🔲 `plan-96` 主菜单缺运行状态仪表盘
-
-**现状与问题**（2026-10-07 自审迁入）：`print_header` 仅首次使用指引；上次运行时间、缓存健康、数据新鲜度、降级摘要、LLM 配置状态散落在 [V]/[H]/[4]/[S] 四处，启动后要逐个点进去才知系统近况
-
-**动作**：页头常驻一行紧凑状态（上次报告时间 · 缓存过期数 · 数据新鲜度 · 降级源数 · LLM 状态点），全部取自既有 `data_freshness`/`doctor`/缓存统计单源，点对应菜单展开；无数据显示「—」，不新增任何外部调用
 
 #### 🔲 `plan-92` Excel 纯数字呈现，缺可视化辅助
 

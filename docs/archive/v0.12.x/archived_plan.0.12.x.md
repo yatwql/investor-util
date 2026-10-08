@@ -169,3 +169,7 @@
 ## plan-97 生成进行中 ETA / 阶段预估 — ✅ 已完成（2026-10-07）
 
 **动作**：`core/perf.py` 新增 `estimate_stage_eta()`（取 perf 历史最近 20 次运行的同名阶段耗时中位数减已耗时，严格按报告类型筛样本、负值钳 0、历史或类型无样本返回 None，读档/计算异常一律 `logger.debug` 后静默降级为无 ETA）与 `format_stage_status()`（「「阶段」· 已耗时 Ns · 预计剩余 ~Ns」的唯一格式化点）；`PerfCollector` 增 `stage_status()`/`report_type` property 与可选 `stage_announcer` 回调（`start()` 置位后广播、回调异常隔离吞掉），basic/both/full 三处管线构造点以 `stage_announcer=reporter.stage_progress` 接线、调用点零改动；`ProgressReporter.stage_progress()` 基类单一实现使 CLI verbose / Web / TUI 同源——无活跃阶段不输出、ETA 不可得且已耗时 <1s 静默（首跑无历史不刷屏）、ETA 可得但预估剩余 <1s 不输出（瞬时阶段如快照对比）、ETA 不可得且已耗时 ≥1s 仅显已耗时，整体 try/except 静默降级。测试 24 项（`unit/core/test_perf_stage_eta.py` 17 项：中位数口径/类型不匹配/窗口外历史剔除/负样本忽略/早期 list 形状兼容/异常静默；`unit/report/test_progress.py` 扩 7 项：格式器/四类不输出分支/CLI verbose stderr 落点），test-coverage 计数与 folders 目录树同步。
+
+## plan-96 主菜单页头状态仪表盘 — ✅ 已完成（2026-10-07）
+
+**动作**：新增 `tui/status_line.py` 五项本地单源组装——上次报告时间（perf 历史末条时间戳 → MM-DD HH:MM）、缓存过期数（与菜单 [4] 同一 `get_cache_stats().expired` 口径）、数据新鲜度（最新价格缓存的 `price_date` 数据日期 + 自然日龄）、降级源数（datasource_health 末条 `fail_count`，无记录 `—`）、LLM 状态点（`llm_status` 与 [S] 同源判定 ●/○）；`print_header` 标题下常驻单行并附详情菜单指引 `〔详情 [4][H][S]〕`。契约：逐项独立 try/except 降级为「—」、整行组装异常降级为 `状态 │ —` 永不向调用方抛出、TTL 45s 记忆化（页头随主循环重绘，重取限频）、零外部网络调用。**设计取舍**：数据新鲜度原拟用 `data_freshness.classify_freshness` × 交易日历，但 `trading_calendar` 日历缓存未命中会走 akshare 触网（违反「不新增任何外部调用」且撞测试网络守卫的 BaseException），故页头改呈纯本地读数（数据日期 + 自然日龄），分类器仍留给报告管线。测试 12 项（`unit/ui/test_tui_menu.py` 扩：五项取数正常/降级分支、整行拼接与菜单指引、五路全挂逐项 `—`、TTL 记忆化复用与过期重取、print_header 接线）。
