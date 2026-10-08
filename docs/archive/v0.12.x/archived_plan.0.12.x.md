@@ -239,3 +239,35 @@
 **动作**：归并占位样式为一族（章节级 / 单元级 / 图表级三档 + 状态语义色阶）；降级文案口径单源化（「数据不可用 + 原因」句式，与健康检查降级原因同源，HTML/Excel 双端一致）；对照数据状态矩阵（data_status 契约）补「状态 → 观感」映射并写入 DESIGN.md 状态节（plan-103）；20 个 partial 逐一核对切换
 
 **完成态（2026-10-08，`d867594f`）**：三档空态族归并（章节 `empty-section` / 单元 `empty-note` / 图表 `chart-empty-note`，原 `placeholder-note` 并入基底、20 处双类清零）；文案二元口径（合法空「暂无+具体对象」——指数占位双端改「暂无指数数据」；降级空「数据不可用：<原因>」——数据源状态行×2 与历史图空态加前缀）+ 豁免表入档；DESIGN Data States 节改写（含 20 partial 核对结论与空态中性分工约束）；`test_report_empty_states` 11 项；脆窗 print 断言改括号平衡解析。
+
+#### ✅ `plan-110` scripts 契约机检守护（观察期） — 已完成（2026-10-08，`ce59ef34`）
+
+**现状与问题**（2026-10-08 scripts 核查）：退出码 docstring 声明与实现的契约（rf-629/rf-630 两例实错）、检查类 CLI 面（`-v`/`--ci`/`add_common_args`）、文本 I/O 显式 encoding、脚本↔测试映射，全靠人肉与逐案修复；一次核查即发现退出码声明 5 例不齐
+
+**动作**：新增 check-script-contract（复用 `_checklib`，`-v/--ci`、退出 0/2；观察期不入钩子与 CI，模式同 check-style-guardrails）：① docstring 退出码声明码集 ⊆ `_checklib.report` 返回值域 {0,2}（特例白名单：check-code-traces 0/1/2/3、check-doc-traces 0/1/2、check-svg 含 1=环境缺失、check-version-consistency 含 1=事实源不可读）② 顶层 check-* 必须 `add_common_args` ③ 脚本文本 I/O 显式 encoding ④ 顶层脚本须有对应测试（一次性工具白名单豁免）；配单测覆盖规则命中与白名单
+
+**完成态（2026-10-08，`ce59ef34`）**：`scripts/check-script-contract.py` 四规则上线，复用 `_checklib` 契约，配单测 39 项（规则命中 / 白名单 / 用例自证规避）；同批把 `check-version-consistency` 手写 argv 解析改 argparse + `add_common_args`；上线时唯一 finding 为 `check-code-traces` CLI 面，随 plan-114 归零。**观察期未入钩子与 CI**，稳定后评估入域。
+
+#### ✅ `plan-111` 测试域脚本 loader 样板统一 — 已完成（2026-10-08，`3a03b6b0`）
+
+**现状与问题**（2026-10-08 scripts 核查）：`_load_script` importlib 加载样板在 60 个测试文件重复（每处约 12 行），加载方式靠复制传播，改造 scripts 加载面时需逐文件同步
+
+**动作**：提取公共 loader（`src/test/_script_loader.py` 或 conftest fixture），新测试强制使用，存量按批次增量迁移（不一次性改 60 文件）；迁移完成前旧样板兼容
+
+**完成态（2026-10-08，`3a03b6b0`）**：新增 `src/test/_script_loader.py`（按文件名/子路径加载、模块名由文件名派生或显式覆盖、注册进 `sys.modules` 保住 `@dataclass` 按 `cls.__module__` 回查、每次调用重新执行返回新实例），33 个测试文件的 4 种自建样板全部迁移，顺带清 38 处失效路径常量与 importlib 导入，净 −362 行；`test_script_loader.py` 9 项机检样板唯一性（除共享 loader 外不得再出现动态加载样板、不得再定义同名本地加载器），新测试强制复用共享实现。
+
+#### ✅ `plan-112` collect modes 与 test-runner MODES 单源化 — 已完成（2026-10-08，`67bb74fc`）
+
+**现状与问题**（2026-10-08 scripts 核查）：`collect-test-coverage.py` 的 `modes` lambda 字典与 `_test_runner/modes.py::MODES` 的 marker 表达式双处定义，脚本注释自认「双处定义——modes.py 门禁 marker 变更必须同步本字典，否则计数表口径漂移」，纯人肉纪律无机检
+
+**动作**：二选一：① `modes.py` 导出语义化表达式（或编译谓词）供 collect 复用导入 ② 保留双处但新增机检（双向对表：MODES 键集 == modes 字典键集，表达式等价性抽查）；落地后删除同步警告注释
+
+**完成态（2026-10-08，`67bb74fc`）**：按方案 ① 单源化——`modes.py` 新增 `mode_marker_expr()`（顶层 `marker` 缺省时回落到首阶段 marker）与 `compile_marker_expr()`（复用 pytest 自身 `-m` 表达式求值器，空表达式恒真、非法表达式抛 `SyntaxError`），`collect-test-coverage.py` 删 15 项手写 lambda 字典与双处定义警告注释，改为按 `MODES` 键集现场编译（`all`/`live` 两项显式豁免并在脚本内注记理由，模式增删自动跟随）；真值表参数化用例与注册表回读用例锁死表达式语义，对拍 `unit` / `not unit and not live` / `unit_scripts` / `scenario` 四组谓词计数与 `pytest -m` 收集数逐项相等。
+
+#### ✅ `plan-114` check-code-traces 接入 _checklib 公共设施 — 已完成（2026-10-09，`82d81f99`）
+
+**现状与问题**（2026-10-08 scripts 核查）：`check-code-traces.py`（592 行，十守护之一）未引 `_checklib`——argparse 基建（`-v`/`--verbose`/`--ci`）手写、输出格式自成一派，与其余检查脚本的公共契约分叉（其 HIGH=1/LOW=3 四级退出码特例合理保留）
+
+**动作**：接入 `add_common_args` 与公共输出原语，退出码分级语义不变；同步 test_trace_check_scripts 对应断言
+
+**完成态（2026-10-09，`82d81f99`）**：手写 argparse 换 `_checklib.add_common_args`、本地 `rel` 改共享 `rel()`（别名 `rel_path`），0/1/2/3 分级退出码语义保留，`--help` 统一面由新增用例锁死（`add_common_args` 须为 `_checklib` 同一对象）；`check-script-contract` 四条规则**全部归零**；`_checklib` 契约 docstring 中该脚本分级描述与实现不符一并改正。同批完成该脚本的扫描域修复（扫描目录深度算错致守卫空转、规则定义载体与领域值豁免、展示层分层倒置实质修复），详见 review-findings 已解决段 rf-636。
