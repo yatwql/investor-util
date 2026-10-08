@@ -151,6 +151,8 @@
 
 **落地设计**：若判定转正，按 [`decision-reflection-shadow-design.md`](../plan/decision-reflection-shadow-design.md) 四迭代执行（决策条目结构化 → 到期结算器 → doctor 概览增强 → 报告内反思块），该设计以 Vibe-Trading `shadow_account`（extract→backtest→render）为参照；死线未过前不实施。plan-76 持仓变动复盘落地后与其构成「意图 vs 成交」对账（只读，不互写）。
 
+**观测快照（2026-10-07）**：条目 2026-10-03 前后立项（`607eaa65` 时已存在），其后仅 v0.12.6 一次发布——**2 个发布周期窗口未满，维持等待（不撤销、不转正、不实施设计）**；读数：experiment_stats `decision_reflection` 启用 14 次且 `last_enabled_date=2026-10-07`（增长中，判据①不成立）、`decision_ledger.jsonl` 2 决策 1 结算（已结算 1 条 <10，判据②暂成立但窗口内持续积累）、本机 features 覆写为开（实际使用中）。窗口期满（约至 v0.12.8 发布后）按上述两判据重新取数判定。
+
 #### 🔲 `plan-87` 相关性分析为静态单点
 
 **现状与问题**（2026-10-07 自审迁入）：`correlation.py` 仅 `compute_correlation_matrix` 全区间静态矩阵，无滚动窗口——分散化是否随时间失效（危机期相关性系统性抬升）不可见
