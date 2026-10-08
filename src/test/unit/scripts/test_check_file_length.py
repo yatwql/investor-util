@@ -15,14 +15,13 @@ over_limit_inventory / main，不运行真实 CLI 进程。
 
 from __future__ import annotations
 
-import importlib.util
 import sys
 from pathlib import Path
 
 import pytest
+from src.test._script_loader import load_script
 
 _REPO_ROOT = Path(__file__).resolve().parents[4]  # investor-util 仓库根目录
-_SCRIPTS_DIR = _REPO_ROOT / "scripts"
 
 pytestmark = [
     pytest.mark.unit,
@@ -31,20 +30,9 @@ pytestmark = [
 ]
 
 
-def _load_script(name: str):
-    """按文件名加载 scripts/ 下的检查脚本（规避 import 路径限制）。"""
-    fpath = _SCRIPTS_DIR / name
-    mod_name = name.replace(".py", "").replace("-", "_")
-    spec = importlib.util.spec_from_file_location(mod_name, fpath)
-    mod = importlib.util.module_from_spec(spec)
-    assert spec.loader is not None
-    spec.loader.exec_module(mod)
-    return mod
-
-
 @pytest.fixture(scope="module")
 def length_script():
-    return _load_script("check-file-length.py")
+    return load_script("check-file-length.py")
 
 
 def _make_file(root: Path, rel_path: str, lines: int) -> Path:

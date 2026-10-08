@@ -16,13 +16,12 @@ from __future__ import annotations
 
 import importlib
 import importlib.util
-import sys
 from pathlib import Path
 
 import pytest
+from src.test._script_loader import load_script
 
 _REPO_ROOT = Path(__file__).resolve().parents[4]
-_SCRIPTS_DIR = _REPO_ROOT / "scripts"
 
 pytestmark = [
     pytest.mark.unit,
@@ -30,30 +29,17 @@ pytestmark = [
 ]
 
 
-def _load_runner():
-    """按文件名加载 scripts/test-runner.py（规避 import 路径限制）。"""
-    name = "test_runner_report_paths"
-    if name in sys.modules:
-        return sys.modules[name]
-    spec = importlib.util.spec_from_file_location(name, _SCRIPTS_DIR / "test-runner.py")
-    module = importlib.util.module_from_spec(spec)
-    sys.modules[name] = module
-    assert spec.loader is not None
-    spec.loader.exec_module(module)
-    return module
-
-
 class TestProjectRoot:
     """项目根定位：拆包后 `_test_runner/paths.py` 的层级若算错会把报告写到 `scripts/` 下。"""
 
     def test_project_root_is_repo_root(self):
-        runner = _load_runner()
+        runner = load_script("test-runner.py", module_name="test_runner_report_paths")
         assert Path(runner._PROJECT_ROOT).resolve() == _REPO_ROOT
         assert Path(runner._LATEST_DIR) == _REPO_ROOT / "test-reports" / "latest"
         assert Path(runner._SRC_DIR) == _REPO_ROOT / "src" / "test"
 
     def test_report_dirs_live_under_repo_root(self):
-        runner = _load_runner()
+        runner = load_script("test-runner.py", module_name="test_runner_report_paths")
         for path in (runner._LATEST_DIR, runner._ARCHIVES_DIR):
             assert Path(path).is_relative_to(_REPO_ROOT)
             assert "scripts" not in Path(path).relative_to(_REPO_ROOT).parts
@@ -61,18 +47,18 @@ class TestProjectRoot:
 
 class TestPhaseReportPath:
     def test_phased_gets_own_file(self):
-        runner = _load_runner()
+        runner = load_script("test-runner.py", module_name="test_runner_report_paths")
         path = runner._phase_report_path("dev-verify", "A")
         assert Path(path).parts[-2:] == ("dev-verify", "report_phase_A.html")
         assert Path(runner._phase_report_path("dev-verify", "B")).name == "report_phase_B.html"
 
     def test_non_phased_keeps_plain_name(self):
         """非分阶段模式维持 report.html（既有文档/CI artifact 约定不变）。"""
-        path = Path(_load_runner()._phase_report_path("unit"))
+        path = Path(load_script("test-runner.py", module_name="test_runner_report_paths")._phase_report_path("unit"))
         assert path.parts[-2:] == ("unit", "report.html")
 
     def test_build_args_uses_phase_path(self):
-        runner = _load_runner()
+        runner = load_script("test-runner.py", module_name="test_runner_report_paths")
         args = runner._build_pytest_args(
             {"marker": "unit", "parallel": False}, "dev-verify", True, False, None, phase_tag="A"
         )
@@ -92,15 +78,27 @@ class TestIndexLinks:
         return runner._report_links_html("dev-verify")
 
     def test_lists_every_phase(self, tmp_path, monkeypatch):
-        html = self._make(_load_runner(), tmp_path, monkeypatch, ["report_phase_A.html", "report_phase_B.html"])
+        html = self._make(
+            load_script("test-runner.py", module_name="test_runner_report_paths"),
+            tmp_path,
+            monkeypatch,
+            ["report_phase_A.html", "report_phase_B.html"],
+        )
         assert "dev-verify/report_phase_A.html" in html
         assert "dev-verify/report_phase_B.html" in html
         assert "Phase A" in html and "Phase B" in html
 
     def test_plain_report_still_linked(self, tmp_path, monkeypatch):
-        html = self._make(_load_runner(), tmp_path, monkeypatch, ["report.html"])
+        html = self._make(
+            load_script("test-runner.py", module_name="test_runner_report_paths"),
+            tmp_path,
+            monkeypatch,
+            ["report.html"],
+        )
         assert 'href="dev-verify/report.html"' in html
 
     def test_no_report_shows_placeholder(self, tmp_path, monkeypatch):
-        html = self._make(_load_runner(), tmp_path, monkeypatch, [])
+        html = self._make(
+            load_script("test-runner.py", module_name="test_runner_report_paths"), tmp_path, monkeypatch, []
+        )
         assert "无" in html

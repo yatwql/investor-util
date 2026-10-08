@@ -1,28 +1,12 @@
 """factor_zoo_eval 评测脚本边缘场景（空输入/退化数据/极端值），全部离线。"""
 
-import importlib.util
-from pathlib import Path
-
 import pytest
-
-_REPO_ROOT = Path(__file__).resolve().parents[4]  # 仓库根目录
-_SCRIPTS_DIR = _REPO_ROOT / "scripts"
-
-
-def _load_script(name: str):
-    """按文件名加载 scripts/ 下的评测脚本（规避 import 路径限制）。"""
-    fpath = _SCRIPTS_DIR / name
-    mod_name = name.replace(".py", "").replace("-", "_")
-    spec = importlib.util.spec_from_file_location(mod_name, fpath)
-    mod = importlib.util.module_from_spec(spec)
-    assert spec.loader is not None
-    spec.loader.exec_module(mod)
-    return mod
+from src.test._script_loader import load_script
 
 
 @pytest.fixture(scope="module")
 def ev():
-    return _load_script("factor_zoo_eval.py")
+    return load_script("factor_zoo_eval.py")
 
 
 pytestmark = [

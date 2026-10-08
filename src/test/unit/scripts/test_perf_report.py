@@ -14,18 +14,15 @@
 
 from __future__ import annotations
 
-import importlib.util
 import inspect
 import re
-import sys
 from datetime import datetime
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
 import pytest
+from src.test._script_loader import load_script
 
-_REPO_ROOT = Path(__file__).resolve().parents[4]  # investor-util 仓库根目录
-_SCRIPTS_DIR = _REPO_ROOT / "scripts"
 
 pytestmark = [
     pytest.mark.unit,
@@ -34,22 +31,9 @@ pytestmark = [
 ]
 
 
-def _load_script(name: str):
-    """按文件名加载 scripts/ 下的脚本（规避 import 路径限制）。"""
-    fpath = _SCRIPTS_DIR / name
-    mod_name = name.replace(".py", "").replace("-", "_")
-    spec = importlib.util.spec_from_file_location(mod_name, fpath)
-    mod = importlib.util.module_from_spec(spec)
-    assert spec.loader is not None
-    # 注册进 sys.modules：`@dataclass` 解析类命名空间时按 cls.__module__ 回查模块
-    sys.modules[mod_name] = mod
-    spec.loader.exec_module(mod)
-    return mod
-
-
 @pytest.fixture(scope="module")
 def perf_report():
-    return _load_script("perf-report.py")
+    return load_script("perf-report.py")
 
 
 @pytest.fixture()

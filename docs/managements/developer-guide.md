@@ -808,6 +808,17 @@ def test_ttl_during_trading_hours_returns_30s(self):
 def test_qdii_nav_date_delayed_t2(self):
 ```
 
+**加载 `scripts/` 下脚本（动态加载）**：
+
+```python
+from src.test._script_loader import load_script
+
+mod = load_script("check-svg.py")                                            # 模块名由文件名派生
+mod = load_script("_test_runner/modes.py", module_name="modes_under_test")   # 子路径 + 显式模块名
+```
+
+> 唯一实现为 `src/test/_script_loader.py`：按文件名/子路径加载 `scripts/` 下脚本、每次调用重新执行返回新实例、注册进 `sys.modules`（`@dataclass` 按 `cls.__module__` 回查命名空间依赖它）。**禁止**在测试文件里再手写 `importlib.util.spec_from_file_location` 样板或自定义 `_load_script`——`unit/scripts/test_script_loader.py` 的样板唯一性机检会检出（除 loader 自身外出现动态加载样板、或定义同名本地加载器均判失败）。
+
 **新增后必须更新的文件**：
 
 1. **`test-coverage.md` 场景测试分组表** — 新增 S/T/D 场景时补充条目（含测试类参考列）

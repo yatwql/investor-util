@@ -9,6 +9,8 @@
 
 ## [0.12.7-dev] - 开发中（未发布）
 
+- **工程质量/重构**：**测试域脚本加载样板收敛为共享实现**——新增 `src/test/_script_loader.py`（`load_script(name, module_name=None)`：按文件名/子路径加载 `scripts/` 下脚本，模块名缺省由文件名派生、可显式覆盖，每次调用重新执行返回新实例，注册进 `sys.modules` 保住 `@dataclass` 按 `cls.__module__` 回查），33 个测试文件的 4 种自建样板（模块级 `_load_script(name)` / 无参固定脚本 / 路径+模块名两参 / `_load_checklib`·`_load_release_module`·`_load_modes`·`_load_runner` 自定义名）全部迁移，顺带清 38 处失效路径常量与 importlib 导入，净 −362 行；样板唯一性由 `test_script_loader.py` 机检（除 loader 外不得再出现动态加载样板、不得再定义同名本地加载器），新测试强制复用共享 loader | plan-111
+
 - **工程质量/契约**：**scripts 顶层脚本契约机检上线（观察期）**——新增 `check-script-contract.py` 四条规则：退出码 docstring 声明 ⊆ `_checklib.report` 返回值域 {0,2}（白名单：code-traces 0/1/2/3、doc-traces/svg/version-consistency 的 1=HIGH/环境缺失/事实源不可读）、`check-*` 须统一 `add_common_args`（-v/--ci）、文本 I/O 显式 encoding（内建 open 非二进制模式 / Path.read_text·write_text / subprocess text=True，AST 全口径）、顶层脚本须被 `src/test/` 测试按文件名引用（一次性探测工具豁免）；同批把 `check-version-consistency` 手写 argv 解析改 argparse + `add_common_args`（补 `-v`）；当前唯一 finding 为 `check-code-traces` CLI 面（plan-114 收口后归零）；测试 39 项 | plan-110
 
 - **工程质量/缺陷**：**测试标记清单改由 conftest 派生**——`check-test-markers` 的 `KNOWN_MARKERS` 由手写 42 项改为 `registered_markers()` 对 `src/test/conftest.py` 的 `addinivalue_line("markers", …)` 做 AST 提取（多行调用与相邻字面量拼接天然处理），conftest 新增/删除标记自动跟随；已实测真实漂移：`cassette` 早已注册却不在手写清单内（43 vs 42），裸属性写法会被误判「未注册」；`EXPECTED_DIR_MARKERS` 补齐 5 个含测试却无期望的目录（`unit/cache`·`unit/startup`·`unit/web`·`scenario/perf`·`scenario/security`，原静默不查）并加目录结构绑定注释，`src/test/unit/conftest.py` 的 `_DIR_TO_MARKER` 同步补齐 cache/scripts/startup；docstring 删去「已移除的标记（如 integration）」与现状矛盾的表述；回归 = 27 项，含期望表↔目录、提示表↔期望表的结构性双向绑定断言 | rf-633

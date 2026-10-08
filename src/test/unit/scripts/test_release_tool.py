@@ -18,14 +18,13 @@
 from __future__ import annotations
 
 import argparse
-import importlib.util
 import subprocess
 from pathlib import Path
 
 import pytest
+from src.test._script_loader import load_script
 
 _REPO_ROOT = Path(__file__).resolve().parents[4]
-_SCRIPTS_DIR = _REPO_ROOT / "scripts"
 
 pytestmark = [
     pytest.mark.unit,
@@ -33,18 +32,9 @@ pytestmark = [
 ]
 
 
-def _load_release_module():
-    fpath = _SCRIPTS_DIR / "release.py"
-    spec = importlib.util.spec_from_file_location("release_tool", fpath)
-    mod = importlib.util.module_from_spec(spec)
-    assert spec.loader is not None
-    spec.loader.exec_module(mod)
-    return mod
-
-
 @pytest.fixture(scope="module")
 def rel():
-    return _load_release_module()
+    return load_script("release.py", module_name="release_tool")
 
 
 def ns(**kwargs) -> argparse.Namespace:

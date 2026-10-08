@@ -24,7 +24,6 @@
 
 from __future__ import annotations
 
-import importlib.util
 import re
 from dataclasses import replace
 from pathlib import Path
@@ -32,9 +31,7 @@ from pathlib import Path
 from src.python.core.section_block_registry import SECTION_BLOCK_SPECS
 
 import pytest
-
-_REPO_ROOT = Path(__file__).resolve().parents[4]  # 仓库根目录（src/test/unit/scripts 向上 4 级）
-_SCRIPTS_DIR = _REPO_ROOT / "scripts"
+from src.test._script_loader import load_script
 
 
 def _documented_test_count(doc_text: str) -> int | None:
@@ -47,20 +44,9 @@ def _documented_test_count(doc_text: str) -> int | None:
     return None
 
 
-def _load_script(name: str):
-    """按文件名加载 scripts/ 下的检查脚本（规避 import 路径限制）。"""
-    fpath = _SCRIPTS_DIR / name
-    mod_name = name.replace(".py", "").replace("-", "_")
-    spec = importlib.util.spec_from_file_location(mod_name, fpath)
-    mod = importlib.util.module_from_spec(spec)
-    assert spec.loader is not None
-    spec.loader.exec_module(mod)
-    return mod
-
-
 @pytest.fixture(scope="module")
 def drift():
-    return _load_script("check-doc-drift.py")
+    return load_script("check-doc-drift.py")
 
 
 @pytest.fixture(scope="module")

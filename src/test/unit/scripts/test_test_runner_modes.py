@@ -14,22 +14,10 @@ check-test-redundancy 全量 AST 解析约 3.5s/次，一轮任务最多跑 3 �
 
 from __future__ import annotations
 
-import importlib.util
 import itertools
-from pathlib import Path
 
 import pytest
-
-_REPO_ROOT = Path(__file__).resolve().parents[4]
-_MODES_PATH = _REPO_ROOT / "scripts" / "_test_runner" / "modes.py"
-
-
-def _load_modes():
-    spec = importlib.util.spec_from_file_location("_test_runner_modes_under_test", _MODES_PATH)
-    mod = importlib.util.module_from_spec(spec)
-    assert spec.loader is not None
-    spec.loader.exec_module(mod)
-    return mod
+from src.test._script_loader import load_script
 
 
 @pytest.mark.unit_scripts
@@ -38,20 +26,20 @@ class TestDevVerifyPreflightDedup:
 
     def test_preflight_is_numbering_only(self):
         """preflight 命令清单必须恰好是任务编号快检一项。"""
-        modes = _load_modes()
+        modes = load_script("_test_runner/modes.py", module_name="_test_runner_modes_under_test")
         scripts = [cmd[1] for cmd in modes.MODES["dev-verify"].get("preflight", [])]
         assert scripts == ["scripts/check-task-numbering.py"]
 
     def test_heavy_guards_not_in_preflight(self):
         """重量守护不得回到预检（否则同树重复执行回归）。"""
-        modes = _load_modes()
+        modes = load_script("_test_runner/modes.py", module_name="_test_runner_modes_under_test")
         joined = " ".join(" ".join(cmd) for cmd in modes.MODES["dev-verify"].get("preflight", []))
         assert "check-doc-drift" not in joined
         assert "check-test-redundancy" not in joined
 
     def test_preflight_entries_are_ci_guards(self):
         """预检条目必须指向 scripts/ 下的守护脚本并带 --ci（契约不破形）。"""
-        modes = _load_modes()
+        modes = load_script("_test_runner/modes.py", module_name="_test_runner_modes_under_test")
         preflight = modes.MODES["dev-verify"].get("preflight", [])
         assert preflight, "preflight 不得为空（fail-fast 快检须保留）"
         for cmd in preflight:
@@ -76,7 +64,7 @@ class TestDevVerifySinglePhaseMerge:
 
     @staticmethod
     def _phase() -> dict:
-        modes = _load_modes()
+        modes = load_script("_test_runner/modes.py", module_name="_test_runner_modes_under_test")
         phases = modes.MODES["dev-verify"]["phases"]
         assert len(phases) == 1, "dev-verify 必须单阶段（合一后回退两阶段会重复付收集与 worker 启动）"
         return phases[0]

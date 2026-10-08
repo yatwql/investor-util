@@ -20,9 +20,9 @@ SVG_NS = 'xmlns="http://www.w3.org/2000/svg" width="1000" height="600"'
 @pytest.fixture(name="mod")
 def fixture_mod():
     """加载 `scripts/check-svg.py` 为可测模块。"""
-    from src.test.unit.scripts.test_perf_report import _load_script
+    from src.test._script_loader import load_script
 
-    return _load_script("check-svg.py")
+    return load_script("check-svg.py")
 
 
 def _svg(tmp_path: Path, name: str, body: str) -> Path:

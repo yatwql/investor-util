@@ -14,12 +14,12 @@
 | 架构图示 | SVG | 3 | 337 | `src/static/` README 架构图（architecture 三渠道→引擎→双报告、llm-chain Provider 链式分发、capabilities 九大功能域总览）+ 报告实景截图 2 张 PNG（`report-overview`/`report-charts`，不计入本行） |
 | 辅助脚本 | Python | 60 | 15,483 | `scripts/`（启动脚本 + CLI 命令行包装、测试驱动、工具检查、任务编号检查、性能测试、LLM 幻觉率评估、测试覆盖计数、代码/文档历史痕迹检查、语义命名索引校验、Claude Code hook 安装/校验、Web 冒烟脚本、push2 连通性诊断、SVG 架构图检查） |
 | 源代码合计 | — | 429 | 111,073 | 主程序 + 模板 + 脚本 + SVG |
-| 测试代码 | Python | 502 | 145,496 | `src/test/` 所有 `.py` 文件（含近期 ruff format 全仓重排） |
-| 测试用例 | — | — | 9,695 个 | `pytest --collect-only` 统计（`scripts/collect-test-coverage.py` 实时收集快照，不含 opt-in live 套件） |
+| 测试代码 | Python | 504 | 145,264 | `src/test/` 所有 `.py` 文件（含近期 ruff format 全仓重排） |
+| 测试用例 | — | — | 9,704 个 | `pytest --collect-only` 统计（`scripts/collect-test-coverage.py` 实时收集快照，不含 opt-in live 套件） |
 | 用户文档 | Markdown | 11 | 5,608 | 含 README.md（184 行）；行数为 README + manuals 之和 |
 | ├ manuals/ | 用户手册分册 | 10 | 5,424 | 配置/faq/快速上手/TUI/CLI/Web 三种模式指南等 |
-| 项目文档 | Markdown | 163 | 61,080 | 含 CLAUDE.md（87 行）；md 口径（CLAUDE.md 1 + managements 10 + plan 4 + archive md 148），py/txt 不计行 |
-| ├ managements/ | 管理文档 | 10 | 11,593 | 变更日志/目录树/测试计划/技术设计/开发者指南等 |
+| 项目文档 | Markdown | 163 | 61,095 | 含 CLAUDE.md（87 行）；md 口径（CLAUDE.md 1 + managements 10 + plan 4 + archive md 148），py/txt 不计行 |
+| ├ managements/ | 管理文档 | 10 | 11,608 | 变更日志/目录树/测试计划/技术设计/开发者指南等 |
 | ├ archive/ | 版本归档 | 148 | 48,787 | 各版本 changelog/plan/review-findings 与设计文档归档（148 md 48,721 行，含 Vibe-Trading/gs-quant/TradingAgents 借鉴批候选研究、基金申购限购三份设计与 LLM 成本调节/自检/源指定设计） |
 | ├ plan/ | 中间设计文件 | 4 | 612 | 在办设计文档（扁平存放，完成后随完成态移入对应版本的归档子目录）：两份 Jev 新闻关联判定文档（对照评测方案 171 行 + 类型化判定通道接入设计 198 行）+ 决策跨期反思闭环设计 + Web 展示借鉴研究（awesome-design-md，Web 展示借鉴批立项依据） |
 | └ tmp/ | 临时文件 | — | — | 调试产物、迁移暂存（git 忽略，不计入统计） |
@@ -503,6 +503,7 @@ investor-util/
 │       ├── __init__.py               #   包标记（空文件）
 │       ├── _network_guard.py         #   测试网络隔离原语（不可吞的断网错误 + offline_external_sources 离线桩）
 │       ├── _path_isolation.py        #   敏感路径隔离实现体（config/缓存/快照/输出目录重定向，供 conftest fixture 调用）
+│       ├── _script_loader.py         #   共享脚本加载器（scripts/ 按文件名动态加载的唯一实现，样板唯一性有机检）
 │       ├── conftest.py               #   pytest 全局配置 + 标记注册
 │       ├── helpers.py                #   测试辅助工具
 │       ├── data/                     #   测试数据集
@@ -926,6 +927,7 @@ investor-util/
 │       │   │   ├── test_find_order_dependent_test.py # 顺序依赖二分工具：前缀二分/收集解析/分类/精简 + 端到端
 │       │   │   ├── test_calibrate_dedup_threshold.py # 去重校准工具：分支重判/锚点压缩幂等/报告口径与过时建议回归
 │       │   │   ├── test_script_encoding.py  #   *.ps1/requirements.txt 编码与 *.sh 可执行位约定回归
+│       │   │   ├── test_script_loader.py  #   共享脚本加载器测试（加载契约/模块名派生与覆盖/sys.modules 注册/每次新实例/样板唯一性机检）
 │       │   │   ├── test_check_semantic_index.py  #   语义命名索引正反向校验脚本测试
 │       │   │   ├── test_check_doc_drift.py  #   文档与实现一致性检查脚本测试（章节/开关/默认值/面板编号/目录树/统计表/归档索引/分区纪律/章节-区块矩阵）
 │       │   │   ├── test_check_doc_drift_crosscheck.py # 文档↔代码交叉校验分片（链路表/Thinking 支持矩阵/收集快照/生成产物/真库冒烟/统计回写/守护同源）

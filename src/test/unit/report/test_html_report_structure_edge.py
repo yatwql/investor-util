@@ -10,31 +10,17 @@
 
 from __future__ import annotations
 
-import importlib.util
 import os
-import pathlib
 import re
 import unittest
 
 import pytest
+from src.test._script_loader import load_script
 
 pytestmark = [pytest.mark.unit, pytest.mark.unit_report, pytest.mark.edge]
 
-_SCRIPTS_DIR = pathlib.Path(__file__).resolve().parents[4] / "scripts"  # 仓库根 scripts/
 
-
-def _load_script(name: str):
-    """按文件名加载 scripts/ 下的模块（规避 import 路径限制）。"""
-    fpath = _SCRIPTS_DIR / name
-    mod_name = name.replace(".py", "").replace("-", "_")
-    spec = importlib.util.spec_from_file_location(mod_name, fpath)
-    mod = importlib.util.module_from_spec(spec)
-    assert spec.loader is not None
-    spec.loader.exec_module(mod)
-    return mod
-
-
-_checklib = _load_script("_checklib.py")
+_checklib = load_script("_checklib.py")
 
 _TEMPLATE_PATH = os.path.normpath(
     os.path.join(os.path.dirname(__file__), "..", "..", "..", "static", "tmpl", "report_template.html"),

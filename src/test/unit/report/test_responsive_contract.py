@@ -7,11 +7,11 @@
 
 from __future__ import annotations
 
-import importlib.util
 import pathlib
 import re
 
 import pytest
+from src.test._script_loader import load_script
 
 pytestmark = [pytest.mark.unit, pytest.mark.unit_web]
 
@@ -20,21 +20,9 @@ _REPORT = _ROOT / "src/static/tmpl/report_template.html"
 _WHATIF = _ROOT / "src/static/tmpl/whatif_template.html"
 _WORKBENCH = _ROOT / "src/static/web/style.css"
 _DESIGN = _ROOT / "DESIGN.md"
-_SCRIPTS_DIR = _ROOT / "scripts"
 
 
-def _load_script(name: str):
-    """按文件名加载 scripts/ 下的模块（规避 import 路径限制）。"""
-    fpath = _SCRIPTS_DIR / name
-    mod_name = name.replace(".py", "").replace("-", "_")
-    spec = importlib.util.spec_from_file_location(mod_name, fpath)
-    mod = importlib.util.module_from_spec(spec)
-    assert spec.loader is not None
-    spec.loader.exec_module(mod)
-    return mod
-
-
-_checklib = _load_script("_checklib.py")
+_checklib = load_script("_checklib.py")
 
 
 def _css(path: pathlib.Path) -> str:
