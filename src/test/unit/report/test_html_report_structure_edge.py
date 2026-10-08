@@ -10,7 +10,9 @@
 
 from __future__ import annotations
 
+import importlib.util
 import os
+import pathlib
 import re
 import unittest
 
@@ -18,33 +20,25 @@ import pytest
 
 pytestmark = [pytest.mark.unit, pytest.mark.unit_report, pytest.mark.edge]
 
+_SCRIPTS_DIR = pathlib.Path(__file__).resolve().parents[4] / "scripts"  # 仓库根 scripts/
+
+
+def _load_script(name: str):
+    """按文件名加载 scripts/ 下的模块（规避 import 路径限制）。"""
+    fpath = _SCRIPTS_DIR / name
+    mod_name = name.replace(".py", "").replace("-", "_")
+    spec = importlib.util.spec_from_file_location(mod_name, fpath)
+    mod = importlib.util.module_from_spec(spec)
+    assert spec.loader is not None
+    spec.loader.exec_module(mod)
+    return mod
+
+
+_checklib = _load_script("_checklib.py")
+
 _TEMPLATE_PATH = os.path.normpath(
     os.path.join(os.path.dirname(__file__), "..", "..", "..", "static", "tmpl", "report_template.html"),
 )
-
-
-def _print_blocks(tmpl: str) -> list[str]:
-    """提取全部 @media print 块体（括号平衡解析，避免固定字符窗脆弱断言）。"""
-    blocks: list[str] = []
-    start = 0
-    while True:
-        idx = tmpl.find("@media print", start)
-        if idx < 0:
-            break
-        brace = tmpl.find("{", idx)
-        depth = 0
-        end = brace
-        for pos in range(brace, len(tmpl)):
-            if tmpl[pos] == "{":
-                depth += 1
-            elif tmpl[pos] == "}":
-                depth -= 1
-                if depth == 0:
-                    end = pos
-                    break
-        blocks.append(tmpl[brace : end + 1])
-        start = end + 1
-    return blocks
 
 
 class TestHtmlCssStructure(unittest.TestCase):
@@ -291,7 +285,7 @@ class TestHtmlTocStatic(unittest.TestCase):
     def test_toc_print_hidden(self):
         """打印样式应隐藏左侧目录（.toc-sidebar / .toc-toggle-btn，存在含二者的 print 块）。"""
         self.assertIn(".toc-sidebar", self.tmpl, "模板中应有 .toc-sidebar 选择器")
-        blocks = _print_blocks(self.tmpl)
+        blocks = _checklib.extract_at_rule_blocks(self.tmpl, "media print")
         self.assertTrue(blocks, "模板中缺少 @media print")
         hit = any(".toc-sidebar" in b and ".toc-toggle-btn" in b for b in blocks)
         self.assertTrue(hit, ".toc-sidebar 与 .toc-toggle-btn 应同处一个 @media print 块")
@@ -345,7 +339,7 @@ class TestHtmlThemeStatic(unittest.TestCase):
 
     def test_theme_btn_print_hidden(self):
         """@media print 内应隐藏切换按钮（存在含该规则的 print 块）。"""
-        blocks = _print_blocks(self.tmpl)
+        blocks = _checklib.extract_at_rule_blocks(self.tmpl, "media print")
         self.assertTrue(blocks, "模板中缺少 @media print")
         hit = any(".theme-toggle-btn" in b and "display: none" in b for b in blocks)
         self.assertTrue(hit, ".theme-toggle-btn 应在某个 @media print 块内 display: none")

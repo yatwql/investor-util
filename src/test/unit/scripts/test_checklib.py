@@ -183,3 +183,18 @@ class TestTracesCommon:
         assert [p.pattern for p in traces_common._COMPILED_ROUND_EXCLUDE] == [
             p.pattern for p in traces_common._round_excludes()
         ]
+
+
+class TestExtractAtRuleBlocks:
+    """extract_at_rule_blocks：括号平衡提取 @at_rule 块体（拒绝固定字符窗）。"""
+
+    def test_extracts_all_blocks_with_nested_braces(self, checklib):
+        css = "@media print{a{b:c}}x@media print{p{@page{m:1}}}@media screen{q{}}"
+        blocks = checklib.extract_at_rule_blocks(css, "media print")
+        assert [b for b in blocks if "screen" in b] == []  # 非目标规则不入
+        assert blocks[0] == "{a{b:c}}"  # 括号平衡：内层嵌套正确收敛
+        assert "@page" in blocks[1]
+
+    def test_absent_rule_or_unbalanced_returns_empty(self, checklib):
+        assert checklib.extract_at_rule_blocks("body{color:red}", "media print") == []
+        assert checklib.extract_at_rule_blocks("@media print no-brace", "media print") == []

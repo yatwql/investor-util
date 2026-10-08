@@ -11,6 +11,7 @@
 
 from __future__ import annotations
 
+import re
 import pathlib
 
 import pytest
@@ -83,7 +84,6 @@ class TestCopyDiction:
         for path in _all_templates():
             text = path.read_text(encoding="utf-8")
             # 渲染文本域：剥 HTML 注释后查整词（Jinja 注释 {# #} 同步剥）
-            import re
 
             body = re.sub(r"<!--.*?-->|{#.*?#}", "", text, flags=re.S)
             assert "暂无数据" not in body, f"{path.name} 残留多口径占位「暂无数据」"

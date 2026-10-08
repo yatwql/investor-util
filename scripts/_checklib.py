@@ -102,6 +102,38 @@ def replace_region(text: str, start_marker: str, end_marker: str, block: str) ->
     return text[:body_start] + block + text[end:]
 
 
+def extract_at_rule_blocks(css: str, at_rule: str) -> list[str]:
+    """提取全部 ``@<at_rule>`` 块体（括号平衡解析），如 ``at_rule="media print"``。
+
+    拒绝「首匹配起固定字符窗」类脆弱正则——样式块增删会使窗口越界造成假阴性
+    （曾致打印断言随内容增长随机失败）；括号平衡定位语义精确，块内嵌套
+    ``{...}``（``@page``/``keyframes``）亦正确收敛。
+    """
+    blocks: list[str] = []
+    start = 0
+    needle = f"@{at_rule}"
+    while True:
+        idx = css.find(needle, start)
+        if idx < 0:
+            break
+        brace = css.find("{", idx)
+        if brace < 0:
+            break
+        depth = 0
+        end = brace
+        for pos in range(brace, len(css)):
+            if css[pos] == "{":
+                depth += 1
+            elif css[pos] == "}":
+                depth -= 1
+                if depth == 0:
+                    end = pos
+                    break
+        blocks.append(css[brace : end + 1])
+        start = end + 1
+    return blocks
+
+
 def _table_region_pattern(markers: tuple[str, str]) -> re.Pattern[str]:
     """表区域正则（起始标记 → 表格 → 结束标记，跨行）。"""
     start_marker, end_marker = markers

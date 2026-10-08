@@ -1,6 +1,6 @@
 # 投资复盘助手 - 自我审查问题记录
 > 文档版本：0.12.7-dev
-> **编号源**：`rf-next = 629`（新增问题取此编号，完成后更新为 +1；已用最大 rf-628，递增保证唯一，归档不回收。若与历史归档冲突，运行 `scripts/check-task-numbering.py` 校验）
+> **编号源**：`rf-next = 630`（新增问题取此编号，完成后更新为 +1；已用最大 rf-629，递增保证唯一，归档不回收。若与历史归档冲突，运行 `scripts/check-task-numbering.py` 校验）
 
 ---
 
@@ -54,7 +54,7 @@
 - rf-624 已修复（2026-10-07，v0.12.6 发布后自查，当批修复）：`scripts/check-version-consistency.py` 的 `_auto_fix_header` docstring 含裸 `\s` 转义 → 非 raw 字符串下每次导入/运行打印 `SyntaxWarning: invalid escape sequence '\s'`（py3.12+），污染终端与 CI stderr（全仓扫描仅此一处）；修复 = docstring 改 raw 前缀（顺带 `[ \t]` 显示由真实 TAB 还原为字面 `\t`）；回归 = 以 `warnings.simplefilter("error", SyntaxWarning)` + `compile()` 锁定脚本可无警告编译（同批自纠：本条回归测试类的 docstring 初版亦含裸 `\s`，由提交前钩子回放段告警捕获，已同步 raw 化）
 - rf-625 已修复（2026-10-07，v0.12.6 发布 publish 实战，当批修复）：`release.py publish` 组装 release subject 时未归一 `--title`——title 自带 `release: v… —— ` 前缀时拼出双前缀（v0.12.6 发布提交 `a68f2376` 即 `release: v0.12.6 —— release: v0.12.6 —— …`；tag/历史不可变故保留）；修复 = 新增 `normalize_release_title()` 剥离重复前缀（剥离后为空回退原值）；回归 = 带前缀 title 断言 subject 单前缀 + 纯描述/纯前缀变体不变
 - rf-627 已修复（2026-10-08，报告管线接入，当批修复）：字段层 `apply_report_anonymization` 三处物化点接入（prepare 装配 / Excel basic 内部生成 / HTML 内部生成，off 恒等零开销；summary 折叠明细字典、DetailRow 行留渲染层拦截保持合计真值）+ 明细渲染层（summary 账户组内大类折叠、full 代码列 000XXX）+ 产物清扫（HTML 名称文本 / Excel 字符串单元格，代号编号三层同源；数值单元格不动防数字子串误伤）+ LLM 同源（明细字典匿名进提示词，约束块/新闻关键词标签按映射掩码；code 保留真值供再平衡静默/决策账本/申购状态键控链路）；修 `_anonymize_detail_entry` full 盈亏输出字符串致下游合计/格式化崩溃缺陷（改数值千位模糊 + 模糊值派生行内恒等 + 旧键兼容）；安全场景升级 3 模式 × HTML/Excel 产物端到端断言（XML 数字实体反转义）+ 管线接线单测 18 项；手册 §L 按实现口径改写；剩余衍生面登记 rf-628
-
+- rf-629 已修复（2026-10-08，24h 技术债核查，当批修复）：`check-task-numbering.py` docstring 退出码声明「1 — 存在违规」与实现不符（main 走 `_checklib.report()` 实际返回 0/2；hook 版自身 0/1 为独立适配语义无误）——docstring 改「2 — 存在违规」；回归 = docstring 声明码集与 `_checklib.report` 返回值域 `{0, 2}` 一致性断言
 - rf-75 已修复（2026-10-07，文件长度红线治理，当批修复）：`core/registry.py` 785 行临界（余 15 行）——按注册职责域下沉 `core/data_registry.py`（数据模块/缓存 TTL/LLM 设置键派生，441 行）+ `core/report_section_registry.py`（报告章节/导航分组/页签名称派生，335 行），`registry.py` 收敛为 62 行门面（computation/section_block 原有单入口再导出保留，导入面/测试 patch 面不变）；两域零跨域引用、`__all__` 声明契约且互不相交；`check-semantic-index` 章节 AST 解析改指持有子模块（`_SECTION_REGISTRY_PY`）；门面同一性+域契约测试 3 项
 
 ### 归档档案

@@ -5,6 +5,7 @@
 必需节子集存在、护栏条目连续编号且 DO/DON'T 对偶、角色族覆盖、
 文内引用的实现文件真实存在。新增节/新增护栏不破坏断言（子集关系）。
 """
+
 from pathlib import Path
 
 import pytest
@@ -53,9 +54,7 @@ class TestDesignDocStructure:
 
     def test_required_sections_present(self):
         text = _read()
-        headings = [
-            line for line in text.splitlines() if line.startswith("## ")
-        ]
+        headings = [line for line in text.splitlines() if line.startswith("## ")]
         missing = [s for s in REQUIRED_SECTIONS if not any(s in h for h in headings)]
         assert not missing, f"DESIGN.md 缺契约节: {missing}"
 
@@ -76,24 +75,17 @@ class TestGuardrailEntries:
     @staticmethod
     def _guardrail_items(text: str) -> list[str]:
         section = text.split("## Do's and Don'ts", 1)[1].split("\n## ", 1)[0]
-        return [
-            ln for ln in section.splitlines()
-            if ln and ln[0].isdigit() and ". **DO**" in ln
-        ]
+        return [ln for ln in section.splitlines() if ln and ln[0].isdigit() and ". **DO**" in ln]
 
     def test_guardrail_numbering_contiguous(self):
         items = self._guardrail_items(_read())
         assert items, "护栏条目为空"
         numbers = [int(ln.split(".", 1)[0]) for ln in items]
-        assert numbers == list(range(1, len(numbers) + 1)), (
-            f"护栏编号不连续: {numbers}"
-        )
+        assert numbers == list(range(1, len(numbers) + 1)), f"护栏编号不连续: {numbers}"
 
     def test_guardrail_do_dont_pairs(self):
         for ln in self._guardrail_items(_read()):
-            assert "**DO**" in ln and "**DON'T**" in ln, (
-                f"护栏缺 DO/DON'T 对偶: {ln[:60]}"
-            )
+            assert "**DO**" in ln and "**DON'T**" in ln, f"护栏缺 DO/DON'T 对偶: {ln[:60]}"
 
 
 class TestReferencedFilesExist:

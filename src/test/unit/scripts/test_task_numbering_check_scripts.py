@@ -15,6 +15,7 @@ check_kind 函数，不运行真实 CLI。临时文件用 monkeypatch 指向 tmp
 from __future__ import annotations
 
 import importlib.util
+import re
 from pathlib import Path
 
 import pytest
@@ -163,3 +164,10 @@ def test_check_kind_plan_and_rf_independent(numbering, tmp_path: Path, monkeypat
 
     assert numbering.check_kind("rf", ci_mode=True) == []
     assert numbering.check_kind("plan", ci_mode=True) == []
+
+
+def test_docstring_exit_codes_match_report_contract(numbering):
+    """docstring 退出码声明与 _checklib.report 返回值域 {0, 2} 一致（防声明漂移）。"""
+    doc = numbering.__doc__ or ""
+    declared = {int(x) for x in re.findall(r"^\s*(\d+) — ", doc, re.M)}
+    assert declared == {0, 2}

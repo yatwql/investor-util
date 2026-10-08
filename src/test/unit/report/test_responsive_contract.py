@@ -7,6 +7,7 @@
 
 from __future__ import annotations
 
+import importlib.util
 import pathlib
 import re
 
@@ -19,6 +20,21 @@ _REPORT = _ROOT / "src/static/tmpl/report_template.html"
 _WHATIF = _ROOT / "src/static/tmpl/whatif_template.html"
 _WORKBENCH = _ROOT / "src/static/web/style.css"
 _DESIGN = _ROOT / "DESIGN.md"
+_SCRIPTS_DIR = _ROOT / "scripts"
+
+
+def _load_script(name: str):
+    """按文件名加载 scripts/ 下的模块（规避 import 路径限制）。"""
+    fpath = _SCRIPTS_DIR / name
+    mod_name = name.replace(".py", "").replace("-", "_")
+    spec = importlib.util.spec_from_file_location(mod_name, fpath)
+    mod = importlib.util.module_from_spec(spec)
+    assert spec.loader is not None
+    spec.loader.exec_module(mod)
+    return mod
+
+
+_checklib = _load_script("_checklib.py")
 
 
 def _css(path: pathlib.Path) -> str:
@@ -29,30 +45,6 @@ def _breakpoint_values(css: str) -> set[int]:
     """提取全部 max/min-width 断点像素值（配对边界 1023 属 1024 档）。"""
     vals = re.findall(r"@media\s*\((?:max|min)-width:\s*(\d+)px\)", css)
     return {int(v) for v in vals}
-
-
-def _print_blocks(css: str) -> list[str]:
-    """提取全部 @media print 块体（括号平衡解析，拒绝脆弱的单正则）。"""
-    blocks: list[str] = []
-    start = 0
-    while True:
-        idx = css.find("@media print", start)
-        if idx < 0:
-            break
-        brace = css.find("{", idx)
-        depth = 0
-        end = brace
-        for pos in range(brace, len(css)):
-            if css[pos] == "{":
-                depth += 1
-            elif css[pos] == "}":
-                depth -= 1
-                if depth == 0:
-                    end = pos
-                    break
-        blocks.append(css[brace : end + 1])
-        start = end + 1
-    return blocks
 
 
 def _design_breakpoints() -> set[int]:
@@ -113,7 +105,10 @@ class TestMobileReadingGuard:
     def test_frozen_first_column_disabled_in_print(self) -> None:
         """打印归位：print 块内首列静态定位（防打印分页错位）。"""
         for path in (_REPORT, _WHATIF):
-            hit = any("thead th:first-child" in blk and "position: static" in blk for blk in _print_blocks(_css(path)))
+            hit = any(
+                "thead th:first-child" in blk and "position: static" in blk
+                for blk in _checklib.extract_at_rule_blocks(_css(path), "media print")
+            )
             assert hit, f"{path.name} print 未归位首列冻结"
 
 
