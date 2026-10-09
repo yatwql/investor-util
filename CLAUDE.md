@@ -68,6 +68,7 @@
   - `docs/managements/test-coverage.md` — 模式/unit 子标记/跨类/功能域各项测试计数（`--update-docs` 回写）
   - `docs/managements/folders.md` — 项目统计表（主程序/模板/脚本/测试代码行数、文件数、测试用例数）及目录树新增/重命名文件；**版本演进对照表（`## 版本演进对照`）每次发布必须更新**——「最新发布」列按新 tag 重跑快照统计（复现方法见表头：`git ls-tree -r --name-only <rev>` + `git cat-file --batch` 计行 + `git grep -c "def test_"` 数用例，`<rev>` = 新 tag），「当前开发版」列同步重跑刷新；列头版本号与 tag/日期文本由 `check-version-consistency.py --fix`（`evolution_head` / `release_tag` 断言）同步，只改版本号不刷演进表数据行属发布遗漏
   - `docs/manuals/datasource.md` + `datasource-reliability.md` — 数据源清单/路由归属/可靠性描述与实际代码配置一致
+  - **发布归档迁移（四项强制，非可选）**：发布提交前必须全部完成，未完成不得继续 gate/publish——① `review-findings.md`「已解决问题」区全部条目迁入对应版本归档（如 `docs/archive/v0.12.x/archived_review-findings.0.12.x.md`，同步更新归档头部涵盖版本/追加行与主文件「归档档案」索引行）；② `plan.md` 不得残留 ✅/已完成任务节（完成态归入 `archived_plan.*`）；③ changelog 已发布段迁入 `archived_changelog.*`（`release.py prepare` 自动执行，人工核对指针与归档索引）；④ `docs/plan/` 中**已完成任务**的迭代设计文件迁入对应版本归档子目录（在办任务的设计文件保留，按其关联 plan/rf 任务状态判定），同步更新 plan.md/folders.md 引用链接与目录树
   数据快照更新与「版本号一致」的版本头同步可在同一次提交内完成。
 - **版本标签**：发布版本时，完成版本号更新并提交后，**必须**执行 `git tag v{版本号}` 打标签并 `git push origin --tags`，确保每次发布都可追溯。
 - **发布编排脚本**：发布全流程可用 `scripts/release.py` 分步执行——`check`（预检）→ `prepare`（版本全链 + changelog 发布段归档 + 一致性 `--fix`）→ `refresh`（bench/collect/sync）→ `evolution --release`（演进对照两列快照）→ `gate`（P2：regression + 十守护）→ `publish --title`（release 提交 + P1 verify + `--no-ff` 合并 + tag）→ `devbump`（切下一开发版）；每步独立可审阅、失败即停，rf 归档迁移保留人工，推送默认关闭需 `--push`。

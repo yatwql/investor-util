@@ -5,7 +5,9 @@
 
     check      预检：分支 / 工作树干净 / 版本形态 / tag 未占用 / 版本一致性
     prepare    文档手术：版本全链（constants + README + --fix 传播）+ changelog
-               发布段迁入归档、指针与归档索引改写；rf 归档迁移保留人工（需语义判断）
+               发布段迁入归档、指针与归档索引改写（changelog 段由本步自动完成）；
+               rf 已解决条目 / plan 已完成任务 / docs/plan 已完成任务设计文件三项归档迁移为
+               人工强制项（未完成不得继续 gate/publish）
     refresh    数据刷新：bench --update-docs + collect-test-coverage + doc-drift --sync
     evolution  版本演进对照快照：git 清单 + 逐文件行数口径；默认只滚「当前开发版」列，
                `--release` 时发布列与增长比一并写入（发布期在 prepare 之后执行）
@@ -332,7 +334,7 @@ def cmd_prepare(args: argparse.Namespace, runner=None) -> int:
         print(status_out.rstrip())
     print("\n[OK] prepare 完成。后续人工项：")
     print("  1. 审阅 git diff（重点：changelog 指针/归档索引、演进列头）")
-    print("  2. review-findings 已解决条目迁入归档（语义判断，保留人工）")
+    print("  2. 发布归档迁移（强制）：rf 已解决条目 + plan 已完成任务 + docs/plan 已完成任务设计文件迁档（changelog 段已由本步自动完成），未完成不得继续 gate/publish")
     print("  3. 按序继续：refresh → evolution --release → gate → publish → devbump")
     return 0
 

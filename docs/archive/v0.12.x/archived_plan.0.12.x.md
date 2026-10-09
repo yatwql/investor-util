@@ -187,7 +187,7 @@
 
 #### ✅ `plan-103` Web/报告设计语言契约立档（DESIGN.md） — 已完成（2026-10-08，`49a2ec46`）
 
-**现状与问题**（2026-10-07 Web 展示借鉴批）：报告 HTML（`report_template.html` 内联 179 个 CSS 变量 + `theme.js` 明暗双主题）与 Web 工作台（`src/static/web/style.css` 1,070 行 / 19 个变量、仅浅色）各持一套样式词汇（`--bg` vs `--color-bg`），全仓无设计语言文档——30+ 章节 partial 与面板新增时无观感真值可依，AI 辅助改动尤易两面漂移；上游 `VoltAgent/awesome-design-md` 的 73 份 Stitch 规范 DESIGN.md 提供了可套用的文档骨架（研究见 [`awesome-design-md-borrow-candidates-research.md`](../plan/awesome-design-md-borrow-candidates-research.md)）
+**现状与问题**（2026-10-07 Web 展示借鉴批）：报告 HTML（`report_template.html` 内联 179 个 CSS 变量 + `theme.js` 明暗双主题）与 Web 工作台（`src/static/web/style.css` 1,070 行 / 19 个变量、仅浅色）各持一套样式词汇（`--bg` vs `--color-bg`），全仓无设计语言文档——30+ 章节 partial 与面板新增时无观感真值可依，AI 辅助改动尤易两面漂移；上游 `VoltAgent/awesome-design-md` 的 73 份 Stitch 规范 DESIGN.md 提供了可套用的文档骨架（研究见 [`awesome-design-md-borrow-candidates-research.md`](awesome-design-md-borrow-candidates-research.md)）
 
 **动作**：按其节骨架（Overview 基调 / Colors 语义角色 / Typography 字阶 / Components 全状态 / Layout 间距 / 阴影 / Do-Don't 护栏 / Responsive 断点 / Iteration Guide / Known Gaps）裁剪项目自有 `DESIGN.md`，数值取两侧既有 token 提案值而非推倒重来；落仓库根，由 CLAUDE.md 与 developer-guide 链入，作为后续一切 Web/报告 UI 改动（含 AI 生成）的首个读取入口
 
