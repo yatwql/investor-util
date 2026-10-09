@@ -16,6 +16,8 @@ from __future__ import annotations
 
 import json
 import logging
+import random
+import time
 from typing import Any
 
 
@@ -33,6 +35,8 @@ logger = logging.getLogger("invest")
 
 _PUSH2_BASE = "https://push2.eastmoney.com/api/qt/stock/get"
 _TIMEOUT = 5.0
+# 每次请求前随机间隔（秒）：批量同速连续请求易触发服务端反爬断连
+_PUSH2_THROTTLE = (0.05, 0.2)
 _HEADERS = {
     "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
     "Referer": "https://www.eastmoney.com/",
@@ -86,6 +90,7 @@ def make_push2_request(code: str, retries: int = _MAX_RETRIES) -> dict | None:
     logger.debug("东方财富 push2 请求: %s", code)
 
     def _attempt() -> str:
+        time.sleep(random.uniform(*_PUSH2_THROTTLE))
         with make_http_client(timeout=_TIMEOUT) as client:
             resp = client.get(_PUSH2_BASE, params=params, headers=_HEADERS)
             return resp.text

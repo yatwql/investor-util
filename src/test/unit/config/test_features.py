@@ -637,3 +637,31 @@ class TestFactorCatalogSwitch:
         from src.python.config.features import feature_switch_registry
 
         assert feature_switch_registry["factor_catalog"].label == "因子目录"
+
+
+class TestBannerLogLevel:
+    """log_experimental_features 级别契约：INFO 提示，不占用 ERROR 统计。"""
+
+    def test_banner_records_are_info_not_error(self, caplog):
+        """横幅各行为 INFO 且零 ERROR——错误统计只保留真错误。"""
+        import logging
+
+        from src.python.config.features import (
+            is_feature_enabled,
+            log_experimental_features,
+            set_feature_enabled,
+        )
+
+        flag = "decision_reflection"
+        was_enabled = is_feature_enabled(flag)
+        set_feature_enabled(flag, True)
+        try:
+            with caplog.at_level(logging.INFO, logger="invest"):
+                log_experimental_features()
+        finally:
+            set_feature_enabled(flag, was_enabled)
+
+        banner = [r for r in caplog.records if "⚗" in r.getMessage()]
+        assert banner, "应产出 ⚗ 横幅日志"
+        assert all(r.levelno == logging.INFO for r in banner)
+        assert not any(r.levelno >= logging.ERROR for r in caplog.records), "横幅不得使用 ERROR 级别（会污染错误统计）"

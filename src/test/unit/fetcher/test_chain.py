@@ -830,3 +830,41 @@ class TestProviderEmptyReasonSurfaced(unittest.TestCase):
             )
         self.assertIsNone(result)
         self.assertEqual(reason, "返回空")
+
+
+class TestDocIdLogTag(unittest.TestCase):
+    """失败日志定位标识：无 code 的链路（财报 doc 维度）以 doc_id 入日志。"""
+
+    def test_full_chain_failure_log_carries_doc_id(self):
+        """fn_kwargs 无 code 时以 doc_id 定位：全链路失败日志带 [doc_id]，可反查文档。"""
+        provider_map = {"fake": ("FakeSource", lambda **_kw: None)}
+
+        with self.assertLogs(chain.logger, level="WARNING") as cm:
+            result = chain.fetch_with_fallback(
+                "financial_report",
+                provider_map,
+                "ut_doc_tag_cache_key",
+                60.0,
+                fn_kwargs={"doc_id": "999001"},
+            )
+
+        self.assertIsNone(result)
+        self.assertTrue(any("[999001]" in m for m in cm.output), "\n".join(cm.output))
+
+    def test_code_takes_precedence_over_doc_id(self):
+        """code 与 doc_id 同在时以 code 优先（有 code 的链路日志语义不变）。"""
+        provider_map = {"fake": ("FakeSource", lambda **_kw: None)}
+
+        with self.assertLogs(chain.logger, level="WARNING") as cm:
+            result = chain.fetch_with_fallback(
+                "financial_report",
+                provider_map,
+                "ut_doc_tag_cache_key_2",
+                60.0,
+                fn_kwargs={"code": "600000", "doc_id": "999001"},
+            )
+
+        self.assertIsNone(result)
+        joined = "\n".join(cm.output)
+        self.assertIn("[600000]", joined)
+        self.assertNotIn("[999001]", joined)

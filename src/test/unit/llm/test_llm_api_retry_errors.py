@@ -188,6 +188,38 @@ class TestCallLlmWithRetryHttpErrors(unittest.TestCase):
         self.assertIsNone(result)
         self.assertIsNone(usage)
         self.assertEqual(self.client.post.call_count, 3)
+
+    @patch("src.python.llm.api_base._cb_record_failure")
+    @patch("time.sleep")
+    def test_429_exhausted_forces_long_cooldown(self, mock_sleep, mock_failure):
+        """重试耗尽仍 429 → 以 cooldown=600 + force=True 立即长冷却熔断，消除后续无效先试。"""
+        from src.python.llm.api_base import _RATE_LIMIT_RECOVERY, call_llm_with_retry
+
+        self.client.post.return_value = _make_mock_response(429)
+        result, usage = call_llm_with_retry(**self.base_kw)
+
+        self.assertIsNone(result)
+        mock_failure.assert_called_once()
+        _args, kwargs = mock_failure.call_args
+        self.assertEqual(kwargs.get("cooldown"), _RATE_LIMIT_RECOVERY)
+        self.assertEqual(kwargs.get("cooldown"), 600)
+        self.assertIs(kwargs.get("force"), True)
+
+    @patch("src.python.llm.api_base._cb_record_failure")
+    @patch("time.sleep")
+    def test_non_429_retryable_keeps_default_cooldown(self, mock_sleep, mock_failure):
+        """非 429 的可重试失败（如超时）保持默认记录：无 force/cooldown 参数。"""
+        from src.python.llm.api_base import call_llm_with_retry
+
+        self.client.post.side_effect = [
+            __import__("httpx").TimeoutException("t"),
+            __import__("httpx").TimeoutException("t"),
+            __import__("httpx").TimeoutException("t"),
+        ]
+        result, usage = call_llm_with_retry(**self.base_kw)
+
+        self.assertIsNone(result)
+        mock_failure.assert_called_once_with(self.base_kw["url"])
         mock_failure.assert_called_once()
 
     @patch("src.python.llm.api_base._cb_record_success")

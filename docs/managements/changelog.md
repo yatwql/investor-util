@@ -13,6 +13,10 @@
 - **修复/报告侧**：**调试页窄视口溢出与打印 display 还原修复（rf-645，rf-113 附带发现）**——`test-chart.html` grid 列下限改 `minmax(min(420px,100%),1fr)`；`chart-print.js` beforeprint 记录 canvas 原内联 display、afterprint 按记录还原（未记录回退 block、周期末清空），替代置空串导致的 computed display 漂移；`test_feature_interactive.py` 补 4 回归用例。
 - **文档/需求**：**事件窗量化对照需求登记补齐（rf-646）**——`requirements.md` §6.16 + `R-EW-01..06` 六条需求行（先读实现后如实登记），`testplan.md` §2.1 补 6 行载体映射，`check-requirement-trace` 纳入 R-EW 域（38/38 域全量双向一致，后续新增不再漏报）。
 - **文档/结构**：**设计语言契约 DESIGN.md 迁入管理文档目录**——自仓库根移至 `docs/managements/DESIGN.md`（设计约束类文档归属管理文档区）；路径性引用同步（`check-style-guardrails.py` 真值路径、4 处契约测试路径、CLAUDE.md 设计契约入口与管理文档清单、developer-guide 设计契约链接、folders.md 目录树与统计口径；样式/模板中的注释性提及按文件名寻址，无需改动）。
+- **修复/LLM**：**provider 链路 429 长冷却与全挂延迟重试（rf-647，72h 日志分析立账）**——429 重试耗尽后以 `cooldown=600s + force=True` 立即熔断（`circuit_breaker` 新增参数，非 429 保持阈值语义），消除 kimi-main 每次调用白试 1~3 次的无效先试；`_execute_llm_with_finalize` 对瞬时类失败（network/timeout/api_error）延迟 `llm_full_fail_retry_delay`（默认 30s）整链重试 1 次，配额/熔断终态不重试；回归 7 用例（circuit force/cooldown 2 + 429 分支 2 + skeleton 重试 3）。
+- **修复/日志**：**实验横幅级别纠正（rf-649）**——`log_experimental_features` 横幅（`====` + `⚗` 各行）`ERROR` → `INFO`，72h 内 68 条 ERROR 中 65 条为该横幅的统计污染消除；回归用例断言横幅行全 INFO、零 ERROR。
+- **修复/数据**：**东财 push2 请求节流与穿透写入空数据降级（rf-650）**——push2 每次请求前随机间隔 0.05~0.2s 防同速批量触发反爬断连；`write_penetration_sheet` 空数据分支改 `.get("top10")` 消除 KeyError 整表写入失败（降级占位空 dict 路径），edge 用例回归「暂无穿透数据」优雅降级。
+- **日志分析/财报**：**财报 44 只两源全空定性修正与日志定位增强（rf-648，未闭环）**——定性修正：标的经 `collect_a_share_targets` 过滤后全为 A 股个股（原「基金噪音」判断错误），属真故障待根因探测；已完成：chain 失败日志补 doc_id 定位标识（`_tag_key = code or doc_id`），下轮生成可直接反查标的。
 
 
 （本次发布内容见下方归档索引）

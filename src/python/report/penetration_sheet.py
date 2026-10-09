@@ -347,7 +347,9 @@ def write_penetration_sheet(
 
     result = penetration_data if penetration_data is not None else compute_penetration_top10(holdings, details)
 
-    if not result["top10"]:
+    # .get 防御：调用方降级路径可能传入空 dict（穿透计算模块键缺失时的占位回退），
+    # 空数据应走「暂无穿透数据」分支优雅降级，而非在键访问处抛 KeyError 整表失败
+    if not result.get("top10"):
         write_data_row(ws, row, ["暂无穿透数据"])
         # 即使无 TOP10 数据，也检查是否有数据源失败需要展示状态
         data_status = build_penetration_data_status(result)

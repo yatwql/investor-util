@@ -166,6 +166,14 @@ def _mock_httpx(text: str = "", error: type | None = None):
     return MockClient
 
 
+@pytest.fixture(autouse=True)
+def _fast_throttle(monkeypatch):
+    """测试内屏蔽 push2 请求前随机间隔（节流本身由专项用例验证，其余用例不真睡）。"""
+    from src.python.providers import eastmoney_industry as ei
+
+    monkeypatch.setattr(ei.time, "sleep", lambda _s: None)
+
+
 class TestSecid(unittest.TestCase):
     """测试 _secid 前缀规则。"""
 
@@ -484,6 +492,24 @@ class TestIndustryExtendedFields(unittest.TestCase):
             self.assertEqual(second["pe"], 10.0)
             self.assertEqual(first["market_cap"], 1e11)
             mock_push2.assert_called_once_with("600900")
+
+    @patch("src.python.core.http_client.httpx.Client")
+    def test_request_applies_random_throttle(self, mock_client_cls):
+        """每次 push2 请求前随机间隔（防批量同速触发服务端反爬断连），间隔在声明档位内。"""
+        from src.python.providers import eastmoney_industry as ei
+
+        mock_client_cls.side_effect = _mock_httpx(json.dumps(_MOCK_SUCCESS_RESPONSE))
+        with (
+            patch.object(ei.time, "sleep") as mock_sleep,
+            patch.object(ei.random, "uniform", side_effect=lambda a, b: a) as mock_uniform,
+        ):
+            result = fetch_industry_and_concepts("600900")
+
+        self.assertIsNotNone(result)
+        mock_sleep.assert_called()
+        lo, hi = mock_uniform.call_args.args
+        self.assertGreaterEqual(lo, 0.05)
+        self.assertLessEqual(hi, 0.2)
 
 
 if __name__ == "__main__":

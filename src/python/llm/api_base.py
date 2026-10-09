@@ -74,6 +74,9 @@ __all__ = [
 
 # ── 上次失败的详细原因（供调用方区分失败类型，不改变函数签名） ──
 
+_RATE_LIMIT_RECOVERY = 600  # 429 重试耗尽后的端点熔断冷却（秒）：限速属配额/风控终态，
+# 常规 60s 冷却会在下一批调用时再次撞限速并重复整段重试，长冷却消除无效先试
+
 _last_llm_failure_reason: str | None = None
 """最近一次 LLM API 调用失败的详细原因（FAIL_REASON_* 常量），成功调用后为 None。"""
 
@@ -719,7 +722,11 @@ def call_llm_with_retry(
 
     if kind == "retryable":
         logger.warning("%s API %s（已重试 %d 次）", label, _retry_detail(info), max_retries)
-        _cb_record_failure(url)
+        if info == 429:
+            # 重试耗尽仍 429 = 端点限速终态：立即长冷却熔断，避免后续调用反复无效先试
+            _cb_record_failure(url, cooldown=_RATE_LIMIT_RECOVERY, force=True)
+        else:
+            _cb_record_failure(url)
         _last_llm_failure_reason = FAIL_REASON_TIMEOUT if info is None else FAIL_REASON_NETWORK_ERROR
         return (None, None)
 
