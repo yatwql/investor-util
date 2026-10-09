@@ -13,7 +13,13 @@ from collections.abc import Callable
 from typing import Any
 
 from src.python.cache import get_ttl
-from src.python.core.code_utils import is_a_share_code, is_exchange_fund_code, is_otc_code_overlap, is_otc_fund_by_name
+from src.python.core.code_utils import (
+    is_a_share_code,
+    is_exchange_fund_code,
+    is_otc_code_overlap,
+    is_otc_fund_by_name,
+    is_qdii_extended,
+)
 from src.python.fetcher.chain import FailureDiagnostics, fetch_with_fallback
 from src.python.providers import eastmoney, tencent
 from src.python.providers import sina as sina_provider
@@ -178,25 +184,36 @@ def _price_chain_slots() -> tuple[dict[str, tuple[str, _ProviderFunc]], dict[str
 # ── 公开接口 ─────────────────────────────────────────────────
 
 
-#: 场外/QDII 官方净值天然滞后一日的路由：其合法新鲜度阈值为「前一交易日」而非
-#: 「最近交易日」——海外市场时差与净值披露节奏决定 T-1 是正常态。按最近交易日判定
-#: 会把正常净值永远视为跨日残留 → 清缓存重取 → 重复请求并记 ``price_*_refresh`` 失败。
+#: 场外官方净值路由（``price_fund_otc``）。该路由同时承载国内场外基金与 QDII，
+#: 两者合法新鲜度不同：QDII 因海外时差与披露节奏 T-1 是正常态；国内场外 T 日当晚
+#: 即披露净值，盘后应已到 T。故阈值不能按路由一刀切，须再用 ``is_qdii_extended``
+#: 细分（见 ``_price_cache_fresh``）。
 _OTC_NAV_ROUTES = frozenset({"price_fund_otc"})
 
 
-def _price_cache_fresh(data: dict, data_type: str) -> bool:
+def _price_cache_fresh(data: dict, data_type: str, name: str = "") -> bool:
     """收市后验证价格缓存数据是否来自当前交易日。
 
     缓存命中的缓存若 price_date 早于**该路由允许的最新日期**，说明是跨日残留的过时
     数据（例如盘中 Tencent 降级到 EastMoney 写入的上一交易日净值），应强制刷新。
     盘中不验证（短 TTL 已保证实时性）。
 
-    新鲜度阈值按路由分域：场内行情要求等于最近交易日；场外/QDII 官方净值合法为
-    T-1，以前一交易日为阈值（否则正常净值被误判为过时并反复刷新）。
+    新鲜度阈值按路由分域：
+      - 场内行情（``price_stock``）要求等于最近交易日；
+      - 场外官方净值（``price_fund_otc``）再按基金类型细分：
+        QDII 合法为 T-1（以前一交易日为阈值），国内场外 T 日当晚即披露、
+        盘后应已到 T（以最近交易日为阈值）。
+
+    QDII 判定与 ``report.market_value.price_update_status`` 同源自
+    ``is_qdii_extended``，确保「缓存新鲜度门禁」与「价格更新状态」口径一致——
+    否则门禁会放行一份报告口径上已过期的国内场外缓存（T-1），导致价格更新状态
+    长期缺数。
 
     Args:
         data: 价格数据（含 ``price_date``）
         data_type: 价格路由（``price_stock`` / ``price_fund_otc``）
+        name: 持仓名称，用于区分 QDII 与国内场外（场外提供商返回的 ``name`` 常为空，
+            必须由调用方传入持仓名）
     """
     try:
         from src.python.core.market_hours import is_market_open as _mh_open
@@ -209,9 +226,11 @@ def _price_cache_fresh(data: dict, data_type: str) -> bool:
             return False
         td = _gtd()
         if data_type in _OTC_NAV_ROUTES:
-            from src.python.report.market_value import get_prev_trading_day as _gp
+            hint = name or data.get("name", "")
+            if is_qdii_extended(hint):
+                from src.python.report.market_value import get_prev_trading_day as _gp
 
-            td = _gp(td)
+                td = _gp(td)
         return pd >= td
     except Exception:
         logger.warning("[price] _price_cache_fresh 校验异常，保守视作新鲜", exc_info=True)
@@ -277,7 +296,7 @@ def _fetch_price_with_cache_refresh(
     else:
         _t.record(_src_key, "T2", success=False, failure_type="unreachable", message=diag.summary())
 
-    if r is not None and not _price_cache_fresh(r, data_type):
+    if r is not None and not _price_cache_fresh(r, data_type, expected_name):
         from src.python.cache import clear as _cache_clear
         from src.python.report.market_value import get_last_trading_day as _gtd
 

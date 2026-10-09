@@ -489,7 +489,7 @@ llm_providers.json
 | **429 诊断回显** | 端点返回 429 时日志先回显两级实际配置（全局 `llm_max_concurrency` + 该 provider 条目 `pacing.max_concurrency`、`pacing.min_interval`；端点约束未声明标「未配置（不限流）」、间隔未声明标「未配置」），再按**生效并发 = min(全局, 端点)**（端点未配置时即全局值）判定还有没有下降空间：未声明 `pacing` → 提示配置端点约束；生效并发 >1 → 只建议**绑定项**（等于生效并发的那一级：端点 < 全局只调端点、全局 < 端点只调全局、相等则两个都列；非绑定项注明「须低于对方现值才生效」）；生效并发 =1（端点已=1 或全局已=1）→ 明确**调低任何并发旋钮均不再减少该端点在途并发**（端点=1 时调低全局对 min(全局,1) 恒无效），不给无效建议，改指向 `min_interval`（带当前值）/请求速率与配额（RPM/TPM）/风控判断/切换 provider（`pacing._concurrency_hint`） |
 | **策略惰性装载兜底** | 注册表由 `_inject_provider_chain_data() → register_policies()` 在配置装载时写入；未经该路径的入口（单测 / 脚本 / `doctor` 概览）由 `pacing._ensure_loaded()` 兜底，按与生产装载**同源**的 `get_llm_config()._provider_list` 再装载一次——否则这些路径拿不到策略、静默按「无约束」处理（与上表「缺省零影响」语义混淆） |
 
-**与 403 的配合**：端点返回 403（配额/风控，如 5 小时窗口用尽、并发上限）时**不重试**——这类限制按时间窗口滚动而非瞬时故障，重试无益且高频重试会加剧风控画像。`_attempt_api_call` 将其归为 `("quota", 403)`，重试骨架直接返回并记 `FAIL_REASON_QUOTA_EXCEEDED`，报告显示「LLM 端点配额/风控限制已触发」并降级到下一 provider。**429 / 503 仍按 `max_retries` 重试**（真正的瞬时限制）。
+**与 403 的配合**：端点返回 403（配额/风控，如 5 小时窗口用尽、并发上限）时**不重试**——这类限制按时间窗口滚动而非瞬时故障，重试无益且高频重试会加剧风控画像。`_attempt_api_call` 将其归为 `("quota", 403)`，重试骨架直接返回并记 `FAIL_REASON_QUOTA_EXCEEDED`，报告显示「LLM 端点配额/风控限制已触发」并降级到下一 provider。**503 仍按 `max_retries` 重试**（真正的瞬时限制）；**429 归 `quota` 终态不重试**——限速属配额/风控终态，退避重试只是无效请求与日志噪音，首试即以 `_RATE_LIMIT_RECOVERY=600s` 长冷却熔断。
 
 ### 4.3 缓存预检查优化
 
@@ -722,25 +722,32 @@ call_gemini() Extended Thinking 注入
 
 ## 6. 重试与容错
 
-### 6.1 四层容错
+### 6.1 五层容错
 
 ```
 第 1 层：熔断器（circuit_breaker.py）
     ── call_llm_with_retry() 入口检查
     ── 连续 3 次失败 → 冷却 60s → 半开放行
+    ── 429 命中（quota 终态）→ 首试即 force 熔断、冷却 _RATE_LIMIT_RECOVERY=600s
     ── 熔断中直接跳过，不发起 HTTP
 
 第 2 层：重试骨架（api_base.py）
-    ── 可重试错误 (429/503/超时/网络异常) → 递增退避重试（1s/3s/5s/10s/15s）
+    ── 可重试错误 (503/超时/网络异常) → 递增退避重试（1s/3s/5s/10s/15s）
+    ── 配额/限速/风控终态 (429/403) → 不重试，记 FAIL_REASON_QUOTA_EXCEEDED 并降级
     ── 致命错误 (JSON 解析失败) → 不重试
     ── max_retries 默认 2（可通过 llm_settings.json 配置）；退避序列超出末位锁定末位
 
-第 3 层：截断自动重试（skeleton.py）
+第 3 层：全链延迟重试（skeleton.py）
+    ── 瞬时类全链路失败（FAIL_REASON_NETWORK_ERROR / TIMEOUT / API_ERROR）后，
+       等待 llm_full_fail_retry_delay（默认 30s，0=不等待）整链重试 1 次
+    ── 配额耗尽 / 熔断中属终态（窗口滚动 / 冷却未到），不进入此分支
+
+第 4 层：截断自动重试（skeleton.py）
     ── 检测输出含 _TRUNCATION_MARKER
     ── max_tokens × 1.5 重试一次
     ── 二次截断则保留第一次结果 + 尾部警告
 
-第 4 层：空内容处理（api.py）
+第 5 层：空内容处理（api.py）
     ── `_extract_content` 无 text block → 返回 None，若曾开启 thinking
        且判定为思考耗尽 → 先关闭 thinking 同 provider 重试一次（安全网）
        （DeepSeek V4 强制推理模型思考部分耗尽 max_tokens 预算时响应仅含
@@ -771,7 +778,8 @@ policy = replace(_RETRY_POLICY, attempts=max(1, max_retries + 1))   # 尝试次�
 |:-----|:------|:---------|
 | `FAIL_REASON_CIRCUIT_OPEN` | 熔断开启 | 冷却期内跳过请求 |
 | `FAIL_REASON_TIMEOUT` | 请求超时 | 超过 timeout 秒数未收到响应 |
-| `FAIL_REASON_NETWORK_ERROR` | 网络异常 | HTTP 错误（429/503 等） |
+| `FAIL_REASON_NETWORK_ERROR` | 网络异常 | 传输失败 / 503 等非 429 HTTP 错误 |
+| `FAIL_REASON_QUOTA_EXCEEDED` | 配额/限速/风控终态 | 429 / 403（不重试；429 首试即长冷却熔断，不进入全链延迟重试） |
 | `FAIL_REASON_API_ERROR` | API 响应异常 | JSON 解析失败、响应格式异常 |
 | `FAIL_REASON_DISABLED` | 模块已禁用 | enabled_llm.xxx = false |
 | `FAIL_REASON_NOT_CONFIGURED` | LLM 未配置 | get_llm_config() 返回 None |
@@ -1252,6 +1260,7 @@ reload_pricing() → 合并 llm_settings.json → pricing
   pricing
   llm_max_concurrency
   llm_max_thinking_concurrency
+  llm_full_fail_retry_delay
   news_correlation_top_n
   debate
   fact_check

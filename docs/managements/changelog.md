@@ -9,8 +9,8 @@
 
 ## [0.12.9-dev] - 开发中（未发布）
 
-
-（本次发布内容见下方归档索引）
+- **修复/数据**：**场外净值缓存新鲜度门禁按基金类型分域（rf-652）**——`_price_cache_fresh` 新增 `name` 形参并按 `is_qdii_extended` 细化阈值：QDII 官方净值合法 T-1（不变），国内场外 T 日当晚披露、盘后要求 T；两处调用点传入持仓名（`fetcher/price.py` 强刷路径 `expected_name`、`report/market_value.py` CACHE_ONLY 路径 `h.name`），与 `price_update_status` 口径同源。修前实测 5 只国内场外缓存停在 T-1 被误判新鲜、报告「价格更新状态」8/13（东财已返回 T），修后盘后强刷取到 T。回归 4 项。
+- **技术债/文档+配置**：**过去 72h 实现核查三项修复（rf-653）**——① rf-647 的 429 行为变更（归 `quota` 终态、首试即 600s 长冷却熔断、零退避重试）同步入 `llm-technical.md`（§4.2 与 403 的配合、§6.1 容错层次新增「全链延迟重试」、§6.2 重试表、§6.3 失败原因表补 `FAIL_REASON_QUOTA_EXCEEDED`、§12.2 全局键）、`requirements.md`（R-LLM-10 与 `max_retries` 说明）、`technical.md`（LLM 降级与 C26）、`developer-guide.md`；② `llm_full_fail_retry_delay` 补入 `_DEFAULT_LLM_SETTINGS`/模板/已知键集（原 `skeleton` 直接读取却未登记，用户设置会被判「未知配置项」），加「默认集 ⊆ 已知键集」结构回归；③ `_factor_zoo` 根路径收敛为包 `__init__.py` 的 `PROJECT_ROOT` 单一来源（原 catalog/metrics/stages 三处各算 `parents[2]`）。
 
 ## 归档
 

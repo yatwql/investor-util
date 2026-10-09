@@ -1,6 +1,6 @@
 # 投资复盘助手 - 自我审查问题记录
 > 文档版本：0.12.9-dev
-> **编号源**：`rf-next = 652`（新增问题取此编号，完成后更新为 +1；已用最大 rf-651，递增保证唯一，归档不回收。若与历史归档冲突，运行 `scripts/check-task-numbering.py` 校验）
+> **编号源**：`rf-next = 654`（新增问题取此编号，完成后更新为 +1；已用最大 rf-653，递增保证唯一，归档不回收。若与历史归档冲突，运行 `scripts/check-task-numbering.py` 校验）
 
 ---
 
@@ -47,7 +47,9 @@
 
 ## 已解决问题
 
+- rf-652 已修复（2026-10-10，用户报告盘后「价格更新状态 8/13」长期缺数）：**场外净值缓存新鲜度门禁对国内场外误用 QDII 的 T-1 阈值**——`_OTC_NAV_ROUTES`（`price_fund_otc`）把国内场外与 QDII 一律按前一交易日判新鲜，而国内场外 T 日当晚即披露净值、盘后应已达 T；实测数据源（东财）已返回 T（10-09），缓存仍停在 T-1（10-08）被门禁放行，报告口径（`price_update_status` 国内场外仅认 T）与缓存口径不一致 → 5 只国内场外长期计为未更新。修复：`_price_cache_fresh` 增 `name` 形参并按 `is_qdii_extended` 细分（QDII 保留 T-1、国内场外要求 T），两处调用点传入持仓名（`fetcher/price.py` 强刷路径 `expected_name`、`report/market_value.py` CACHE_ONLY 路径 `h.name`）。回归 4 项（QDII T-1 新鲜 / 国内场外 T-1 过时 / 国内场外 T 新鲜 / 端到端强刷并验证持仓名转发）；`unit/fetcher` + `unit/report` 3076 项全绿。
 
+- rf-653 已处置（2026-10-10，过去 72h 实现技术债核查：BASE=`424f25b5^..HEAD`，78 提交）：三项修复——① **LLM 429 行为变更后文档未同步**：rf-647 把 429 由「可重试」改判 `quota` 终态（首试即 600s 长冷却熔断、零退避重试），但 `llm-technical.md`（§4.2 与 403 的配合 / §6.1「四层容错」/ §6.2 重试表 / §6.3 失败原因表）、`requirements.md`（R-LLM-10 + `max_retries` 说明）、`technical.md`（LLM 降级 + C26）、`developer-guide.md`（测试载体描述）仍写 429 重试——按实现改写，并把 429 长冷却与「全链延迟重试（`llm_full_fail_retry_delay`）」补入容错层次与失败原因表；② **`llm_full_fail_retry_delay` 未登记为已知键**：`skeleton._execute_llm_with_finalize` 直接读取该键，但 `_DEFAULT_LLM_SETTINGS` 与 `get_known_llm_settings_keys()` 均无——用户在 `llm_settings.json` 设置会被判「未知配置项…请删除」，与消费端读取矛盾；补入默认集/模板/已知键集，并加结构回归（默认集 ⊆ 已知键集 + 设置该键不产生未知键告警）；③ **`_factor_zoo` 包内根路径三处重复计算**：`catalog/metrics/stages` 各自 `Path(__file__).resolve().parents[2]`（rf-636 同类「拆包后层级算错静默失效」风险），收敛为包 `__init__.py` 的 `PROJECT_ROOT` 单一来源。
 
 ### 归档档案
 

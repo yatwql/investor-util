@@ -18,6 +18,8 @@ _DEFAULT_LLM_SETTINGS: dict[str, Any] = {
     "max_retries": 2,
     "llm_max_concurrency": 3,
     "llm_max_thinking_concurrency": 1,
+    # 全链路失败（网络/超时/接口异常）后整链重试 1 次的等待秒数（0 = 不等待）
+    "llm_full_fail_retry_delay": 30,
     "enabled_llm": {
         "global_macro": True,
         "expert_review": True,
@@ -199,6 +201,9 @@ def _get_default_llm_settings_template() -> str:
     lines.append(f'  "max_retries": {d["max_retries"]},')
     lines.append(f'  "llm_max_concurrency": {d["llm_max_concurrency"]},')
     lines.append(f'  "llm_max_thinking_concurrency": {d["llm_max_thinking_concurrency"]},')
+    lines.append(
+        _kv("llm_full_fail_retry_delay", "// 全链路失败（网络/超时/接口异常）后整链重试 1 次的等待秒数（0=不等待）")
+    )
 
     # ── 模块开关 ──
     _section("模块开关 — 控制各 LLM 分析功能的启用/停用")
