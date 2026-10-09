@@ -1,5 +1,5 @@
 # 测试覆盖统计
-> 文档版本：0.12.8-dev
+> 文档版本：0.12.8
 
 > ⚠ 以下测试项数为撰写时的快照值，实际计数随版本迭代而变化。`模式对应测试量` 表由 `--mode bench --update-docs` 自动回填本机实测；功能域/分组等子表精确统计请运行 `scripts/collect-test-coverage.py`（或 `pytest src/test/ --collect-only -q`）获取实时计数。
 
@@ -10,19 +10,19 @@
 <!-- mode-count-table:start -->
 | `--mode` 值 | 覆盖项数 | 典型耗时 |
 |:------------|:--------:|:--------:|
-| `unit` | **9431** | ~31s |
-| `standard` | **8261** | ~23s |
-| `scenario` | **257** | ~7s |
-| `regression` | **257** | ~7s |
-| `dev-verify` | **6442** | ~31s |
-| `verify` | **9127** | ~33s |
-| `integration` | **299** | ~8s |
-| `edge` | **1102** | ~12s |
+| `unit` | **9463** | ~32s |
+| `standard` | **8292** | ~24s |
+| `scenario` | **257** | ~11s |
+| `regression` | **257** | ~11s |
+| `dev-verify` | **6465** | ~35s |
+| `verify` | **9159** | ~33s |
+| `integration` | **299** | ~10s |
+| `edge` | **1103** | ~15s |
 | `data` | **70** | ~3s |
-| `all` | **9784** | ~38s |
+| `all` | **9816** | ~38s |
 | `smoke` | **26** | ~3s |
-| `report` | **2464** | ~22s |
-| `all_no_unit` | **353** | ~8s |
+| `report` | **2471** | ~20s |
+| `all_no_unit` | **353** | ~10s |
 | `scenario_extreme` | **9** | ~3s |
 <!-- mode-count-table:end -->
 
@@ -62,20 +62,20 @@
 <!-- duration-table:start -->
 | `--mode` | dragonball（2026-10-09 实测） | stallman-NB1（2026-10-02 实测） |
 |:---------|:---------------------------:|:---:|
-| `unit` | ~31s | ~3min |
-| `standard` | ~23s | ~3min |
-| `scenario` | ~7s | ~51s |
-| `regression` | ~7s | ~1min |
-| `verify,regression` | ~40s（verify+regression 顺序之和） | ~5min（verify+regression 顺序之和） |
-| `dev-verify` | ~31s | ~4min |
+| `unit` | ~32s | ~3min |
+| `standard` | ~24s | ~3min |
+| `scenario` | ~11s | ~51s |
+| `regression` | ~11s | ~1min |
+| `verify,regression` | ~44s（verify+regression 顺序之和） | ~5min（verify+regression 顺序之和） |
+| `dev-verify` | ~35s | ~4min |
 | `verify` | ~33s | ~4min |
-| `integration` | ~8s | ~2min |
-| `edge` | ~12s | ~1min |
+| `integration` | ~10s | ~2min |
+| `edge` | ~15s | ~1min |
 | `data` | ~3s | ~31s |
 | `all` | ~38s | ~4min |
 | `smoke` | ~3s | ~28s |
-| `report` | ~22s | ~2min |
-| `all_no_unit` | ~8s | ~1min |
+| `report` | ~20s | ~2min |
+| `all_no_unit` | ~10s | ~1min |
 | `scenario_extreme` | ~3s | ~32s |
 | 数据更新时间 | 2026-10-09 | 2026-10-02 |
 <!-- duration-table:end -->
