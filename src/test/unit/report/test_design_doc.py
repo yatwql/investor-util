@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-"""设计语言契约（仓库根 DESIGN.md）结构守卫。
+"""设计语言契约（docs/managements/DESIGN.md）结构守卫。
 
 契约是 UI 改动的首个读取入口，断言其骨架不漂移：
 必需节子集存在、护栏条目连续编号且 DO/DON'T 对偶、角色族覆盖、
@@ -13,7 +13,7 @@ import pytest
 pytestmark = [pytest.mark.unit, pytest.mark.unit_report]
 
 REPO_ROOT = Path(__file__).resolve().parents[4]
-DESIGN_DOC = REPO_ROOT / "DESIGN.md"
+DESIGN_DOC = REPO_ROOT / "docs" / "managements" / "DESIGN.md"
 
 # 契约必需节（子集断言：只防删除/改名，不锁总数）
 REQUIRED_SECTIONS = [

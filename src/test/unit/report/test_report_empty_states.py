@@ -22,7 +22,7 @@ _ROOT = pathlib.Path(__file__).resolve().parents[4]
 _TMPL = _ROOT / "src/static/tmpl"
 _REPORT = _TMPL / "report_template.html"
 _WHATIF = _TMPL / "whatif_template.html"
-_DESIGN = _ROOT / "DESIGN.md"
+_DESIGN = _ROOT / "docs" / "managements" / "DESIGN.md"
 _SUMMARY_PY = _ROOT / "src/python/report/summary.py"
 
 

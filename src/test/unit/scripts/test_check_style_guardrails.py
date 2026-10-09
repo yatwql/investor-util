@@ -149,7 +149,7 @@ class TestRealRepoSmoke:
 
     def test_radius_tiers_match_design(self, guard):
         """圆角档位与 DESIGN.md Layout「圆角档」同源（4/6/8 明文 + 999 药丸）。"""
-        design = (_REPO_ROOT / "DESIGN.md").read_text(encoding="utf-8")
+        design = (_REPO_ROOT / "docs" / "managements" / "DESIGN.md").read_text(encoding="utf-8")
         for tier in ("4px", "6px", "8px"):
             assert tier in design, f"DESIGN Layout 应含圆角档 {tier}"
         assert guard.RADIUS_TIERS >= {4, 6, 8, 999}

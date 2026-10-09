@@ -48,7 +48,7 @@ STYLE_DOMAIN = (
 RADIUS_TIERS = frozenset({4, 6, 8, 999})
 
 #: DESIGN.md 文件（Colors / Layout 真值来源）
-DESIGN_DOC = "DESIGN.md"
+DESIGN_DOC = "docs/managements/DESIGN.md"
 
 _COMMENT_PREFIXES = ("/*", "*", "//", "<!--", "#")
 _TOKEN_DEF = re.compile(r"--[\w-]+\s*:")  # 行内任意位置的变量定义形态（含单行 :root {...}）

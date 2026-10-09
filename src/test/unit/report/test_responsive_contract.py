@@ -19,7 +19,7 @@ _ROOT = pathlib.Path(__file__).resolve().parents[4]
 _REPORT = _ROOT / "src/static/tmpl/report_template.html"
 _WHATIF = _ROOT / "src/static/tmpl/whatif_template.html"
 _WORKBENCH = _ROOT / "src/static/web/style.css"
-_DESIGN = _ROOT / "DESIGN.md"
+_DESIGN = _ROOT / "docs" / "managements" / "DESIGN.md"
 
 
 _checklib = load_script("_checklib.py")

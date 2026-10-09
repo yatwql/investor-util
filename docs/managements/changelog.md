@@ -9,6 +9,8 @@
 
 ## [0.12.8-dev] - 开发中（未发布）
 
+- **文档/结构**：**设计语言契约 DESIGN.md 迁入管理文档目录**——自仓库根移至 `docs/managements/DESIGN.md`（设计约束类文档归属管理文档区）；路径性引用同步（`check-style-guardrails.py` 真值路径、4 处契约测试路径、CLAUDE.md 设计契约入口与管理文档清单、developer-guide 设计契约链接、folders.md 目录树与统计口径；样式/模板中的注释性提及按文件名寻址，无需改动）。
+
 
 （本次发布内容见下方归档索引）
 
