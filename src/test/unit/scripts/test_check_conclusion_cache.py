@@ -11,7 +11,6 @@
 
 from __future__ import annotations
 
-import importlib.util
 import json
 import os
 import subprocess
@@ -19,6 +18,7 @@ import sys
 from pathlib import Path
 
 import pytest
+from src.test._script_loader import load_script
 
 _REPO_ROOT = Path(__file__).resolve().parents[4]
 _SCRIPTS_DIR = _REPO_ROOT / "scripts"
@@ -30,16 +30,6 @@ pytestmark = [
 
 #: 参与结论缓存的守护（脚本名，不含 .py）
 _CACHED_GUARDS = ("check-doc-traces", "check-semantic-index", "check-doc-links")
-
-
-def _load_checklib():
-    """按文件名加载 scripts/_checklib.py（规避 import 路径限制）。"""
-    spec = importlib.util.spec_from_file_location("_checklib_under_test", _SCRIPTS_DIR / "_checklib.py")
-    mod = importlib.util.module_from_spec(spec)
-    assert spec.loader is not None
-    sys.modules["_checklib_under_test"] = mod
-    spec.loader.exec_module(mod)
-    return mod
 
 
 def _run_guard(name: str, cache_dir: Path) -> tuple[int, str]:
@@ -83,7 +73,7 @@ class TestConclusionCacheHelper:
 
     def test_roundtrip_pass_conclusion_cached(self, monkeypatch, tmp_path):
         """空 findings（通过结论）保存后可原样回放。"""
-        mod = _load_checklib()
+        mod = load_script("_checklib.py", module_name="_checklib_under_test")
         monkeypatch.setenv("CHECK_CONCLUSION_CACHE_DIR", str(tmp_path / "cache"))
         doc, logic = self._inputs(tmp_path)
         mod.conclusion_cache_save("ns_pass", [logic], [doc], {"findings": []})
@@ -91,7 +81,7 @@ class TestConclusionCacheHelper:
 
     def test_roundtrip_findings_conclusion_cached(self, monkeypatch, tmp_path):
         """非空 findings（发现结论）与附带回放字段同样缓存——不只缓存通过。"""
-        mod = _load_checklib()
+        mod = load_script("_checklib.py", module_name="_checklib_under_test")
         monkeypatch.setenv("CHECK_CONCLUSION_CACHE_DIR", str(tmp_path / "cache"))
         doc, logic = self._inputs(tmp_path)
         mod.conclusion_cache_save("ns_fail", [logic], [doc], {"findings": ["a.md:1 痕迹", "b.md:2 痕迹"], "total": 2})
@@ -102,7 +92,7 @@ class TestConclusionCacheHelper:
 
     def test_input_content_change_misses(self, monkeypatch, tmp_path):
         """输入文件时间戳/内容变化 → 必失配（全量重算）。"""
-        mod = _load_checklib()
+        mod = load_script("_checklib.py", module_name="_checklib_under_test")
         monkeypatch.setenv("CHECK_CONCLUSION_CACHE_DIR", str(tmp_path / "cache"))
         doc, logic = self._inputs(tmp_path)
         mod.conclusion_cache_save("ns_a", [logic], [doc], {"findings": []})
@@ -112,7 +102,7 @@ class TestConclusionCacheHelper:
 
     def test_input_file_set_change_misses(self, monkeypatch, tmp_path):
         """输入文件集增删 → 必失配（新增/删除文件改变扫描面）。"""
-        mod = _load_checklib()
+        mod = load_script("_checklib.py", module_name="_checklib_under_test")
         monkeypatch.setenv("CHECK_CONCLUSION_CACHE_DIR", str(tmp_path / "cache"))
         doc, logic = self._inputs(tmp_path)
         mod.conclusion_cache_save("ns_b", [logic], [doc], {"findings": []})
@@ -123,7 +113,7 @@ class TestConclusionCacheHelper:
 
     def test_logic_change_misses(self, monkeypatch, tmp_path):
         """收集逻辑（脚本字节）变化 → 必失配（结论随逻辑版本失效）。"""
-        mod = _load_checklib()
+        mod = load_script("_checklib.py", module_name="_checklib_under_test")
         monkeypatch.setenv("CHECK_CONCLUSION_CACHE_DIR", str(tmp_path / "cache"))
         doc, logic = self._inputs(tmp_path)
         mod.conclusion_cache_save("ns_c", [logic], [doc], {"findings": []})
@@ -132,7 +122,7 @@ class TestConclusionCacheHelper:
 
     def test_corrupt_cache_is_miss(self, monkeypatch, tmp_path):
         """缓存文件损坏/结构非法 → 按未命中处理（全量重算），不得抛异常。"""
-        mod = _load_checklib()
+        mod = load_script("_checklib.py", module_name="_checklib_under_test")
         monkeypatch.setenv("CHECK_CONCLUSION_CACHE_DIR", str(tmp_path / "cache"))
         doc, logic = self._inputs(tmp_path)
         path = mod.conclusion_cache_dir() / "ns_d.json"

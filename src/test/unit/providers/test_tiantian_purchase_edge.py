@@ -96,7 +96,7 @@ class TestParseFailure:
         assert parse_purchase_table(_response_body([row])) is None
 
     def test_zero_limit_parses_to_none(self):
-        """0 元限额 → daily_limit=None（「限额未知」的解析层单点转换，风险 R4）。"""
+        """0 元限额 → daily_limit=None（「限额未知」的解析层单点转换，不显示 0 元）。"""
         row = _well_formed_row()
         row[9] = "0"
         payload = parse_purchase_table(_response_body([row]))

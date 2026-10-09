@@ -23,8 +23,11 @@ import pytest
 _UNIT_ROOT = Path(__file__).resolve().parent
 
 # 子目录名 → unit_* 标记名
+# 目录结构绑定：键集必须与 scripts/check-test-markers.py 的 `EXPECTED_DIR_MARKERS`
+# 中 unit/* 部分一致（单测双向校验），新增/重命名 unit 子目录时两处同步。
 _DIR_TO_MARKER: dict[str, str] = {
     "analysis": "unit_analysis",
+    "cache": "unit_core",
     "cli": "unit_cli",
     "config": "unit_config",
     "core": "unit_core",
@@ -34,6 +37,8 @@ _DIR_TO_MARKER: dict[str, str] = {
     "news": "unit_news",
     "providers": "unit_providers",
     "report": "unit_report",
+    "scripts": "unit_scripts",
+    "startup": "unit_ui",
     "ui": "unit_ui",
     "web": "unit_web",
 }

@@ -109,10 +109,13 @@ def circuit_status_snapshot() -> dict[str, dict[str, Any]]:
 
 
 def _register_to_core_gateway() -> None:
-    """把 LLM 熔断快照注册进 core 网关（模块导入时执行一次）。"""
-    from src.python.core.circuit_breaker import register_breaker_status
+    """把 LLM 熔断快照与展示判定注册进 core 网关（模块导入时执行一次）。"""
+    from src.python.core.circuit_breaker import register_breaker_status, register_circuit_text
 
     register_breaker_status("llm", circuit_status_snapshot)
+    # 晚绑定回调：经模块全局解析 get_circuit_status，展示层只拿到 core 侧的
+    # 注册面，不反向 import 本模块；也便于用例替换判定函数。
+    register_circuit_text(lambda endpoint: get_circuit_status(endpoint))
 
 
 _register_to_core_gateway()

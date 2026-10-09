@@ -5,10 +5,11 @@
 所在目录的预期匹配，避免新文件漏标导致标记体系退化。
 
 通过标准：
-  - unit/ 下每个文件必须包含 unit_* 子标记（unit/conftest.py 已有运行时强制）
-  - scenario/ 下每个测试类必须包含对应 scenario_* 标记
+  - unit/ 下每个文件按目录期望须含对应 unit_* 子标记（unit/conftest.py 已有运行时强制）
+  - scenario/ 下每个文件按目录期望须含对应 scenario_* 标记
   - _edge.py 文件必须包含 pytest.mark.edge
-  - 所有 pytestmark 中不得引用已移除的标记（如 integration）
+  - 标记须在 src/test/conftest.py 注册集内（`KNOWN_MARKERS` 由该文件 AST 派生，conftest 新增标记自动跟随）
+  - `DEPRECATED_MARKERS` 登记的已移除标记不得出现（当前登记集为空）
 
 用法：
   python scripts/check-test-markers.py          # 检查全部
@@ -17,7 +18,7 @@
 
 退出码：
   0 — 全部通过
-  1 — 存在违规
+  2 — 存在违规（与 _checklib.report 返回值域一致）
 """
 
 from __future__ import annotations
@@ -31,11 +32,17 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))  # 同目录共享设�
 from _checklib import REPO_ROOT, add_common_args, rel, report  # noqa: E402,F401
 
 TEST_DIR = REPO_ROOT / "src" / "test"
+#: 标记注册的单一事实来源（`pytest_configure` 里的 `addinivalue_line("markers", …)`）
+CONFTEST_PATH = REPO_ROOT / "src" / "test" / "conftest.py"
 
 # 期望的标记映射：子目录名 → 应含的标记名集合
-# unit_* 标记由 conftest.py 运行时强制，此处只做静态扫描辅助
+# 目录结构绑定：键必须是 `src/test/` 下真实存在的子目录（unit/* 与 scenario/* 全覆盖，
+# 由单测双向校验）；子集语义是「至少命中其一」，故 `unit/handlers` 取 `unit_core`（该目录无专属标记）。
 EXPECTED_DIR_MARKERS: dict[str, set[str]] = {
     # unit 子模块 — 由 pytestmark 模块级列表覆盖
+    "unit/analysis": {"unit", "unit_analysis"},
+    "unit/cache": {"unit", "unit_core"},
+    "unit/cli": {"unit", "unit_cli"},
     "unit/config": {"unit", "unit_config"},
     "unit/core": {"unit", "unit_core"},
     "unit/fetcher": {"unit", "unit_fetcher"},
@@ -44,65 +51,47 @@ EXPECTED_DIR_MARKERS: dict[str, set[str]] = {
     "unit/news": {"unit", "unit_news"},
     "unit/providers": {"unit", "unit_providers"},
     "unit/report": {"unit", "unit_report"},
-    "unit/analysis": {"unit", "unit_analysis"},
-    "unit/cli": {"unit", "unit_cli"},
-    "unit/ui": {"unit", "unit_ui"},
     "unit/scripts": {"unit", "unit_scripts"},
+    "unit/startup": {"unit", "unit_ui"},
+    "unit/ui": {"unit", "unit_ui"},
+    "unit/web": {"unit", "unit_web"},
     # scenario 子模块
     "scenario/basic": {"scenario", "scenario_basic"},
-    "scenario/resilience": {"scenario", "scenario_resilience", "scenario_extreme"},
-    "scenario/llm": {"scenario", "scenario_llm", "llm"},
     "scenario/datetime": {"scenario", "scenario_datetime"},
+    "scenario/llm": {"scenario", "scenario_llm", "llm"},
+    "scenario/perf": {"scenario", "scenario_perf"},
+    "scenario/resilience": {"scenario", "scenario_resilience", "scenario_extreme"},
+    "scenario/security": {"scenario", "scenario_security"},
 }
 
 # 已移除的标记（不得出现）— 当前无已移除标记
 DEPRECATED_MARKERS: set[str] = set()
 
-# 已知的合法标记全集（与 src/test/conftest.py 注册保持一致）
-KNOWN_MARKERS = {
-    "scenario",
-    "scenario_basic",
-    "scenario_resilience",
-    "scenario_llm",
-    "scenario_datetime",
-    "scenario_stock",
-    "scenario_fund",
-    "scenario_mixed_accounts",
-    "scenario_new_holdings",
-    "scenario_cache_hit",
-    "scenario_bond",
-    "scenario_network_down",
-    "scenario_single_holding",
-    "scenario_zero_cost",
-    "scenario_extreme",
-    "scenario_perf",
-    "scenario_security",
-    "unit",
-    "unit_providers",
-    "unit_fetcher",
-    "unit_llm",
-    "unit_news",
-    "unit_report",
-    "unit_config",
-    "unit_core",
-    "unit_cli",
-    "unit_ui",
-    "unit_analysis",
-    "unit_scripts",
-    "unit_web",
-    "edge",
-    "smoke",
-    "data",
-    "llm",
-    "integration",
-    "integration_contract",
-    "integration_isolation",
-    "integration_news_pipeline",
-    "integration_cache",
-    "integration_tui",
-    "integration_cli",
-    "live",
-}
+
+def registered_markers(conftest_path: Path = CONFTEST_PATH) -> set[str]:
+    """从 `conftest.py` 的 `pytest_configure` 提取 `addinivalue_line("markers", …)` 注册的标记名。
+
+    AST 解析（不执行 conftest），值取 `"名称: 说明"` 的冒号前部分；多行调用与相邻字符串
+    字面量拼接由 `ast` 天然处理。标记清单只此一处事实源，conftest 新增/删除标记后本脚本
+    自动跟随，不再靠人肉对表。
+    """
+    tree = ast.parse(conftest_path.read_text(encoding="utf-8"))
+    names: set[str] = set()
+    for node in ast.walk(tree):
+        if not isinstance(node, ast.Call) or not isinstance(node.func, ast.Attribute):
+            continue
+        if node.func.attr != "addinivalue_line" or len(node.args) < 2:
+            continue
+        group, value = node.args[0], node.args[1]
+        if not isinstance(group, ast.Constant) or group.value != "markers":
+            continue
+        if isinstance(value, ast.Constant) and isinstance(value.value, str) and value.value.strip():
+            names.add(value.value.split(":", 1)[0].strip())
+    return names
+
+
+#: 已知的合法标记全集（与 src/test/conftest.py 注册集同源派生，见 `registered_markers`）
+KNOWN_MARKERS: set[str] = registered_markers()
 
 
 def _extract_markers_from_file(filepath: Path) -> set[str]:

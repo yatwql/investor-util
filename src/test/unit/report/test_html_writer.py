@@ -209,7 +209,11 @@ class TestCandidateCompareTemplate(unittest.TestCase):
     def setUp(self):
         from jinja2 import Environment
 
+        from src.python.report.html_jinja_env import _ENV
+
+        # 片段取自真实模板，须继承生产过滤器（含匿名化代码列 anon_code）
         self.env = Environment()
+        self.env.filters.update(_ENV.filters)
         tmpl_path = os.path.join(
             os.path.dirname(__file__),
             "..",

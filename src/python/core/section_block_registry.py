@@ -134,7 +134,7 @@ SECTION_BLOCK_SPECS: dict[str, SectionBlockSpec] = {
         modules=("llm_content.py",),
     ),
     "portfolio_history_drawdown": SectionBlockSpec.both(
-        ("走势表", "回撤矩阵", "危机区间标注"),
+        ("走势表", "回撤矩阵", "危机区间标注", "月度收益日历"),
         partials=("portfolio_history_drawdown_section.html",),
         modules=("portfolio_history_drawdown_sheet.py",),
     ),

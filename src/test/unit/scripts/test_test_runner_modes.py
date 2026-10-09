@@ -14,22 +14,10 @@ check-test-redundancy 全量 AST 解析约 3.5s/次，一轮任务最多跑 3 �
 
 from __future__ import annotations
 
-import importlib.util
 import itertools
-from pathlib import Path
 
 import pytest
-
-_REPO_ROOT = Path(__file__).resolve().parents[4]
-_MODES_PATH = _REPO_ROOT / "scripts" / "_test_runner" / "modes.py"
-
-
-def _load_modes():
-    spec = importlib.util.spec_from_file_location("_test_runner_modes_under_test", _MODES_PATH)
-    mod = importlib.util.module_from_spec(spec)
-    assert spec.loader is not None
-    spec.loader.exec_module(mod)
-    return mod
+from src.test._script_loader import load_script
 
 
 @pytest.mark.unit_scripts
@@ -38,20 +26,20 @@ class TestDevVerifyPreflightDedup:
 
     def test_preflight_is_numbering_only(self):
         """preflight 命令清单必须恰好是任务编号快检一项。"""
-        modes = _load_modes()
+        modes = load_script("_test_runner/modes.py", module_name="_test_runner_modes_under_test")
         scripts = [cmd[1] for cmd in modes.MODES["dev-verify"].get("preflight", [])]
         assert scripts == ["scripts/check-task-numbering.py"]
 
     def test_heavy_guards_not_in_preflight(self):
         """重量守护不得回到预检（否则同树重复执行回归）。"""
-        modes = _load_modes()
+        modes = load_script("_test_runner/modes.py", module_name="_test_runner_modes_under_test")
         joined = " ".join(" ".join(cmd) for cmd in modes.MODES["dev-verify"].get("preflight", []))
         assert "check-doc-drift" not in joined
         assert "check-test-redundancy" not in joined
 
     def test_preflight_entries_are_ci_guards(self):
         """预检条目必须指向 scripts/ 下的守护脚本并带 --ci（契约不破形）。"""
-        modes = _load_modes()
+        modes = load_script("_test_runner/modes.py", module_name="_test_runner_modes_under_test")
         preflight = modes.MODES["dev-verify"].get("preflight", [])
         assert preflight, "preflight 不得为空（fail-fast 快检须保留）"
         for cmd in preflight:
@@ -76,7 +64,7 @@ class TestDevVerifySinglePhaseMerge:
 
     @staticmethod
     def _phase() -> dict:
-        modes = _load_modes()
+        modes = load_script("_test_runner/modes.py", module_name="_test_runner_modes_under_test")
         phases = modes.MODES["dev-verify"]["phases"]
         assert len(phases) == 1, "dev-verify 必须单阶段（合一后回退两阶段会重复付收集与 worker 启动）"
         return phases[0]
@@ -103,3 +91,69 @@ class TestDevVerifySinglePhaseMerge:
     def test_timeout_budget_is_sum_of_legacy_phases(self):
         """超时预算 = 原两阶段 300s×2 之和（合并不缩总预算、不放宽单轮包络）。"""
         assert self._phase()["timeout_sec"] == 300 * 2
+
+
+@pytest.mark.unit_scripts
+class TestMarkerExprSingleSource:
+    """marker 表达式单源：MODES 是唯一定义处，编译谓词与 `-m` 实跑同源求值。"""
+
+    @staticmethod
+    def _modes():
+        return load_script("_test_runner/modes.py", module_name="_test_runner_modes_under_test")
+
+    def test_every_mode_resolves_compilable_expression(self):
+        """注册表里每个模式（含只有阶段 marker 的 dev-verify）都要能解析并编译。"""
+        modes = self._modes()
+        for name in modes.MODES:
+            expr = modes.mode_marker_expr(name)
+            assert isinstance(expr, str)
+            assert callable(modes.compile_marker_expr(expr))
+
+    def test_phase_marker_used_when_top_level_absent(self):
+        modes = self._modes()
+        assert "marker" not in modes.MODES["dev-verify"]
+        assert modes.mode_marker_expr("dev-verify") == modes.MODES["dev-verify"]["phases"][0]["marker"]
+
+    def test_top_level_marker_used_when_present(self):
+        modes = self._modes()
+        assert modes.mode_marker_expr("verify") == modes.MODES["verify"]["marker"]
+
+    def test_expression_follows_registry_edit(self, monkeypatch):
+        """改注册表里的表达式 → 解析结果跟着变（证明是读表而非抄写/缓存）。"""
+        modes = self._modes()
+        monkeypatch.setitem(modes.MODES, "unit", {**modes.MODES["unit"], "marker": "unit_report"})
+        pred = modes.compile_marker_expr(modes.mode_marker_expr("unit"))
+        assert pred({"unit_report"}) is True
+        assert pred({"unit_core"}) is False
+
+    def test_empty_expression_matches_everything(self):
+        """空表达式 = 不过滤（与 test-runner 空 marker 不传 -m 同口径）。"""
+        pred = self._modes().compile_marker_expr("")
+        assert pred({"live"}) is True
+        assert pred(set()) is True
+
+    @pytest.mark.parametrize(
+        ("expr", "markers", "expected"),
+        [
+            ("unit", {"unit"}, True),
+            ("unit", {"edge"}, False),
+            ("unit and not (edge or data)", {"unit"}, True),
+            ("unit and not (edge or data)", {"unit", "edge"}, False),
+            ("unit and not (edge or data)", {"unit", "data"}, False),
+            ("scenario or integration", {"integration"}, True),
+            ("scenario or integration", {"unit"}, False),
+            ("not unit and not live", {"scenario"}, True),
+            ("not unit and not live", {"live"}, False),
+            ("not unit and not live", {"unit"}, False),
+            ("scenario_extreme", {"scenario"}, False),
+            ("scenario_extreme", {"scenario_extreme"}, True),
+        ],
+    )
+    def test_boolean_semantics_match_dash_m(self, expr, markers, expected):
+        """真值表断言（与 -m 布尔语义逐项对拍，独立于实现写死期望）。"""
+        assert self._modes().compile_marker_expr(expr)(set(markers)) is expected
+
+    def test_malformed_expression_fails_loudly(self):
+        """语法错误在编译期暴露，不带病进入计数。"""
+        with pytest.raises(SyntaxError):
+            self._modes().compile_marker_expr("unit and")

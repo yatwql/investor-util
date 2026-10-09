@@ -104,6 +104,12 @@ def print_header() -> None:
     print(f"        {APP_NAME}  v{APP_VERSION}")
     print_sep()
 
+    # 页头常驻状态行（全本地取数、逐项降级、TTL 内记忆化）
+    from src.python.tui.status_line import build_status_line
+
+    print(f"  {build_status_line()}")
+    print()
+
     # 首次运行引导：检测是否缺少关键资源
     config = _config_cache if _config_cache is not None else refresh_config()
     holdings = os.path.join(config.get("holdings_dir", ""), config.get("holdings_filename", ""))

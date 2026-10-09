@@ -68,11 +68,11 @@ _PIPELINE_DATA_KNOWN_KEYS: set[str] = {
     # report/_experimental_seams.record_llm_decisions_and_review_block 注入；
     # 实验功能关闭或区块为空时键缺席，两条输出路径保持既有输出）
     "decision_review_data",
-    # 持仓变动复盘：快照差分事件清单/频率/结构演变/意图对账（实验开关
+    # 持仓变动复盘：快照差分事件清单/频率/结构演变/意图对账（报告章节与增强开关
     # `holding_change_review`，由 report/_experimental_seams.inject_holding_change_data
     # 注入；开关关闭时键缺席，整章隐藏）
     "holding_change_data",
-    # 事件窗量化对照：新闻事件窗口收益与文本极性对照表（实验开关
+    # 事件窗量化对照：新闻事件窗口收益与文本极性对照表（报告章节与增强开关
     # `event_window_impact`，由 report/_experimental_seams.inject_event_impact_data
     # 注入；开关关闭时键缺席，整章隐藏）
     "event_impact_data",

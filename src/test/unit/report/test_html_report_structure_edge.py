@@ -15,8 +15,12 @@ import re
 import unittest
 
 import pytest
+from src.test._script_loader import load_script
 
 pytestmark = [pytest.mark.unit, pytest.mark.unit_report, pytest.mark.edge]
+
+
+_checklib = load_script("_checklib.py")
 
 _TEMPLATE_PATH = os.path.normpath(
     os.path.join(os.path.dirname(__file__), "..", "..", "..", "static", "tmpl", "report_template.html"),
@@ -242,36 +246,35 @@ class TestHtmlTocStatic(unittest.TestCase):
         self.assertIn(".toc-list a.active", self.tmpl)
 
     def test_toc_narrow_screen_hidden(self):
-        """窄屏（< 900px）隐藏左侧栏，保留横向 section-nav。"""
+        """窄屏（< 1024px）隐藏左侧栏，保留横向 section-nav。"""
         match = re.search(
-            r"@media\s*\(max-width:\s*899px\)\s*\{(.*?)\}",
+            r"@media\s*\(max-width:\s*1023px\)\s*\{(.*?)\}",
             self.tmpl,
             re.DOTALL,
         )
-        self.assertIsNotNone(match, "应存在 max-width: 899px 响应式块")
+        self.assertIsNotNone(match, "应存在 max-width: 1023px 响应式块")
         block = match.group(1)
         self.assertIn(".toc-sidebar", block, "窄屏块应隐藏 .toc-sidebar")
         self.assertIn(".toc-toggle-btn", block, "窄屏块应隐藏展开按钮")
 
     def test_toc_wide_screen_content_shift(self):
-        """宽屏（>= 900px）展开时内容让出左侧栏。"""
+        """宽屏（>= 1024px）展开时内容让出左侧栏。"""
         match = re.search(
-            r"@media\s*\(min-width:\s*900px\)\s*\{(.*?)\}",
+            r"@media\s*\(min-width:\s*1024px\)\s*\{(.*?)\}",
             self.tmpl,
             re.DOTALL,
         )
-        self.assertIsNotNone(match, "应存在 min-width: 900px 响应式块")
+        self.assertIsNotNone(match, "应存在 min-width: 1024px 响应式块")
         block = match.group(1)
         self.assertIn("margin-left: 220px", block, "宽屏展开时 .container 应让出 220px 左侧栏")
 
     def test_toc_print_hidden(self):
-        """打印样式应隐藏左侧目录（.toc-sidebar / .toc-toggle-btn）。"""
+        """打印样式应隐藏左侧目录（.toc-sidebar / .toc-toggle-btn，存在含二者的 print 块）。"""
         self.assertIn(".toc-sidebar", self.tmpl, "模板中应有 .toc-sidebar 选择器")
-        print_pos = self.tmpl.find("@media print")
-        self.assertGreater(print_pos, -1, "模板中缺少 @media print")
-        block = self.tmpl[print_pos : print_pos + 1200]
-        self.assertIn(".toc-sidebar", block, ".toc-sidebar 应出现在 @media print 块中")
-        self.assertIn(".toc-toggle-btn", block, ".toc-toggle-btn 应出现在 @media print 块中")
+        blocks = _checklib.extract_at_rule_blocks(self.tmpl, "media print")
+        self.assertTrue(blocks, "模板中缺少 @media print")
+        hit = any(".toc-sidebar" in b and ".toc-toggle-btn" in b for b in blocks)
+        self.assertTrue(hit, ".toc-sidebar 与 .toc-toggle-btn 应同处一个 @media print 块")
 
     def test_toc_script_referenced(self):
         """模板引用 toc.js（defer 加载）。"""
@@ -321,13 +324,11 @@ class TestHtmlThemeStatic(unittest.TestCase):
         self.assertIn("--profit: #ff6b6b", self.tmpl, "深色下盈利红应提亮")
 
     def test_theme_btn_print_hidden(self):
-        """@media print 内应隐藏切换按钮。"""
-        print_pos = self.tmpl.find("@media print")
-        self.assertGreater(print_pos, -1, "模板中缺少 @media print")
-        # 主 @media print 块起自按钮样式之前：取 1500 字符覆盖隐藏交互元素清单（含 .theme-toggle-btn）
-        block = self.tmpl[print_pos : print_pos + 1500]
-        self.assertIn(".theme-toggle-btn", block, ".theme-toggle-btn 应出现在 @media print 块中")
-        self.assertIn("display: none", block, "打印时应隐藏切换按钮")
+        """@media print 内应隐藏切换按钮（存在含该规则的 print 块）。"""
+        blocks = _checklib.extract_at_rule_blocks(self.tmpl, "media print")
+        self.assertTrue(blocks, "模板中缺少 @media print")
+        hit = any(".theme-toggle-btn" in b and "display: none" in b for b in blocks)
+        self.assertTrue(hit, ".theme-toggle-btn 应在某个 @media print 块内 display: none")
 
     def test_no_hardcoded_profit_loss_colors(self):
         """模板不应再出现旧硬编码红绿（#CC0000/#009900）语义色（已变量化）。"""

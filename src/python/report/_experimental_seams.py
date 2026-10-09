@@ -2,7 +2,8 @@
 
 六个挂载点（决策跨期反思闭环 / 模块级质量分级 / 确定性信号沉淀 / 景气度框架诊断 /
 持仓变动复盘 / 事件窗量化对照；其中前四者已随读侧判定转正为常规组开关
-（景气度框架诊断除外），但守护语义与挂载形态不变）在报告管线固定工序位置插入挂载点。决策/横幅/信号三个位于
+（景气度框架诊断除外）、后两者已转正入报告章节与增强组，但守护语义与挂载形态不变）
+在报告管线固定工序位置插入挂载点。决策/横幅/信号三个位于
 ``_report_generation._generate_report_full`` 的工序序列内；景气度框架诊断（产出
 ``prosperity_framework_data`` 契约）经 :func:`record_prosperity_diagnosis` 接入两条 HTML
 生成路径，注入点须晚于基本面契约（个股 ROE）与历史走势就绪；持仓变动复盘（产出
@@ -258,7 +259,7 @@ def inject_holding_change_data(
     *,
     snapshot_namespace: str | None = None,
 ) -> None:
-    """持仓变动复盘（实验性功能，2b 后注入）：装配事件契约并注入 ``pipeline_data``。
+    """持仓变动复盘（报告章节与增强开关，2b 后注入）：装配事件契约并注入 ``pipeline_data``。
 
     事件清单由本次快照捕获后的目录差分产出（须晚于 ``capture_snapshot``，
     顺序约束见模块文档字符串）；意图对账只读 ``decision_ledger`` 历史事件，
@@ -299,7 +300,7 @@ def inject_event_impact_data(
     penetrated_assets: list[dict] | None = None,
     comparison_indices: dict[str, str] | None = None,
 ) -> None:
-    """事件窗量化对照（实验性功能，新闻获取后注入）：装配事件表并注入 ``pipeline_data``。
+    """事件窗量化对照（报告章节与增强开关，新闻获取后注入）：装配事件表并注入 ``pipeline_data``。
 
     事件表须以**本次新闻**（含逐条 LLM 关联判定极性）为输入，故挂载点位于新闻
     收集完成之后（调用方 ``_llm_news._fetch_llm_and_news`` 保证顺序；开关开启时

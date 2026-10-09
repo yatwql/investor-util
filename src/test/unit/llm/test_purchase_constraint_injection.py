@@ -196,14 +196,14 @@ class TestPromptEndToEndContainsBlock(unittest.TestCase):
 
 
 # ═══════════════════════════════════════════════════════════════
-#  辩论面：pro / con / synthesis 三章 + inputs 指纹
+#  辩论面：pro / con / synthesis 三个章节 + inputs 指纹
 # ═══════════════════════════════════════════════════════════════
 
 
 @patch("src.python.llm.skeleton.generate_llm_content", return_value=("<p>观点</p>", False))
 @patch("src.python.llm.skeleton.get_llm_config", return_value=dict(_ENABLED))
 class TestDebateProConSynContainBlock(unittest.TestCase):
-    """辩论三章 prompt 与指纹的约束块注入。"""
+    """辩论三个章节的 prompt 与指纹的约束块注入。"""
 
     def test_debate_three_prompts_contain_block(self, mock_cfg, mock_content):
         """pro/con/synthesis 三次模型调用的 prompt 均含块。"""
@@ -426,7 +426,7 @@ class TestAbsentBlockFallbackPair(unittest.TestCase):
     """降级成对断言：缺席时辩论/自检 prompt 不含块（与完备面一一对应）。"""
 
     def test_debate_prompts_absent_block(self, mock_cfg, mock_content):
-        """缺省 → 辩论三章 prompt 均不含块。"""
+        """缺省 → 辩论三个章节的 prompt 均不含块。"""
         from src.python.llm.generators import generate_debate_procon
 
         generate_debate_procon(60_000.0, 55_000.0, 5_000.0, 500.0, 1, {})

@@ -15,6 +15,7 @@ from src.python.core.constants import BEIJING_TZ
 from datetime import datetime
 from typing import Any
 
+from src.python.config.anonymizer import mask_holding_code
 from src.python.core.decision_header import build_structured_header_instruction
 from src.python.llm.prompts_core import (
     _build_concept_sector_block,
@@ -131,7 +132,7 @@ def _build_concentration_qa_block(
         mv = h.get("mv", 0) or 0
         ratio = mv / total_mv if total_mv > 0 else 0
         if ratio > threshold:
-            name = h.get("name", h.get("code", "未知"))
+            name = h.get("name") or mask_holding_code(h.get("code", "")) or "未知"
             questions.append(
                 f"1. **{name} 占比 {ratio:.1%}**，超过 {threshold:.0%} 警戒线，"
                 "存在单品种集中风险。若该品种出现极端行情，可能对组合整体造成显著冲击。"
@@ -475,7 +476,7 @@ def _build_penetration_deep_prompt(
         contract_drift = False
         for a in penetrated_assets[:10]:
             name = a.get("name", "")
-            codes = ",".join(a.get("codes", []))
+            codes = ",".join(mask_holding_code(c) for c in a.get("codes", []))
             mv = a.get("mv", 0)
             # 数据契约字段为 ratio_pct（report/penetration.py top10 产出）；
             # 缺失时按 0 处理但**不静默**——记一次契约漂移告警，避免占比恒为 0 再次隐身

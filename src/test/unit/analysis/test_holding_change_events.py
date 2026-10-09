@@ -139,7 +139,7 @@ def test_event_interval_bounds_are_adjacent_period_timestamps():
 
 
 def test_event_before_after_fields_support_contribution_decomposition():
-    """加仓事件携带份额/市值前后值（供迭代 2 贡献分解手算）。"""
+    """加仓事件携带份额/市值前后值（供贡献分解手算）。"""
     data = extract_change_events(_four_period_sequence())
     add_a = next(e for e in data["events"] if e["code"] == "A" and e["action"] == "加仓")
     assert add_a["shares_before"] == 1000.0

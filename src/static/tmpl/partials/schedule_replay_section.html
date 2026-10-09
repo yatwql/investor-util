@@ -23,7 +23,7 @@
 <div class="section" id="sec-schedule_replay" style="order: {{ section_numbers['schedule_replay'] }};">
     <div class="section-title">
         {{ section_numbers['schedule_replay'] }}、{{ section_names['schedule_replay'] }}
-        <span style="font-size:12px;font-weight:400;opacity:0.8;margin-left:8px;">纪律 vs 放任：多期回放对照</span>
+        <span style="font-size: var(--fs-table-sm);font-weight:400;opacity:0.8;margin-left:8px;">纪律 vs 放任：多期回放对照</span>
     </div>
     <details class="section-fold">
         <summary class="section-fold-summary">
@@ -36,7 +36,7 @@
         </div>
 
         <!-- ① 双线图：纪律回放 vs 买入持有（交互图表开启时渲染） -->
-        <div style="font-weight: bold; font-size: 14px; margin: 10px 0 6px;">① 纪律回放 vs 买入持有</div>
+        <div style="font-weight: bold; font-size: var(--fs-body); margin: 10px 0 6px;">① 纪律回放 vs 买入持有</div>
         {% if enable_interactive_charts and _sr.get("chart") %}
         <script type="application/json" id="schedule-replay-chart-data">{{ _sr.get("chart") | tojson }}</script>
         <div class="chart-box" style="height:300px;">
@@ -58,7 +58,7 @@
         </div>
 
         <!-- ② 规则 A 逐期调仓与成本 -->
-        <div style="font-weight: bold; font-size: 14px; margin: 14px 0 6px;">② 规则 A 逐期调仓与成本</div>
+        <div style="font-weight: bold; font-size: var(--fs-body); margin: 14px 0 6px;">② 规则 A 逐期调仓与成本</div>
         <div style="overflow-x:auto;">
         <table>
             <thead>
@@ -77,7 +77,7 @@
 
         <!-- ③ 触发提示与口径标注 -->
         {% for line in _sr.get("trigger_lines", []) %}
-        <div style="font-size: 13px; margin-top: 8px;">{{ line }}</div>
+        <div style="font-size: var(--fs-table); margin-top: 8px;">{{ line }}</div>
         {% endfor %}
         {% for line in _sr.get("notes", []) %}
         <div class="notice-banner" style="margin: 6px 0 2px;">{{ line }}</div>
@@ -86,12 +86,12 @@
     </div>
     {% else %}
     <div class="section-content">
-        <div class="empty-note placeholder-note">
+        <div class="empty-note">
             <p><strong>调仓纪律回放数据暂不可用</strong></p>
-            <p style="margin-top:8px;font-size:13px;color:var(--text-muted);">
+            <p style="margin-top:8px;font-size: var(--fs-table);color:var(--text-muted);">
                 {{ _sr.get("reason") }}
             </p>
-            <p style="margin-top:12px;font-size:12px;color:var(--text-faint);">
+            <p style="margin-top:12px;font-size: var(--fs-table-sm);color:var(--text-faint);">
                 开关开启且历史行情满足验收（窗口跨度 / 净值日 / 行情缺口）后自动装配；目标权重 = 当前持仓归一。
             </p>
         </div>

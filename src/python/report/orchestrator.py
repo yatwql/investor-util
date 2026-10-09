@@ -15,6 +15,7 @@ from datetime import datetime
 from typing import Any
 
 from src.python.report.progress import ProgressReporter
+from src.python.report.run_integrity import bind_health, bind_perf, guard_run
 
 # ── 子模块 re-export ────────────────────────────────────
 from src.python.report._report_aux_metrics import (  # noqa: F401
@@ -226,6 +227,26 @@ def prepare_report_data(
     from src.python.report._report_helpers import attach_holding_trading_days
 
     attach_holding_trading_days(holdings_details, transactions)
+
+    # 持仓匿名化（config anonymization.mode）：明细装配边界统一脱敏——行情
+    # 取数与派生计算（申购限购、价格更新状态）先用真值完成后，在此一次性
+    # 匿名明细字典与 DetailRow（off → 恒等零开销；summary 仅折叠字典供
+    # LLM/行动建议同源，行留给明细渲染层折叠以保持合计真值）；下方
+    # action/HTML/Excel 全部同源消费匿名明细。约束块文本随后按同一映射掩码
+    # （构建期已用真实名称渲染，进 LLM 提示词附录前脱敏）。
+    from src.python.config.anonymizer import build_report_alias_map, get_anonymization_mode, mask_display_text
+    from src.python.report._report_helpers import apply_report_anonymization
+
+    _anon_mode = get_anonymization_mode()
+    if _anon_mode != "off":
+        _alias_map = build_report_alias_map(holdings_details, _anon_mode)
+        holdings_details, details = apply_report_anonymization(
+            holdings_details, details, _anon_mode, alias_map=_alias_map
+        )
+        if purchase_status_data is not None and purchase_status_data.get("constraint_block"):
+            purchase_status_data["constraint_block"] = mask_display_text(
+                purchase_status_data["constraint_block"], _alias_map
+            )
 
     # 行动建议：组装 action_data（含再平衡信号；纪律/调仓/归因后续轮次填充）。
     # 此处为「中间占位构建」：组合历史峰值市值需等历史走势就绪（report 层
@@ -553,6 +574,7 @@ def artifacts_for_report_type(report_type: str) -> tuple[str, ...]:
 # ── generate_report ──
 
 
+@guard_run
 def generate_report(
     holdings: list,
     config: dict,
@@ -604,12 +626,14 @@ def generate_report(
         from src.python.report._report_generation import _collect_health_checks, _spawn_health_checks
         from src.python.report.excel_generator import generate_excel_report
 
-        perf = PerfCollector(report_type="basic", holdings=holdings)
+        perf = PerfCollector(report_type="basic", holdings=holdings, stage_announcer=reporter.stage_progress)
+        bind_perf(perf)
         sec_order = get_report_section_order(config)
         output = output_dir or config.get("output_dir", "reports")
 
         # 后台启动健康检查（与 Excel 生成并行）
         _health_fut = _spawn_health_checks()
+        bind_health(_health_fut, "basic", holdings)
 
         try:
             perf.start("Excel 生成")

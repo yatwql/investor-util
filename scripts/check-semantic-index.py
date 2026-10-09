@@ -10,7 +10,7 @@ check-code-traces.py 只做负面禁止（禁任务代号/魔法编号），本�
   2. 反向：表中每个语义 slug 在 src/python/ 下至少一处非注释代码引用
      （防僵尸条目——功能已删除但表行残留）
   3. 合并章：表下「合并章代码标识符」注声明的 sheet key 必须存在于
-     core/registry.py 的 _REPORT_SECTION_DEFAULT 注册表（防 sheet key 改名/删除后
+     core/report_section_registry.py 的 _REPORT_SECTION_DEFAULT 注册表（防 sheet key 改名/删除后
      文档未同步）
 
 表解析基于该表首尾的 HTML 注释标记（<!-- semantic-index:start/end -->），
@@ -51,7 +51,7 @@ from _checklib import (  # noqa: E402
 _TECHNICAL_MD = REPO_ROOT / "docs" / "managements" / "technical.md"
 _FEATURES_PY = REPO_ROOT / "src/python/config/features.py"
 _CONFIG_DEFAULTS = REPO_ROOT / "src" / "python" / "config" / "_config_defaults.py"
-_REGISTRY_PY = REPO_ROOT / "src" / "python" / "core" / "registry.py"
+_SECTION_REGISTRY_PY = REPO_ROOT / "src" / "python" / "core" / "report_section_registry.py"
 _CODE_ROOT = REPO_ROOT / "src" / "python"
 
 #: 结论文案（全量与缓存回放两路共用，保证输出逐字一致）
@@ -128,7 +128,7 @@ def feature_switch_keys(source: str) -> list[str]:
 
 
 def registry_section_keys(source: str) -> list[str]:
-    """ast 解析 registry.py，返回 _REPORT_SECTION_DEFAULT 列表各 dict 的 key 值。"""
+    """ast 解析 report_section_registry.py，返回 _REPORT_SECTION_DEFAULT 列表各 dict 的 key 值。"""
     tree = ast.parse(source)
     for node in ast.walk(tree):
         if isinstance(node, ast.Assign):
@@ -260,7 +260,7 @@ def run_checks(
     for key in merged_keys:
         if key not in registry_keys:
             findings.append(
-                f"{rel(_TECHNICAL_MD)}: 「功能语义命名表」合并章: sheet key `{key}` 不在 registry._REPORT_SECTION_DEFAULT"
+                f"{rel(_TECHNICAL_MD)}: 「功能语义命名表」合并章: sheet key `{key}` 不在 _REPORT_SECTION_DEFAULT（core/report_section_registry.py）"
             )
 
     return findings
@@ -282,7 +282,7 @@ def main() -> None:
 
     doc_text = _TECHNICAL_MD.read_text(encoding="utf-8")
     features_source = _FEATURES_PY.read_text(encoding="utf-8")
-    registry_source = _REGISTRY_PY.read_text(encoding="utf-8")
+    registry_source = _SECTION_REGISTRY_PY.read_text(encoding="utf-8")
 
     findings = run_checks(doc_text, features_source, registry_source, _CODE_ROOT)
     conclusion_cache_save("semantic_index", [Path(__file__)], inputs, {"findings": findings})

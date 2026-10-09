@@ -7,6 +7,7 @@
 from __future__ import annotations
 
 import unittest
+from unittest.mock import patch
 
 import pytest
 
@@ -622,3 +623,106 @@ class TestBuildPromptAppendix(unittest.TestCase):
             _build_prompt_appendix(holdings, 60_000, 55_000, 5_000, purchase_constraint_block=block),
             base + "\n\n" + block,
         )
+
+
+@pytest.mark.unit_llm
+class TestPromptHoldingCodeMaskFold(unittest.TestCase):
+    """提示词组装点持仓代码折叠（代码折叠模式下真码不进提示词）。"""
+
+    _CODES = ("600519", "600036")
+
+    @staticmethod
+    def _details() -> list[dict]:
+        return [
+            {
+                "name": "品种A",
+                "code": "600519",
+                "market_value": 600000.0,
+                "cost": 500000.0,
+                "profit": 100000.0,
+                "profit_rate": 20.0,
+            },
+            {
+                "name": "品种B",
+                "code": "600036",
+                "market_value": 400000.0,
+                "cost": 380000.0,
+                "profit": 20000.0,
+                "profit_rate": 5.26,
+            },
+        ]
+
+    @staticmethod
+    def _masked():
+        return patch("src.python.config.anonymizer.get_anonymization_mode", return_value="full_anonymous")
+
+    def test_holdings_blocks_carry_no_real_codes_in_full_mode(self):
+        """持仓块族（明细行/TOP3/速查表/白名单/穿透）在 full 模式不含真码。"""
+        from src.python.llm.prompts_data_blocks import _fmt_holding_line
+        from src.python.llm.prompts_tables import (
+            _build_code_whitelist_block,
+            _build_data_slot_block,
+            _build_top3_block,
+            _format_holdings_block,
+            _format_penetration_block,
+        )
+
+        details = self._details()
+        with self._masked():
+            blocks = [
+                _fmt_holding_line(details[0]),
+                _format_holdings_block(details),
+                _build_top3_block(details, 1000000.0),
+                _build_data_slot_block(details, 1000000.0, 880000.0, 120000.0),
+                _build_code_whitelist_block(details, 1000000.0),
+                _format_penetration_block([{"name": "白酒", "codes": ["600519"], "mv": 100.0, "sector": "食品饮料"}]),
+            ]
+        for text in blocks:
+            self.assertTrue(text, "块不应为空")
+            for code in self._CODES:
+                self.assertNotIn(code, text, f"真码泄漏: {text!r}")
+            self.assertIn("000XXX", text, f"应含代码显示掩码: {text!r}")
+
+    def test_off_mode_keeps_real_codes(self):
+        """off 模式（默认）→ 提示词保留真码，既有反幻觉白名单行为不变。"""
+        from src.python.llm.prompts_data_blocks import _fmt_holding_line
+        from src.python.llm.prompts_tables import _build_code_whitelist_block
+
+        details = self._details()
+        with patch("src.python.config.anonymizer.get_anonymization_mode", return_value="off"):
+            self.assertIn("600519", _fmt_holding_line(details[0]))
+            whitelist = _build_code_whitelist_block(details, 1000000.0)
+        self.assertIn("【持仓代码白名单】", whitelist)
+        self.assertIn("600519、600036", whitelist)
+
+    def test_whitelist_rewords_anti_hallucination_rule_in_full_mode(self):
+        """full 模式白名单改写为「真码一律不写」约束（避免全列 000XXX 自相矛盾）。"""
+        from src.python.llm.prompts_tables import _build_code_whitelist_block
+
+        with self._masked():
+            whitelist = _build_code_whitelist_block(self._details(), 1000000.0)
+        self.assertIn("代码已脱敏", whitelist)
+        self.assertIn("品种A", whitelist)
+        self.assertIn("最大持仓", whitelist)
+        self.assertIn("严禁在你的输出中出现任何 6 位数字代码", whitelist)
+
+    def test_whitelist_skipped_when_no_codes(self):
+        """无代码明细（汇总折叠行 code=""）→ 不输出「共 0 个」退化块。"""
+        from src.python.llm.prompts_tables import _build_code_whitelist_block
+
+        folded = [{"name": "股票汇总", "code": "", "market_value": 1000.0}]
+        with patch("src.python.config.anonymizer.get_anonymization_mode", return_value="summary"):
+            self.assertEqual(_build_code_whitelist_block(folded, 1000.0), "")
+
+    def test_news_summary_masks_codes_but_keeps_keyed_lookup(self):
+        """新闻持仓摘要：展示行掩码，industry_data 仍按真码键控命中。"""
+        from src.python.core.models import Holding
+        from src.python.llm.prompts_tables import _build_holdings_summary
+
+        holdings = [Holding(account="证券", name="品种A", code="600519", shares=100, cost_price=10.0)]
+        industry = {"600519": {"industry": "白酒", "concepts": ["消费"]}}
+        with self._masked():
+            block = _build_holdings_summary(holdings, None, industry)
+        self.assertNotIn("600519", block)
+        self.assertIn("000XXX", block)
+        self.assertIn("白酒", block)

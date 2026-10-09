@@ -190,6 +190,8 @@ def _render_template(
     now_str: str,
     today_str: str,
     trading_day: str,
+    # 匿名化：{真码: 显示掩码}，供模板 | anon_code 在代码列渲染点结构化折叠（None/空 = 不掩）
+    anon_code_map: dict | None = None,
     # 生成后自检区块 HTML（与其余 LLM 内容同层传入）
     self_review_block: str | None = None,
     total_mv: float,
@@ -291,6 +293,7 @@ def _render_template(
         flow_display=_build_flow_display(fund_flow_data),
         purchase_status_display=purchase_status_display,
         section_groups=section_groups,
+        anon_code_map=anon_code_map,
         llm_supported_sections=_LLM_SUPPORTED_SECTIONS,
         valuation_enabled=valuation_enabled,
         valuation_real_basis=valuation_real_basis,
@@ -365,7 +368,7 @@ def _render_template(
         industry_beta=industry_beta,
         position_relationship_data=position_relationship_data,
         evolution_data=evolution_data,
-        evolution_chart_data=build_evolution_chart_data(evolution_data),
+        evolution_chart_data=build_evolution_chart_data(evolution_data, code_map=anon_code_map),
         drawdown_min_span=drawdown_min_span,
         data_quality_enabled=data_quality_enabled,
         position_status=position_status,
@@ -438,9 +441,9 @@ def write_html_report(
     purchase_status_data: dict | None = None,  # data 层：申购限购状态契约（None=无数据，申购状态列隐藏）
     decision_review_data: dict | None = None,  # 历史决策复盘 decision_review_data（行动章内嵌块，None=开关关闭）
     holding_change_data: dict
-    | None = None,  # data 层：持仓变动复盘契约（实验开关 `holding_change_review`，None=键缺席→整章隐藏）
+    | None = None,  # data 层：持仓变动复盘契约（报告章节与增强开关 `holding_change_review`，None=键缺席→整章隐藏）
     event_impact_data: dict
-    | None = None,  # data 层：事件窗量化对照契约（实验开关 `event_window_impact`，None=键缺席→整章隐藏）
+    | None = None,  # data 层：事件窗量化对照契约（报告章节与增强开关 `event_window_impact`，None=键缺席→整章隐藏）
     schedule_replay_data: dict
     | None = None,  # data 层：调仓纪律回放契约（实验开关 `rebalance_schedule_replay`，None=键缺席→整章隐藏）
 ) -> str:
@@ -643,10 +646,17 @@ def write_html_report(
         except Exception:
             _factor_names = {}
 
+    # 匿名化：代码列渲染点掩码映射（真码 → 显示掩码）。渲染前一次性构造，
+    # 经模板全局变量注入，各章节以 {{ x | anon_code }} 精确键控折叠代码。
+    from src.python.config.anonymizer import build_code_display_map, get_anonymization_mode
+
+    _code_display_map = build_code_display_map(details if details is not None else holdings, get_anonymization_mode())
+
     html = _render_template(
         now_str=now_str,
         today_str=today_str,
         trading_day=trading_day,
+        anon_code_map=_code_display_map,
         total_mv=total_mv,
         total_cost=total_cost,
         total_profit=total_profit,
@@ -730,6 +740,25 @@ def write_html_report(
         # 内嵌 Chart.js 资产 → HTML 单文件自包含（下载/移动/单发移动端浏览
         # 不再依赖同目录松散 JS；_copy_js_assets 仍保留以兼容既有产物布局）
         html = _inline_js_assets(html)
+
+    # 产物文本清扫（匿名化）：字段层未覆盖的派生面（分类/业绩/管理人等从
+    # holdings 直取名称的区块）在最终 HTML 文本统一真名→代号；明细区块已
+    # 在字段层替换，重复命中无副作用。仅名称（中文串）全局安全，自由文本
+    # 清扫因此**不含代码**——代码是纯数字串，全文子串替换会误伤金额与
+    # JSON 数值；代码面由渲染点结构化掩码（模板 | anon_code）与
+    # mask_code_text 边界安全替换兑底。off → 恒等零开销。
+    from src.python.config.anonymizer import (
+        build_code_display_map,
+        build_report_alias_map,
+        get_anonymization_mode,
+        mask_code_text,
+        mask_display_text,
+    )
+
+    _anon_mode = get_anonymization_mode()
+    if _anon_mode != "off":
+        html = mask_display_text(html, build_report_alias_map(holdings, _anon_mode, include_codes=False))
+        html = mask_code_text(html, _code_display_map)
 
     return _save_html_report(html, output_dir, total_mv, total_profit, prog)
 

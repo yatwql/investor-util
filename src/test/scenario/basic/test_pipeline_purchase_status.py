@@ -1,6 +1,6 @@
 """管线冒烟 — 申购限购状态契约（purchase_status_data）注入两条报告路径。
 
-对应设计文档 docs/plan/fund-purchase-limit-design.md 迭代 2 验收第 4 条：
+对应设计文档 docs/plan/fund-purchase-limit-design.md 验收第 4 条：
 `available=false` 时渲染层静默隐列，且报告生成成功（生成器收到契约、不抛异常）。
 
   - full 路径：prep 契约 → pipeline_data → HTML kwarg / Excel pipeline_data

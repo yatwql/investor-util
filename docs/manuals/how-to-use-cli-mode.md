@@ -34,7 +34,7 @@ CLI 与 TUI 共享同一套缓存、配置与报告管线，可交替使用。
 | `--verbose` | 详细日志输出到 stderr（默认仅写入 `logs/app.log`） |
 | `--non-interactive` | 跳过首次运行交互式引导（定时任务 / 脚本使用） |
 | `--experiment NAME` | 启用**实验组**功能（只开不关的简写），**仅本次运行生效（不写入 features.json）**。可重复指定；`NAME` 取开关名（如 `prosperity_framework`）或显示名（如 `景气度框架诊断`），`all` = 全部启用 |
-| `--feature NAME=VALUE` | 切换**任意**功能开关（实验组与常规组均可），**双向**（可开可关）、**仅本次运行生效（不写入 features.json）**。可重复指定；`NAME` 取开关名（如 `doctor_check`），`VALUE` 取 `on`/`off`（也接受 `true`/`false`/`1`/`0`，大小写不敏感）。同名后写覆盖先写 |
+| `--feature NAME=VALUE` | 切换**任意**功能开关（实验组 / 常规组 / 报告章节与增强组均可），**双向**（可开可关）、**仅本次运行生效（不写入 features.json）**。可重复指定；`NAME` 取开关名（如 `doctor_check`），`VALUE` 取 `on`/`off`（也接受 `true`/`false`/`1`/`0`，大小写不敏感）。同名后写覆盖先写 |
 | `--version` | 显示版本号并退出 |
 
 > **`--experiment` 说明**：等价于在 TUI 菜单 **[S]** / Web 配置面板中临时勾选实验开关，但**只作用于当前这一次命令、不改动持久化配置**——CI / 定时任务可在不污染用户配置的前提下试用实验功能；反之，用户配置里已开启的实验开关不会被本参数关闭。

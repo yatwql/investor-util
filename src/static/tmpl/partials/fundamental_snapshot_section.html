@@ -26,7 +26,7 @@
 <div class="section" id="sec-fundamental_snapshot" style="order: {{ section_numbers['fundamental_snapshot'] }};">
     <div class="section-title">
         {{ section_numbers['fundamental_snapshot'] }}、{{ section_names['fundamental_snapshot'] }}
-        <span style="font-size:12px;font-weight:400;opacity:0.8;margin-left:8px;">持仓 A 股基本面（指标 + 财报摘要）</span>
+        <span style="font-size: var(--fs-table-sm);font-weight:400;opacity:0.8;margin-left:8px;">持仓 A 股基本面（指标 + 财报摘要）</span>
     </div>
 
     <details class="section-fold">
@@ -74,8 +74,8 @@
                 {% for r in _fi.get("rows", []) %}
                 <tr>
                     <td class="text-left">{{ r.get("name", "") }}</td>
-                    <td>{{ r.get("code", "") }}</td>
-                    <td>{{ r.get("report_period", "") }}<br><span style="font-size:11px;color:var(--text-faint);">{{ r.get("doc_type_label", "") }}</span></td>
+                    <td>{{ r.get("code", "") | anon_code }}</td>
+                    <td>{{ r.get("report_period", "") }}<br><span style="font-size: var(--fs-footnote);color:var(--text-faint);">{{ r.get("doc_type_label", "") }}</span></td>
                     <td>{{ yi(r.get("revenue")) }}</td>
                     <td>{{ yi(r.get("net_profit")) }}</td>
                     <td>{{ pct(r.get("net_profit_yoy")) }}</td>
@@ -86,9 +86,9 @@
                     <td>{{ num(r.get("eps"), 4) }}</td>
                     <td>{{ num(r.get("pe"), 2) }}</td>
                     <td>{{ num(r.get("pb"), 2) }}</td>
-                    <td>{{ r.get("quality_grade") or "—" }}{% if r.get("quality_score") is not none %}<br><span style="font-size:11px;color:var(--text-faint);">{{ r.get("quality_score") }}/3</span>{% endif %}</td>
+                    <td>{{ r.get("quality_grade") or "—" }}{% if r.get("quality_score") is not none %}<br><span style="font-size: var(--fs-footnote);color:var(--text-faint);">{{ r.get("quality_score") }}/3</span>{% endif %}</td>
                     <td>{{ r.get("trend") or "—" }}</td>
-                    <td class="text-left" style="font-size:12px;">{{ r.get("source", "") }}</td>
+                    <td class="text-left" style="font-size: var(--fs-table-sm);">{{ r.get("source", "") }}</td>
                 </tr>
                 {% endfor %}
             </tbody>
@@ -98,7 +98,7 @@
         <div class="penetration-notes" style="margin-top: 12px;">
             <div><strong>以下标的未取到指标</strong>（不影响其余标的）：</div>
             {% for f in _fi.get("failures", []) %}
-            <div>* {{ f.get("name") or f.get("code") }}（{{ f.get("code") }}）：{{ f.get("reason") }}</div>
+            <div>* {{ (f.get("name") or f.get("code")) | anon_code }}（{{ f.get("code") | anon_code }}）：{{ f.get("reason") }}</div>
             {% endfor %}
         </div>
         {% endif %}
@@ -111,12 +111,12 @@
     </div>
     {% else %}
     <div class="section-content">
-        <div class="empty-note placeholder-note">
+        <div class="empty-note">
             <p><strong>财务指标暂不可用</strong></p>
-            <p style="margin-top:8px;font-size:13px;color:var(--text-muted);">
+            <p style="margin-top:8px;font-size: var(--fs-table);color:var(--text-muted);">
                 {{ _fi.get("reason") or "暂无 A 股标的或未取到指标" }}。
             </p>
-            <p style="margin-top:12px;font-size:12px;color:var(--text-faint);">
+            <p style="margin-top:12px;font-size: var(--fs-table-sm);color:var(--text-faint);">
                 指标主源为 akshare（需本地安装，无需凭据）；备用支路（DataSinking 财报章节解析）需 DataSinking key
                 （配于 data/config/data_key.json 的 datasink 节，或环境变量 DATASINK_API_KEY）。
                 该块由功能开关 <code>financial_indicator</code> 控制——TUI 菜单 <code>[S]</code> →「报告章节与增强」/
@@ -154,7 +154,7 @@
                 {% for r in _frd.get("rows", []) %}
                 <tr>
                     <td class="text-left">{{ r.get("name", "") }}</td>
-                    <td>{{ r.get("code", "") }}</td>
+                    <td>{{ r.get("code", "") | anon_code }}</td>
                     <td>{{ r.get("report_period", "") }}</td>
                     <td>{{ r.get("doc_type", "") }}</td>
                     <td>{{ r.get("announcement_date", "") }}</td>
@@ -173,7 +173,7 @@
         <div class="penetration-notes" style="margin-top: 12px;">
             <div><strong>未取到财报的标的</strong></div>
             {% for f in _frd_failures %}
-            <div>* {{ f.get("name") or f.get("code") }}（{{ f.get("code") }}）：{{ f.get("reason", "") }}</div>
+            <div>* {{ (f.get("name") or f.get("code")) | anon_code }}（{{ f.get("code") | anon_code }}）：{{ f.get("reason", "") }}</div>
             {% endfor %}
         </div>
         {% endif %}
@@ -184,12 +184,12 @@
     </div>
     {% else %}
     <div class="section-content">
-        <div class="empty-note placeholder-note">
+        <div class="empty-note">
             <p><strong>持仓个股财报摘要暂不可用</strong></p>
-            <p style="margin-top:8px;font-size:13px;color:var(--text-muted);">
+            <p style="margin-top:8px;font-size: var(--fs-table);color:var(--text-muted);">
                 {{ _frd.get("reason") or "暂无 A 股标的或未取到财报" }}。
             </p>
-            <p style="margin-top:12px;font-size:12px;color:var(--text-faint);">
+            <p style="margin-top:12px;font-size: var(--fs-table-sm);color:var(--text-faint);">
                 该块由功能开关 <code>financial_report_digest</code> 控制——TUI 菜单 <code>[S]</code> →「报告章节与增强」/
                 Web 配置面板同名区块，开启后生效。取数需 DataSinking key
                 （配于 data/config/data_key.json 的 datasink 节，或环境变量 DATASINK_API_KEY；免费 key 可在 datasink.ing 领取）；

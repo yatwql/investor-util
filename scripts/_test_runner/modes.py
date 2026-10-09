@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import sys
+from collections.abc import Callable, Collection
 
 
 MODES: dict[str, dict] = {
@@ -142,6 +143,58 @@ MODES: dict[str, dict] = {
 }
 
 
+def mode_marker_expr(mode: str) -> str:
+    """模式的 pytest `-m` 表达式（顶层 ``marker`` 缺省时回落到首个阶段的 marker）。
+
+    多阶段合一后（``phases``），首阶段 marker 就是该模式实际的过滤条件；
+    空字符串表示不过滤（与 ``pytest_env``「空 marker 不传 ``-m``」同一口径）。
+
+    Args:
+        mode: ``MODES`` 中的模式名
+
+    Returns:
+        marker 表达式；模式既无 ``marker`` 也无 ``phases`` 时为空字符串
+
+    Raises:
+        KeyError: 模式名不在 ``MODES`` 中
+    """
+    cfg = MODES[mode]
+    if "marker" in cfg:
+        return str(cfg["marker"])
+    phases = cfg.get("phases") or []
+    return str(phases[0].get("marker", "")) if phases else ""
+
+
+def compile_marker_expr(expr: str) -> Callable[[Collection[str]], bool]:
+    """把 pytest `-m` 表达式编译成「对 marker 名集合」的谓词。
+
+    复用 pytest 自带的表达式求值器（``_pytest.mark.expression``，即 ``-m``
+    过滤走的同一实现），使「收集侧按集合计数」与「test-runner 按 ``-m``
+    实跑」两侧共用一份语义——表达式本身只在 ``MODES`` 定义一处，其它地方
+    （如 ``collect-test-coverage.py``）一律由本函数现场编译，不再抄写。
+
+    Args:
+        expr: pytest `-m` 布尔表达式（``and`` / ``or`` / ``not`` / 括号 / 标识符）
+
+    Returns:
+        谓词：输入已收集项的 marker 名集合，返回是否命中该表达式；空表达式恒真
+
+    Raises:
+        SyntaxError: 表达式语法错误（编译期即暴露，不带病进入计数）
+    """
+    if not expr.strip():
+        return lambda _markers: True
+    from _pytest.mark.expression import Expression  # 延迟导入：仅计数/收集路径付费
+
+    compiled = Expression.compile(expr)
+
+    def matches(markers: Collection[str]) -> bool:
+        names = frozenset(markers)
+        return bool(compiled.evaluate(lambda name, /, **kwargs: name in names))
+
+    return matches
+
+
 _HELP_TEXT = """测试驱动脚本 — 统一运行 pytest 并输出结构化 HTML 报告。
 
 用法:
@@ -177,6 +230,24 @@ _MODE_TABLE_ORDER: tuple[str, ...] = (
 
 
 _BENCH_MODES: tuple[str, ...] = tuple(m for m in _MODE_TABLE_ORDER if m != "all") + ("all",)
+
+
+#: 功能域中文标签 ↔ unit 子标记（单一来源）：collect-test-coverage 的功能域聚合
+#: 与 check-doc-drift 的 test-coverage.md 功能域表核对共用同一张表，增删 unit
+#: 子标记时两边自动跟随，不得各自维护副本。
+UNIT_DOMAIN_LABELS: dict[str, str] = {
+    "unit_providers": "数据源 Provider",
+    "unit_fetcher": "数据获取调度",
+    "unit_news": "新闻处理",
+    "unit_report": "报告生成",
+    "unit_llm": "LLM 智能分析",
+    "unit_config": "配置管理",
+    "unit_core": "核心基础设施",
+    "unit_analysis": "分析计算",
+    "unit_cli": "CLI 命令行",
+    "unit_ui": "TUI 交互",
+    "unit_web": "Web 服务",
+}
 
 
 def _resolve_modes(modes_to_run: list[str]) -> list[str]:

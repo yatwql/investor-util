@@ -96,13 +96,13 @@ class TestEmptyHoldingsWithLlm(unittest.TestCase):
         self.assertIsNotNone(health)
         self.assertIsNotNone(pen)
 
-    @patch("src.python.llm.generators._build_global_macro_prompt")
+    @patch("src.python.llm.generators_singletons._build_global_macro_prompt")
     def test_global_macro_zero_values(self, mock_prompt):
         """generate_global_macro 在 categories={} 时不应崩溃。"""
         from src.python.llm.generators import generate_global_macro
 
         mock_prompt.return_value = "空持仓 prompt"
-        with patch("src.python.llm.generators.generate_llm_module") as mock_gen:
+        with patch("src.python.llm.generators_singletons.generate_llm_module") as mock_gen:
             mock_gen.return_value = ("<p>宏观</p>", False)
             try:
                 result, cached = generate_global_macro({}, {}, 0, 0, 0, {}, force=True)

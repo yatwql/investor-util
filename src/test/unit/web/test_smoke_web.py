@@ -13,30 +13,17 @@
 
 from __future__ import annotations
 
-import importlib.util
-from pathlib import Path
 
 import pytest
+from src.test._script_loader import load_script
 
-_REPO_ROOT = Path(__file__).resolve().parents[4]  # investor-util 仓库根目录
-_SCRIPT = _REPO_ROOT / "scripts" / "smoke-web.py"
 
 pytestmark = [pytest.mark.unit, pytest.mark.unit_web]
 
 
-def _load_script():
-    """按文件名加载 scripts/ 下的脚本（规避 import 路径限制）。"""
-    mod_name = _SCRIPT.stem.replace("-", "_")
-    spec = importlib.util.spec_from_file_location(mod_name, _SCRIPT)
-    mod = importlib.util.module_from_spec(spec)
-    assert spec.loader is not None
-    spec.loader.exec_module(mod)
-    return mod
-
-
 def test_smoke_web_run_smoke_all_pass():
     """run_smoke() 11 项断言全部通过。"""
-    mod = _load_script()
+    mod = load_script("smoke-web.py")
     results = mod.run_smoke()
 
     assert len(results) == 11
@@ -61,20 +48,20 @@ class _FakePollClient:
 
 def test_smoke_web_poll_run_finished_waits_for_done():
     """_poll_run_finished 轮询至终态：queued→running→done 返回 done（不提前返回）。"""
-    mod = _load_script()
+    mod = load_script("smoke-web.py")
     status = mod._poll_run_finished(_FakePollClient(["queued", "running", "done"]), "r1")
     assert status == "done"
 
 
 def test_smoke_web_poll_run_finished_returns_failed():
     """_poll_run_finished 到 failed 也返回终态 failed。"""
-    mod = _load_script()
+    mod = load_script("smoke-web.py")
     status = mod._poll_run_finished(_FakePollClient(["queued", "failed"]), "r1")
     assert status == "failed"
 
 
 def test_smoke_web_poll_run_finished_never_finishes_returns_last():
     """_poll_run_finished 始终不到终态时返回最后 status（不崩溃）。"""
-    mod = _load_script()
+    mod = load_script("smoke-web.py")
     status = mod._poll_run_finished(_FakePollClient(["running", "running"]), "r1", max_iters=2)
     assert status == "running"

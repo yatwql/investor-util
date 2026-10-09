@@ -1,7 +1,7 @@
 """事件窗量化对照（event_impact_panel）接线测试 — 开关/挂载点/注册表/双端/LLM 串行化。
 
-覆盖（迭代 3 验收）：
-  - 开关注册表：event_window_impact 已登记（实验组、默认关、影响报告）
+覆盖（对应验收条目）：
+  - 开关注册表：event_window_impact 已登记（报告章节与增强组、默认关、影响报告）
   - 挂载点：seam 开关关闭零行为、开关注入契约、下游异常只告警不外抛
   - 注册表：无独立条目（并入新闻章）、号序连续、页签名/导航/两端派生点无残留
   - 关态回退：契约缺席 → 新闻章内区块零渲染；新闻父章关 → 区块随父章隐藏
@@ -125,12 +125,12 @@ def _contract(events: list[dict], *, available: bool = True) -> dict:
 
 
 class TestFeatureSwitchRegistry:
-    """event_window_impact 已登记且默认关、影响报告输出。"""
+    """event_window_impact 已登记（区块类转正入报告组）且默认关、影响报告输出。"""
 
-    def test_switch_registered_in_experimental_group_off_by_default(self):
+    def test_switch_registered_in_report_group_off_by_default(self):
         sw = feature_switch_registry["event_window_impact"]
         assert sw.label == "事件窗量化对照"
-        assert sw.group == "experimental"
+        assert sw.group == "report"
         assert sw.default is False
         assert sw.affects_report is True
         assert is_feature_enabled("event_window_impact") is False
@@ -140,7 +140,7 @@ class TestFeatureSwitchRegistry:
 
 
 class TestEventImpactMount:
-    """事件窗量化对照挂载点（实验组开关，产出 ``event_impact_data`` 契约）。"""
+    """事件窗量化对照挂载点（报告章节与增强开关，产出 ``event_impact_data`` 契约）。"""
 
     def test_flag_off_is_inert(self, reporter):
         """开关关闭 → 不装配、不注入、不告警（零导入零成本）。"""

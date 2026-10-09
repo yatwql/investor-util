@@ -22,7 +22,7 @@
                         <tr>
                             <td class="text-left">{{ d.account }}</td>
                             <td class="text-left">{{ d.name }}</td>
-                            <td>{{ d.code }}</td>
+                            <td>{{ d.code | anon_code }}</td>
                             <td class="text-right">{{ d.price | price }}</td>
                             <td>{{ d.nav_date }}</td>
                             <td class="text-right">{{ d.yesterday_close | price }}</td>
@@ -80,7 +80,7 @@
                 </tbody>
             </table>
             {% if purchase_status_display %}
-            <div style="padding: 4px 8px; font-size: 12px; color: {% if purchase_status_display.level == 'stale' %}#B8860B; font-weight: bold;{% else %}#888888;{% endif %}">{{ purchase_status_display.footnote }}</div>
+            <div style="padding: 4px 8px; font-size: var(--fs-table-sm); color: {% if purchase_status_display.level == 'stale' %}#B8860B; font-weight: bold;{% else %}#888888;{% endif %}">{{ purchase_status_display.footnote }}</div>
             {% endif %}
         </div>
 
@@ -106,7 +106,7 @@
                             <td class="text-left">{{ group["property"] }}</td>
                             <td class="text-left">{{ group["sub_category"] }}</td>
                             <td class="text-left">{{ item["name"] }}</td>
-                            <td>{{ item["code"] }}</td>
+                            <td>{{ item["code"] | anon_code }}</td>
                             <td class="text-right">{{ item["market_value"] | money }}</td>
                             <td class="text-right">{{ item["cost"] | money }}</td>
                             <td class="text-right" style="color: {{ item["profit"] | profit_color }}">{{ item["profit"] | money }}</td>

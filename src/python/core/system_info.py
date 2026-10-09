@@ -44,9 +44,10 @@ def circuit_display(endpoint: str, *, default_as_none: bool = False) -> str:
     """
     if not endpoint or (default_as_none and endpoint == "默认"):
         return "—"
-    from src.python.llm.circuit_breaker import get_circuit_status
+    # 熔断文案判定经 core 网关注册获取（上游模块导入时注册），本模块不反向 import 上层
+    from src.python.core.circuit_breaker import circuit_text
 
-    return get_circuit_status(endpoint)
+    return circuit_text(endpoint)
 
 
 def strategy_label(strategy_raw: str) -> str:

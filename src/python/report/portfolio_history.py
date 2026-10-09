@@ -35,6 +35,7 @@ from src.python.analysis.drawdown_events import (
     extract_drawdown_events,
 )
 from src.python.analysis.metrics import compute_daily_returns
+from src.python.analysis.monthly_returns import aggregate_monthly_returns
 from src.python.fetcher.chain import fetch_with_incremental_fallback
 from src.python.report._history_quality import _diagnose_return, _validate_bars
 from src.python.report.benchmark import fetch_benchmarks, normalize_benchmarks
@@ -179,6 +180,7 @@ class PortfolioHistoryCalculator:
                 "total_return": float,
                 "total_return_pct": float,
                 "daily_returns": [float, ...],  # 日收益率序列（小数，非百分比）
+                "monthly_returns": {...},  # 月度收益日历（analysis/monthly_returns 数据契约）
                 "status": "ok" | "degraded" | "unavailable",
                 "warnings": [str, ...],
                 "benchmarks": [{code, name, bars, total_return_pct,
@@ -203,6 +205,7 @@ class PortfolioHistoryCalculator:
                 "warnings": ["所有持仓均无法获取历史走势数据"],
                 "failed_holdings": failed_holdings,
                 "successful_holdings": [],
+                "monthly_returns": aggregate_monthly_returns([]),
             }
 
         total_holdings = len(holdings)
@@ -226,6 +229,7 @@ class PortfolioHistoryCalculator:
                 "daily_returns_portfolio": [],
                 "status": "unavailable",
                 "warnings": warnings,
+                "monthly_returns": aggregate_monthly_returns([]),
             }
 
         # 3) 有效区间截断：去除首尾覆盖不足的日期
@@ -269,6 +273,7 @@ class PortfolioHistoryCalculator:
             "total_return_pct": round(total_return_pct, 2),
             "daily_returns": daily_returns,
             "daily_returns_portfolio": daily_returns,
+            "monthly_returns": aggregate_monthly_returns(bars),
             "data_start": sorted_dates[0],
             "data_end": sorted_dates[-1],
             "status": status,

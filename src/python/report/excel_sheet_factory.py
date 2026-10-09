@@ -72,7 +72,7 @@ def build_data_availability(
     各写一份而漂移：
 
       - 财报摘要 / 财务指标：契约非 None 即就绪（None = 对应功能开关关闭）
-      - 持仓变动复盘：契约非 None 即就绪（None = 实验开关 `holding_change_review`
+      - 持仓变动复盘：契约非 None 即就绪（None = 报告章节与增强开关 `holding_change_review`
         关闭，页签不创建）
       - 调仓纪律回放：契约非 None 即就绪（None = 实验开关 `rebalance_schedule_replay`
         关闭/未注入，页签不创建；available=False 时页签写占位）
@@ -133,7 +133,7 @@ def create_sheets(
         "news": enable_news,  # ← 配置驱动的 board 层值
         "history": enable_history,
         "evolution": enable_portfolio_evolution,
-        # 持仓变动复盘：实验章无 board 层开关（恒 True），可见性由 data 层
+        # 持仓变动复盘：无 board 层开关（恒 True），可见性由 data 层
         # data_flag（holding_change_data，seam 注入）控制
         "holding_change": True,
         # 调仓纪律回放：同持仓变动复盘（实验章无 board 层开关，data 层控制）

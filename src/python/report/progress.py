@@ -103,6 +103,29 @@ class ProgressReporter:
     def print_timing_summary(self) -> None:
         """输出耗时汇总。默认空实现，子类可覆盖。"""
 
+    def stage_progress(self, perf: Any) -> None:
+        """阶段状态行：当前阶段 + 已耗时 + 预计剩余（perf 历史同阶段中位数）。
+
+        所有进度通道（CLI verbose / Web / TUI）继承本单一实现，保证同源文案：
+        - ETA 可得且阶段非瞬时 → 输出「阶段」· 已耗时 · 预计剩余
+        - 历史不足（ETA 不可得）且已耗时 ≥1s → 仅显示已耗时
+        - 无活跃阶段、瞬时阶段（预估剩余 <1s）、预估计算失败 → 静默不输出
+        """
+        from src.python.core.perf import estimate_stage_eta, format_stage_status
+
+        try:
+            status = perf.stage_status()
+            if not status:
+                return
+            eta = estimate_stage_eta(status["phase"], status["elapsed"], report_type=perf.report_type)
+            if eta is None and status["elapsed"] < 1.0:
+                return
+            if eta is not None and eta < 1.0:
+                return
+            self.info(format_stage_status(status, eta))
+        except Exception:
+            logger.debug("阶段状态行生成失败，静默降级", exc_info=True)
+
     def timer(self, label: str) -> Timer:
         """返回绑定了实例级记录的计时器上下文管理器。"""
         return Timer(label, records=self._timing_records)

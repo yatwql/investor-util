@@ -44,15 +44,15 @@
                     <tr>
                         <td>{{ entry["rank"] }}</td>
                         <td class="text-left">{{ entry["name"] }}</td>
-                        <td>{{ entry["codes"] | join(", ") if entry["codes"] else "--" }}</td>
+                        <td>{{ entry["codes"] | map("anon_code") | join(", ") if entry["codes"] else "--" }}</td>
                         <td class="text-right">{{ entry["mv"] | money }}</td>
                         <td class="text-right">{{ (entry["ratio_pct"] / 100) | pct }}</td>
                         <td>{{ entry.get("sector", "--") }}</td>
-                        <td style="font-size: 12px;">{{ entry.get("concepts", []) | join(" / ") if entry.get("concepts") else "--" }}</td>
+                        <td style="font-size: var(--fs-table-sm);">{{ entry.get("concepts", []) | join(" / ") if entry.get("concepts") else "--" }}</td>
                         <td>{{ entry.get("eps_text", "--") }}</td>
                         <td>{{ entry.get("dividend_text", "--") }}</td>
-                        {% if valuation_enabled %}<td style="font-size: 12px;">{{ entry.get("valuation_text", "--") }}</td>{% endif %}
-                        <td class="text-left" style="font-size: 12px;">
+                        {% if valuation_enabled %}<td style="font-size: var(--fs-table-sm);">{{ entry.get("valuation_text", "--") }}</td>{% endif %}
+                        <td class="text-left" style="font-size: var(--fs-table-sm);">
                             {% for src in entry["sources"] %}
                             <span class="source-tag">{{ src }}</span>
                             {% endfor %}
@@ -72,19 +72,19 @@
                 ，合计市值 {{ s["unknown_mv"] | money }} 元未计入穿透 TOP10</div>
             {% set failed_details = s.get("failed_fund_details", []) %}
             {% if failed_details %}
-            <div style="margin-left: 1.5em; font-size: 12px;">
+            <div style="margin-left: 1.5em; font-size: var(--fs-table-sm);">
                 无法获取穿透的基金：
                 {% for f in failed_details %}
-                <span class="source-tag">{{ f["name"] }}({{ f["code"] }})</span>
+                <span class="source-tag">{{ f["name"] }}({{ f["code"] | anon_code }})</span>
                 {% endfor %}
             </div>
             {% endif %}
             {% set stale_details = s.get("stale_fund_details", []) %}
             {% if stale_details %}
-            <div style="margin-left: 1.5em; font-size: 12px;">
+            <div style="margin-left: 1.5em; font-size: var(--fs-table-sm);">
                 报告期陈旧被剔除的基金：
                 {% for f in stale_details %}
-                <span class="source-tag">{{ f["name"] }}({{ f["code"] }}) 报告期 {{ f["period"] }}，距今 {{ f["quarters"] }} 个完整季度</span>
+                <span class="source-tag">{{ f["name"] }}({{ f["code"] | anon_code }}) 报告期 {{ f["period"] }}，距今 {{ f["quarters"] }} 个完整季度</span>
                 {% endfor %}
             </div>
             {% endif %}
@@ -95,10 +95,10 @@
             </div>
             {% set report_periods = s.get("report_periods", []) %}
             {% if report_periods %}
-            <div style="font-size: 12px;">
+            <div style="font-size: var(--fs-table-sm);">
                 各基金持仓报告期：
                 {% for p in report_periods %}
-                <span class="source-tag">{{ p["name"] }}({{ p["code"] }}) {{ p["period"] }}</span>
+                <span class="source-tag">{{ p["name"] }}({{ p["code"] | anon_code }}) {{ p["period"] }}</span>
                 {% endfor %}
             </div>
             {% endif %}

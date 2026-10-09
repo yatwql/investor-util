@@ -82,7 +82,7 @@ def _compute_section_visibility(
         "news": enable_news,  # ← 配置字段（不是 include_news/data 层）
         "history": enable_history,
         "evolution": enable_portfolio_evolution,  # ← board 层：组合演进
-        # 持仓变动复盘：实验章无 board 层开关（恒 True），可见性由 data 层
+        # 持仓变动复盘：无 board 层开关（恒 True），可见性由 data 层
         # data_flag（holding_change_data，seam 注入）控制——与 Excel 端同口径
         "holding_change": True,
         # 调仓纪律回放：同持仓变动复盘（实验章无 board 层开关，data 层控制）
@@ -106,7 +106,7 @@ def _compute_section_visibility(
         # evolution_data 同上：始终由编排层计算注入（非 None）→ 章节可见，
         # available=False 时模板写占位文本（快照不足，§1.4.5）
         "evolution_data": evolution_data is not None,
-        # 持仓变动复盘：实验开关 holding_change_review 经 seam 注入（缺席=None）→
+        # 持仓变动复盘：报告章节与增强开关 holding_change_review 经 seam 注入（缺席=None）→
         # 整章隐藏；注入但 available=False 时模板写占位（双端同口径）
         "holding_change_data": holding_change_data is not None,
         # 调仓纪律回放：实验开关 rebalance_schedule_replay 经 seam 注入（缺席=None）→
@@ -167,7 +167,7 @@ def _build_section_nav_groups(
     按报告号**线性序扫描**，同组连续段聚为一块——默认注册序下每组号段连续、
     一块即一组，展开后严格 1..N 与正文逐位一致；用户配置 report_section_order
     跨组插号时（如附录章插入号段中间），组在号序断点处自然拆块、同组可出现
-    多块，如实反映线性序，展开恒等于正文线性序（无跳号回跳，C7 序号可配置兼容）。
+    多块，如实反映线性序，展开恒等于正文线性序（无跳号回跳，序号可配置兼容）。
     仅收录当前可见章节；空组保留在返回列表末尾，模板端跳过渲染（无 `<details>`）。
     返回 [{key, name, sections: [{key, number, name, llm_supported}, ...]}...]；
     llm_supported 标记该章节是否由 LLM 参与生成（🧠 标记，与导航分组解耦）；

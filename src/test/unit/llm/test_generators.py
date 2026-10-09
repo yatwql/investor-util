@@ -347,3 +347,33 @@ class TestSystemPromptOverride(unittest.TestCase):
         self._call()
         call_args = mock_gen.call_args[0]
         self.assertEqual(call_args[3], _SYSTEM_GLOBAL_MACRO)
+
+
+class TestSingletonsFacade(unittest.TestCase):
+    """单例域下沉后 generators 门面同一性（回归：_llm_dispatch / 旧导入面不破坏）。"""
+
+    def test_singletons_same_objects(self) -> None:
+        """generators_singletons.__all__ 每个名字经门面可得且为同一对象。"""
+        from src.python.llm import generators, generators_singletons
+
+        for name in generators_singletons.__all__:
+            self.assertIs(
+                getattr(generators, name),
+                getattr(generators_singletons, name),
+                msg=name,
+            )
+
+    def test_debate_stays_in_facade(self) -> None:
+        """辩论/自审生成器仍在门面定义域（域拆分不移动辩论）。"""
+        import inspect
+
+        from src.python.llm import generators
+
+        self.assertIs(
+            inspect.getmodule(generators.generate_debate_procon),
+            generators,
+        )
+        self.assertIs(
+            inspect.getmodule(generators.generate_self_review),
+            generators,
+        )

@@ -10,7 +10,6 @@
 
 from __future__ import annotations
 
-import importlib.util
 import json
 from pathlib import Path
 
@@ -26,26 +25,14 @@ from src.python.providers.news_dedup import (
     _CROSS_SAFE_RATIO,
     _SAME_SRC_BIGRAM_MIN,
 )
+from src.test._script_loader import load_script
 
 pytestmark = [pytest.mark.unit, pytest.mark.unit_scripts]
-
-_REPO_ROOT = Path(__file__).resolve().parents[4]
-_SCRIPTS_DIR = _REPO_ROOT / "scripts"
-
-
-def _load_script():
-    """按文件名加载 scripts/ 下的工具脚本（规避 import 路径限制）。"""
-    fpath = _SCRIPTS_DIR / "calibrate-dedup-threshold.py"
-    spec = importlib.util.spec_from_file_location("calibrate_dedup_threshold", fpath)
-    mod = importlib.util.module_from_spec(spec)
-    assert spec.loader is not None
-    spec.loader.exec_module(mod)
-    return mod
 
 
 @pytest.fixture()
 def tool():
-    return _load_script()
+    return load_script("calibrate-dedup-threshold.py")
 
 
 def _record(
@@ -223,3 +210,21 @@ class TestReportOutput:
         out = capsys.readouterr().out
         assert "其中含真专名证据: 1 条" in out
         assert "会新增合并 1 条" in out
+
+
+class TestProperNounVetoSource:
+    """真专名判定与生产同源：泛词否决表经单源原语生效（校准展示面同步）。"""
+
+    def test_shared_helpers_apply_generic_veto(self, tool):
+        # 黄金 ETF 两报：共享 token 只有 etf（被否决）→ 不算真专名证据
+        assert tool._shared_carries_proper_noun("全球黄金ETF资金净流入创纪录", "8月全球黄金ETF净流入创新高") is False
+        assert tool._shared_proper_nouns("全球黄金ETF资金净流入创纪录", "8月全球黄金ETF净流入创新高") == []
+        # CPI 同事件两报：非否决短缩写照常作证据（bg2 设计用例不受影响）
+        assert tool._shared_carries_proper_noun("CPI同比增长2.5%", "CPI涨2.5%超预期") is True
+
+    def test_rules_legend_lists_generic_veto(self, tool, capsys):
+        tool._print_current_rules()
+        out = capsys.readouterr().out
+        assert "非泛词" in out
+        for word in tool._GENERIC_TOKENS:
+            assert word in out

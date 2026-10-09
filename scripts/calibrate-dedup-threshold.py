@@ -40,12 +40,15 @@ from src.python.providers.news_dedup import (  # noqa: E402
     _CROSS_CANDIDATE_RATIO,
     _CROSS_DIRECT_RATIO,
     _CROSS_SAFE_RATIO,
+    _GENERIC_TOKENS,
     _RATIO_CLEAN,
     _SAME_SRC_BIGRAM_MIN,
     _TOKEN_LIKE,
     _has_opposite_direction,
+    has_proper_noun_token,
     _normalize_title,
     _pair_similarity,
+    proper_noun_tokens,
 )
 
 #: 默认锚点文件（与 news_dedup._ANCHOR_PATH 同源，不再各写一份路径）
@@ -197,19 +200,19 @@ def classify_pair(ratio: float, overlap: int, same_source: bool, title_a: str, t
 
 
 def _shared_carries_proper_noun(title_a: str, title_b: str) -> bool:
-    """共享项中是否含真专名证据（英数 token 含字母，或 _tk 虚拟专名）。"""
+    """共享项中是否含真专名证据（与生产同源 ``has_proper_noun_token``，泛词否决表已生效）。"""
     from src.python.providers.news_dedup import _extract_entity_bigrams
 
     shared = _extract_entity_bigrams(_normalize_title(title_a)) & _extract_entity_bigrams(_normalize_title(title_b))
-    return any(_TOKEN_LIKE.match(s) for s in shared)
+    return has_proper_noun_token(shared)
 
 
 def _shared_proper_nouns(title_a: str, title_b: str) -> list[str]:
-    """共享项里的专名证据清单（展示用）。"""
+    """共享项里的专名证据清单（展示用；与生产同源 ``proper_noun_tokens``，泛词否决已生效）。"""
     from src.python.providers.news_dedup import _extract_entity_bigrams
 
     shared = _extract_entity_bigrams(_normalize_title(title_a)) & _extract_entity_bigrams(_normalize_title(title_b))
-    return sorted(s for s in shared if _TOKEN_LIKE.match(s))
+    return proper_noun_tokens(shared)
 
 
 def analyze(records: list[dict[str, Any]]) -> dict[str, Any]:
@@ -468,7 +471,7 @@ def _print_current_rules() -> None:
     print(f"  跨源主规则: 共享 ≥ {_CROSS_BIGRAM_MIN} 实体 bigram → 合并")
     print(
         f"  跨源专名梯度: 共享 = 2 且 ratio ≥ {_CROSS_BG2_RATIO} 且共享项含真专名"
-        f"（英数需含字母，pattern={_TOKEN_LIKE.pattern}）→ 合并"
+        f"（英数需含字母、非泛词[{','.join(sorted(_GENERIC_TOKENS))}]，pattern={_TOKEN_LIKE.pattern}）→ 合并"
     )
     print(
         f"  跨源安全区: ratio ≥ {_CROSS_DIRECT_RATIO} 且专名 bg≥1 → 合并；"

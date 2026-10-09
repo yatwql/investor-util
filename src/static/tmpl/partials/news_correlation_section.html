@@ -18,12 +18,12 @@
                     <tr>
                         <td class="news-seq">{{ loop.index }}</td>
                         <td class="text-left news-title" data-label="新闻标题">
-                            <a href="{{ item.url }}" target="_blank" rel="noopener" style="color: #2E75B6; text-decoration: none;">{{ item.title }}</a>
+                            <a href="{{ item.url }}" target="_blank" rel="noopener" style="color: var(--primary); text-decoration: none;">{{ item.title }}</a>
                         </td>
-                        <td class="text-left" data-label="摘要" style="font-size: 12px; max-width: 300px;">{{ item.intro }}</td>
+                        <td class="text-left" data-label="摘要" style="font-size: var(--fs-table-sm); max-width: 300px;">{{ item.intro }}</td>
                         <td data-label="来源">{{ item.media_name }}</td>
-                        <td data-label="发布时间" style="font-size: 12px;">{{ item.ctime }}</td>
-                        <td class="text-left" data-label="关联关键词" style="font-size: 12px;">
+                        <td data-label="发布时间" style="font-size: var(--fs-table-sm);">{{ item.ctime }}</td>
+                        <td class="text-left" data-label="关联关键词" style="font-size: var(--fs-table-sm);">
                             {% if item.enriched_keywords and item.enriched_keywords|length > 0 %}
                                 {% for ekw in item.enriched_keywords %}
                                 {# ⚠️ ekw.display 来自外部 API，依赖 autoescape 防 XSS —— 勿加 |safe 过滤器 #}
@@ -36,7 +36,7 @@
                             {% endif %}
                         </td>
                         {% if has_llm_analysis %}
-                        <td class="text-left" data-label="LLM 关联分析" style="font-size: 12px; max-width: 200px;">
+                        <td class="text-left" data-label="LLM 关联分析" style="font-size: var(--fs-table-sm); max-width: 200px;">
                             {% if item.llm_analysis %}
                             <span>{{ item.llm_analysis | sentiment_colorize | safe }}</span>
                             {% else %}

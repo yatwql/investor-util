@@ -1,6 +1,6 @@
 """持仓变动复盘面板（holding_change_panel）测试 — 契约装配 + 双端单源展示。
 
-覆盖（迭代 3 验收）：
+覆盖（对应验收条目）：
   - 契约装配：多期快照 → available/事件计数/指标/样本门槛回显/局限标注
   - 保留期读配置（history.snapshot_retention_days），缺省回退常量
   - 意图对账：决策账本事件只读注入 → aligned 计数；空账本 → 无意图记录口径
@@ -8,7 +8,7 @@
   - 双端一致：Excel 页签单元格字符串 ⊇/== view 同源行（同一次装配、同一份文本）
   - 关态：data_flag 缺省 False（Excel 显式 False，HTML data_flags 悲观 False），
     隐藏章不消耗连续编号（逐字节回退既有编号面）
-  - 开关注册表：holding_change_review 已登记（实验组、默认关、影响报告）
+  - 开关注册表：holding_change_review 已登记（报告章节与增强组、默认关、影响报告）
   - 模板接线：partial 存在且被 report_template include，按 section_visible 守卫
 
 测试隔离：conftest `_isolate_sensitive_paths` 把 HISTORY_SNAPSHOT_DIR 与
@@ -325,12 +325,12 @@ class TestOffStateVisibility:
 
 
 class TestFeatureSwitchRegistry:
-    """holding_change_review 已登记且默认关、影响报告输出。"""
+    """holding_change_review 已登记（章节类转正入报告组）且默认关、影响报告输出。"""
 
-    def test_switch_registered_in_experimental_group_off_by_default(self):
+    def test_switch_registered_in_report_group_off_by_default(self):
         sw = feature_switch_registry["holding_change_review"]
         assert sw.label == "持仓变动复盘"
-        assert sw.group == "experimental"
+        assert sw.group == "report"
         assert sw.default is False
         assert sw.affects_report is True
         assert is_feature_enabled("holding_change_review") is False

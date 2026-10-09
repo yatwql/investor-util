@@ -598,6 +598,66 @@ class TestFlushAnchorsDedup(unittest.TestCase):
         self.assertEqual(len(lines), 1, f"重试后应写入 1 条: {lines}")
 
 
+class TestDedupGenericTokenVeto(unittest.TestCase):
+    """bg=2 梯度泛词否决表（ai/etf/cm/gb/ce/pcb 不作专名证据）。
+
+    语料依据：锚点 7.8 万对实测——靠这些词过闸的 bg=2 合并绝大多数为跨主体
+    误合并（不同基金各自行情/不同指数/“20cm”俚语/CE 认证）；CPI/PPI/IPO/AMD
+    类真发布会与公司缩写不在表内、照常作专名证据。
+    """
+
+    def _make_item(self, title: str, source: str = "东方财富") -> dict:
+        return {"title": title, "_source": source, "url": "http://x.com/" + title[:10]}
+
+    def test_generic_tokens_vetoed_but_indicator_acronyms_allowed(self) -> None:
+        """否决词全部无效；非否决短缩写（cpi 等）与混合集保留。"""
+        from src.python.providers.news_dedup import has_proper_noun_token, proper_noun_tokens
+
+        for word in ("ai", "etf", "cm", "gb", "ce", "pcb"):
+            self.assertEqual(proper_noun_tokens({word, "芯片"}), [], f"泛词应被否决: {word}")
+        self.assertFalse(has_proper_noun_token({"ai", "芯片"}))
+        self.assertTrue(has_proper_noun_token({"cpi", "芯片"}))
+        self.assertEqual(proper_noun_tokens({"etf", "cpi"}), ["cpi"])
+
+    def test_bg2_merge_blocked_by_generic_veto(self) -> None:
+        """真实锚点样本：黄金 ETF 两报——否决表置空即合并，现行否决表则保留两条。"""
+        from src.python.providers import news_dedup_rules
+        from src.python.providers.news_aggregator import _dedup_by_title
+        from src.python.providers.news_dedup import (
+            _CROSS_BG2_RATIO,
+            _extract_entity_bigrams,
+            _normalize_title,
+            _pair_similarity,
+        )
+
+        items = [
+            self._make_item("全球黄金ETF资金净流入创纪录 黄金短期交易逻辑出现变化", "第一财经"),
+            self._make_item("8月全球黄金ETF，净流入创新高！后市如何配置？机构研判", "同花顺"),
+        ]
+        # 自证这对标题确实走 bg=2 证据面：ratio 达梯度门槛、overlap=2、共享集含否决词
+        ratio, overlap = _pair_similarity(items[0]["title"], items[1]["title"])
+        self.assertGreaterEqual(ratio, _CROSS_BG2_RATIO)
+        self.assertGreaterEqual(overlap, 2)
+        shared = _extract_entity_bigrams(_normalize_title(items[0]["title"])) & _extract_entity_bigrams(
+            _normalize_title(items[1]["title"])
+        )
+        self.assertLessEqual({"etf"}, shared)
+        with patch.object(news_dedup_rules, "_GENERIC_TOKENS", frozenset()):
+            self.assertEqual(len(_dedup_by_title([dict(i) for i in items])), 1)  # 否决表空 → 原证据合并
+        self.assertEqual(len(_dedup_by_title([dict(i) for i in items])), 2)  # 现行否决 → 保留两条
+
+    def test_rules_fingerprint_covers_generic_token_table(self) -> None:
+        """泛词表入规则指纹：词表变动必须换锚点时代（分代依据不遗漏）。"""
+        from src.python.providers import news_dedup_rules
+        from src.python.providers.news_dedup import _rules_fingerprint
+
+        base = _rules_fingerprint()
+        with patch.object(
+            news_dedup_rules, "_GENERIC_TOKENS", frozenset({"ai", "etf", "cm", "gb", "ce", "pcb", "xyz"})
+        ):
+            self.assertNotEqual(_rules_fingerprint(), base)
+
+
 class TestDedupNumericTokenNotProperNoun(unittest.TestCase):
     """纯数字共享不算专名证据（bg=2 梯度不再为数字误合并）。
 

@@ -107,6 +107,12 @@ def resolve_market_data(
                 details = []
             else:
                 details = gen_details(holdings)
+            # 持仓匿名化装配边界：basic 路径明细在此就地匿名（both/full 已在
+            # prepare_report_data 装配处脱敏；此处仅覆盖内部生成路径）。
+            # off → 恒等零开销；summary 行留给明细页签渲染层折叠。
+            from src.python.report._report_helpers import apply_report_anonymization
+
+            _, details = apply_report_anonymization(None, details)
             total_mv = sum(d.market_value for d in details)
             total_cost = sum(d.cost for d in details)
             total_profit = sum(d.profit for d in details)

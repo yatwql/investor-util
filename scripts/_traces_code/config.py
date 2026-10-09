@@ -4,7 +4,10 @@ from __future__ import annotations
 
 from pathlib import Path
 
-REPO_ROOT = Path(__file__).resolve().parent.parent
+# 本文件位于 scripts/_traces_code/ 下，故深度取三级（仓库根），不得用
+# parent.parent——那样会落在 scripts/ 下，SCAN_DIRS 变成不存在的
+# scripts/src/... 而令整轮扫描静默跳过（扫不到即「永远通过」）。
+REPO_ROOT = Path(__file__).resolve().parents[2]
 SCAN_DIRS = [
     REPO_ROOT / "src" / "python",
     REPO_ROOT / "src" / "test",
@@ -14,6 +17,11 @@ SCAN_DIRS = [
 # 跳过文件名（编译产物）。本工具自身（check-*.traces.py）由 _is_tool_self()
 # 模式豁免——见下方说明，不在此硬编码文件名。
 SKIP_FILES = {"chart.min.js"}
+
+#: 规则定义载体目录：模式/豁免正则与描述字面量（R11/F-1/F_1/第X章…）住在
+#: 本包内，属“尺子本身”而非被查对象（拆包前它们在 check-code-traces.py
+#: 文件体内，由 _is_tool_self() 结构性豁免）。按目录识别，文件名无关。
+RULE_CARRIER_DIRS = frozenset({"_traces_code"})
 
 
 def _is_tool_self(name: str) -> bool:

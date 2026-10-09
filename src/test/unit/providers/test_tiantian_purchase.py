@@ -149,7 +149,7 @@ class TestParsePurchaseTable:
         assert rows["000043"]["daily_limit"] == pytest.approx(100.0)
 
     def test_limited_row_with_zero_cap_maps_to_none(self):
-        """代表行③：限大额但日限 0 元 → 解析层单点转换为 None（限额未知，风险 R4）。"""
+        """代表行③：限大额但日限 0 元 → 解析层单点转换为 None（限额未知，不显示 0 元）。"""
         payload = parse_purchase_table(_fixture_text())
         assert payload is not None
         row = payload["rows"]["000013"]

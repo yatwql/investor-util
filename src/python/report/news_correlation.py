@@ -412,6 +412,29 @@ def _enrich_news_keywords(
         item["enriched_keywords"] = enriched if enriched else []
 
 
+def _mask_news_display_fields(news_items: list[dict[str, Any]], holdings: list[Holding], mode: str) -> None:
+    """新闻关键词显示字段匿名化（返回前单点；检索与 LLM 判定输入保持真值）。
+
+    匹配关键词与富化标签按真名→代号掩码（off → 恒等零开销）。
+    """
+    if mode == "off":
+        return
+    from src.python.config.anonymizer import build_report_alias_map, mask_display_text
+
+    alias_map = build_report_alias_map(holdings, mode)
+    for item in news_items:
+        if item.get("matched_keywords"):
+            item["matched_keywords"] = [mask_display_text(k, alias_map) for k in item["matched_keywords"]]
+        enriched = item.get("enriched_keywords")
+        if enriched:
+            item["enriched_keywords"] = [
+                {**e, "label": mask_display_text(e.get("label", ""), alias_map)}
+                if isinstance(e, dict) and e.get("label")
+                else e
+                for e in enriched
+            ]
+
+
 def build_news_data(
     holdings: list[Holding],
     top_n: int = 100,
@@ -491,6 +514,11 @@ def build_news_data(
         news_items, holdings, penetrated_assets, industry_data, meta, purchase_constraint_block
     )
     _enrich_news_keywords(news_items, holdings, penetrated_assets, industry_data)
+    # 关键词显示脱敏（config anonymization.mode）：取数链真值不变，仅返回前
+    # 掩码显示字段（同一匿名化公共入口）
+    from src.python.config.anonymizer import get_anonymization_mode
+
+    _mask_news_display_fields(news_items, holdings, get_anonymization_mode())
 
     # 补充各源状态（在 aggregate_news 之后获取）
     try:

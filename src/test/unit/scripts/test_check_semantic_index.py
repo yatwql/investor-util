@@ -9,36 +9,21 @@
   - 注释剔除：tokenize 剔除注释、字符串字面量保留
   - 反向存在性：代码中出现为 True、仅注释提及为 False、__pycache__ 跳过
   - run_checks 三向校验：全通过 / 正向表外键 / 反向僵尸条目 / 合并章 key 缺失 / 标记缺失
-  - 真实仓库冒烟：当前 technical.md + _config_defaults.py + registry.py 一致
+  - 真实仓库冒烟：当前 technical.md + _config_defaults.py + report_section_registry.py 一致
 
 测试通过脚本 import 方式直接复用解析函数，不运行真实 CLI。
 """
 
 from __future__ import annotations
 
-import importlib.util
-from pathlib import Path
 
 import pytest
-
-_REPO_ROOT = Path(__file__).resolve().parents[4]  # 仓库根目录（src/test/unit/scripts 向上 4 级）
-_SCRIPTS_DIR = _REPO_ROOT / "scripts"
-
-
-def _load_script(name: str):
-    """按文件名加载 scripts/ 下的检查脚本（规避 import 路径限制）。"""
-    fpath = _SCRIPTS_DIR / name
-    mod_name = name.replace(".py", "").replace("-", "_")
-    spec = importlib.util.spec_from_file_location(mod_name, fpath)
-    mod = importlib.util.module_from_spec(spec)
-    assert spec.loader is not None
-    spec.loader.exec_module(mod)
-    return mod
+from src.test._script_loader import load_script
 
 
 @pytest.fixture(scope="module")
 def sem_index():
-    return _load_script("check-semantic-index.py")
+    return load_script("check-semantic-index.py")
 
 
 pytestmark = [
@@ -276,6 +261,6 @@ class TestRealRepoSmoke:
     def test_current_repo_passes(self, sem_index):
         doc_text = sem_index._TECHNICAL_MD.read_text(encoding="utf-8")
         defaults_source = sem_index._CONFIG_DEFAULTS.read_text(encoding="utf-8")
-        registry_source = sem_index._REGISTRY_PY.read_text(encoding="utf-8")
+        registry_source = sem_index._SECTION_REGISTRY_PY.read_text(encoding="utf-8")
         findings = sem_index.run_checks(doc_text, defaults_source, registry_source, sem_index._CODE_ROOT)
         assert findings == []

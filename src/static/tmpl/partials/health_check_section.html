@@ -8,13 +8,13 @@
         {# 模块已禁用，完全跳过 #}
         {% else %}
         <div class="section-content">
-            <div class="empty-note placeholder-note">
+            <div class="empty-note">
                 <p><strong>本节内容待生成</strong></p>
-                <p style="margin-top: 8px; font-size: 13px; color: #888;">
+                <p style="margin-top: 8px; font-size: var(--fs-table); color: #888;">
                     模块说明：从风险分散度、流动性、收益合理性、成本结构
                     四个维度对投资组合进行全面体检并打分，提供具体改进建议。
                 </p>
-                <p style="margin-top: 12px; font-size: 12px; color: var(--text-faint);">
+                <p style="margin-top: 12px; font-size: var(--fs-table-sm); color: var(--text-faint);">
                     功能入口：菜单 L（生成全系列完整版报告）|
                     需配置 LLM API Key 后自动启用
                 </p>

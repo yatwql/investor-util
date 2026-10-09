@@ -28,6 +28,7 @@ from unittest.mock import patch
 import pytest
 
 from src.python.llm import generators
+from src.python.llm import generators_singletons
 from src.python.llm.generators_orchestrator import _compute_module_cache_info
 from src.python.llm.module_fingerprint import (
     MODULE_FINGERPRINT_BUILDERS,
@@ -206,7 +207,7 @@ def _write_fingerprint(
         "health_check": generators.generate_health_check,
         "penetration_deep": generators.generate_penetration_deep_analysis,
     }[module_key]
-    with patch.object(generators, "generate_llm_module") as mock_gen:
+    with patch.object(generators_singletons, "generate_llm_module") as mock_gen:
         mock_gen.return_value = ("内容", False)
         generator_fn(
             **_write_kwargs(

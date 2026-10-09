@@ -2,11 +2,14 @@
 
 **统一的检查脚本契约**（CLAUDE.md 的提交前/发布前门禁据此调用）：
   - 每个检查脚本支持 `-v/--verbose`（详细）与 `--ci`（仅输出 `文件:描述`）
-  - 退出码 **0 = 通过，2 = 发现 finding**（`check-code-traces.py` 另有 LOW 级别 1，属其自身分级语义）
+  - 退出码 **0 = 通过，2 = 发现 finding**（`check-code-traces.py` 另有分级语义：
+    HIGH/ORIGIN/VERSION=1、仅 LOW=3，其允许码集见 `check-script-contract.py` 白名单）
   - 通过时打印 `[OK] …`；失败时逐条 `[ERR] file:desc`（或 `--ci` 下仅 `file:desc`）+ `[!] 发现 N 处…`
 
-本模块提供**无副作用的原语**（例外：结论缓存 `conclusion_cache_*`——仅在调用方
-显式调用时读写，写入原子、失败静默，见文末章节）；脚本以
+本模块提供**无副作用的原语**（例外有二：结论缓存 `conclusion_cache_*`——仅在调用方
+显式调用时读写，写入原子、失败静默，见文末章节；**stdio 编码收敛**——import 即把
+非 UTF-8 的 stdout/stderr 收敛到 UTF-8，防 Windows 重定向落盘后回放乱码，见
+`_force_utf8_stream`）；脚本以
 ``sys.path.insert(0, str(Path(__file__).resolve().parent))`` 后 ``from _checklib import …`` 引用
 （`pyproject.toml` 对 `scripts/*.py` 声明了 E402 豁免，理由即此）。
 """
@@ -15,6 +18,7 @@ from __future__ import annotations
 
 import argparse
 import hashlib
+import io
 import json
 import os
 import re
@@ -24,6 +28,27 @@ from pathlib import Path
 
 #: 仓库根目录（`scripts/` 的上一级）
 REPO_ROOT: Path = Path(__file__).resolve().parent.parent
+
+
+def _force_utf8_stream(stream: object) -> None:
+    """把非 UTF-8 的真实文本流收敛到 UTF-8（已是 UTF-8 / 非 TextIOWrapper 则无操作）。
+
+    Windows 上 stdout 重定向到文件时 Python 按 locale ANSI（cp936/GBK）编码落盘，
+    UTF-8 终端回放该字节流即乱码（如「未」的 GBK 双字节被逐字节误读成 `δ`）——pre-commit 的
+    `run_bg` 守护日志回放依赖此保证；控制台直打走 `WriteConsoleW` 本就无损，
+    StringIO 等测试输出桩无 reconfigure 能力，均不得改写。
+    """
+    if isinstance(stream, io.TextIOWrapper) and (stream.encoding or "").lower().replace("-", "") != "utf8":
+        stream.reconfigure(encoding="utf-8")
+
+
+def _force_utf8_stdio() -> None:
+    """对当前 stdout/stderr 应用 :func:`_force_utf8_stream`（本模块 import 即调用）。"""
+    _force_utf8_stream(sys.stdout)
+    _force_utf8_stream(sys.stderr)
+
+
+_force_utf8_stdio()
 
 
 def rel(path: Path) -> str:
@@ -100,6 +125,38 @@ def replace_region(text: str, start_marker: str, end_marker: str, block: str) ->
     if end == -1:
         return None
     return text[:body_start] + block + text[end:]
+
+
+def extract_at_rule_blocks(css: str, at_rule: str) -> list[str]:
+    """提取全部 ``@<at_rule>`` 块体（括号平衡解析），如 ``at_rule="media print"``。
+
+    拒绝「首匹配起固定字符窗」类脆弱正则——样式块增删会使窗口越界造成假阴性
+    （曾致打印断言随内容增长随机失败）；括号平衡定位语义精确，块内嵌套
+    ``{...}``（``@page``/``keyframes``）亦正确收敛。
+    """
+    blocks: list[str] = []
+    start = 0
+    needle = f"@{at_rule}"
+    while True:
+        idx = css.find(needle, start)
+        if idx < 0:
+            break
+        brace = css.find("{", idx)
+        if brace < 0:
+            break
+        depth = 0
+        end = brace
+        for pos in range(brace, len(css)):
+            if css[pos] == "{":
+                depth += 1
+            elif css[pos] == "}":
+                depth -= 1
+                if depth == 0:
+                    end = pos
+                    break
+        blocks.append(css[brace : end + 1])
+        start = end + 1
+    return blocks
 
 
 def _table_region_pattern(markers: tuple[str, str]) -> re.Pattern[str]:

@@ -30,8 +30,15 @@ from src.python.config.anonymizer import (
     ANONYMIZATION_MODE_DESCRIPTIONS,
     anonymize_holdings,
     anonymize_holdings_details,
+    build_code_display_map,
+    build_report_alias_map,
+    fold_details_summary,
     get_anonymization_mode,
     is_anonymization_enabled,
+    is_code_masked_mode,
+    mask_code_text,
+    mask_display_text,
+    mask_holding_code,
     set_anonymization_mode,
 )
 from src.python.core.models import Holding
@@ -189,19 +196,25 @@ class TestAnonymizeHoldingsDetails(unittest.TestCase):
         self.assertEqual(result[0]["name"], "品种A")
         self.assertEqual(result[1]["name"], "品种B")
 
-    def test_full_anonymous_masks_value(self):
-        """full_anonymous → 代码掩码 + 金额模糊 + 盈亏文本。"""
+    def test_full_anonymous_blurs_values_and_keeps_code(self):
+        """full_anonymous → 代码保留（键控链路）+ 金额千位模糊 + 盈亏数值派生。"""
         result = anonymize_holdings_details(_mk_details(), "full_anonymous")
         self.assertIsInstance(result, list)
         entry = result[0]
-        self.assertEqual(entry["code"], "000XXX")
+        # 代码保留真值：再平衡静默/决策账本/申购状态等键控链路不跨品种碰撞；
+        # 「000XXX」显示由明细渲染层与产物清扫兑底
+        self.assertEqual(entry["code"], "600036")
         self.assertEqual(entry["market_value"], 216000.0)  # round(216400/1000)*1000
         self.assertEqual(entry["cost"], 200000.0)  # round(200000/1000)*1000
-        self.assertIsInstance(entry["profit"], str)
-        self.assertIn("%", entry["profit"])
+        # 盈亏保持数值型且行内恒等（盈亏 = 市值 − 成本），下游合计/格式化不崩
+        self.assertIsInstance(entry["profit"], float)
+        self.assertEqual(entry["profit"], 16000.0)
+        # 收益率由模糊值派生（百分比契约），不残留模糊前精度
+        self.assertEqual(entry["profit_rate"], 8.0)
+        self.assertEqual(entry["profit_rate_pct"], 8.0)
 
     def test_full_anonymous_zero_profit(self):
-        """full_anonymous + profit=0 → 盈亏文本 '±0.0%'。"""
+        """full_anonymous + 盈亏为 0 → 派生盈亏/收益率为数值 0。"""
         d = {
             "name": "招商银行",
             "code": "600036",
@@ -212,7 +225,8 @@ class TestAnonymizeHoldingsDetails(unittest.TestCase):
             "account": "测试账户",
         }
         result = anonymize_holdings_details([d], "full_anonymous")
-        self.assertEqual(result[0]["profit"], "±0.0%")
+        self.assertEqual(result[0]["profit"], 0.0)
+        self.assertEqual(result[0]["profit_rate"], 0.0)
 
     def test_summary_aggregates_details(self):
         """summary → 含 market_value/cost/profit 汇总。"""
@@ -350,6 +364,139 @@ class TestGetSetMode(unittest.TestCase):
         with self.assertRaises(ValueError):
             set_anonymization_mode("bogus")
         mock_set.assert_not_called()
+
+
+class TestReportAliasMaskFold(unittest.TestCase):
+    """build_report_alias_map / mask_display_text / fold_details_summary（报告管线接入面）。"""
+
+    def test_off_mode_yields_empty_map(self):
+        """off → 空映射（清扫/掩码恒等）。"""
+        self.assertEqual(build_report_alias_map(_mk_details(), "off"), {})
+
+    def test_alias_numbering_matches_details_anonymization(self):
+        """映射编号与 anonymize_holdings_details 的 code 首次见序一致（代号同源）。"""
+        details = _mk_details()
+        mapping = build_report_alias_map(details, "code_display")
+        anon = anonymize_holdings_details([dict(d) for d in details], "code_display")
+        for src, out in zip(details, anon, strict=True):
+            self.assertEqual(mapping[src["name"]], out["name"])
+        self.assertEqual(mapping["招商银行"], "品种A")
+        self.assertEqual(mapping["贵州茅台"], "品种B")
+        # code_display 不映射代码
+        self.assertNotIn("600036", mapping)
+
+    def test_full_map_includes_codes(self):
+        """full → 映射含真码 → 000XXX。"""
+        mapping = build_report_alias_map(_mk_details(), "full_anonymous")
+        self.assertEqual(mapping["600036"], "000XXX")
+        self.assertEqual(mapping["招商银行"], "品种A")
+
+    def test_mask_display_text_long_key_first(self):
+        """长键优先替换；空映射恒等。"""
+        mapping = {"招商银行": "品种A", "600036": "000XXX"}
+        text = "招商银行(600036) 限购 100 份"
+        self.assertEqual(mask_display_text(text, mapping), "品种A(000XXX) 限购 100 份")
+        self.assertEqual(mask_display_text(text, {}), text)
+
+    def test_fold_details_summary_rows_schema(self):
+        """折叠行保持明细 dict 同构键 + 大类聚合值。"""
+        rows = fold_details_summary(_mk_details())
+        self.assertEqual(len(rows), 1)  # 两条均股票/其他
+        row = rows[0]
+        self.assertEqual(row["name"], "股票汇总")
+        self.assertEqual(row["market_value"], 561400.0)
+        self.assertEqual(row["cost"], 500000.0)
+        self.assertEqual(row["profit"], 61400.0)
+        self.assertEqual(row["code"], "")
+        # 同构键：下游渲染/小计/LLM 零改动消费
+        for key in ("profit_rate", "shares", "change_pct", "nav_date", "source_api", "price", "channel"):
+            self.assertIn(key, row)
+        self.assertEqual(row["profit_rate"], 12.28)  # 61400/500000*100
+
+    def test_fold_keeps_first_seen_order_and_fund_label(self):
+        """类别按首见序；含基金时生成「基金汇总」行。"""
+        details = _mk_details() + [
+            {
+                "name": "沪深300ETF",
+                "code": "510300",
+                "market_value": 10000.0,
+                "cost": 9000.0,
+                "profit": 1000.0,
+                "profit_rate_pct": 11.1,
+                "account": "测试账户",
+            }
+        ]
+        rows = fold_details_summary(details)
+        labels = [r["name"] for r in rows]
+        self.assertEqual(labels[0], "股票汇总")
+        self.assertIn("基金汇总", labels)
+
+
+class TestCodeDisplayMaskFold(unittest.TestCase):
+    """build_code_display_map / mask_holding_code / mask_code_text（代码面渲染点掩码）。"""
+
+    def test_code_map_covers_only_code_masking_modes(self):
+        """full/summary → {真码: 掩码}；code_display/off → 空（契约保留真码）。"""
+        details = _mk_details()
+        expected = {"600036": "000XXX", "600519": "000XXX"}
+        self.assertEqual(build_code_display_map(details, "full_anonymous"), expected)
+        self.assertEqual(build_code_display_map(details, "summary"), expected)
+        self.assertEqual(build_code_display_map(details, "code_display"), {})
+        self.assertEqual(build_code_display_map(details, "off"), {})
+
+    def test_code_map_excludes_non_holding_codes(self):
+        """映射只含实际持仓代码——指数/基准代码天然不在其中、不会被误掩。"""
+        mapping = build_code_display_map(_mk_details(), "full_anonymous")
+        self.assertNotIn("000300", mapping)
+        self.assertNotIn("510300", mapping)
+
+    def test_alias_map_exclude_codes_is_names_only(self):
+        """include_codes=False → 仅名称（HTML 自由文本清扫用，杜绝数字替换金额）。"""
+        details = _mk_details()
+        names_only = build_report_alias_map(details, "full_anonymous", include_codes=False)
+        self.assertEqual(names_only["招商银行"], "品种A")
+        self.assertNotIn("600036", names_only)
+        self.assertNotIn("600519", names_only)
+        # 默认仍含代码（Excel 字符串单元格清扫等键控面行为不变）
+        self.assertIn("600036", build_report_alias_map(details, "full_anonymous"))
+
+    def test_mask_holding_code_per_mode(self):
+        """full/summary → 掩码；code_display/off → 原样；空值原样返回。"""
+        self.assertEqual(mask_holding_code("600036", "full_anonymous"), "000XXX")
+        self.assertEqual(mask_holding_code("600036", "summary"), "000XXX")
+        self.assertEqual(mask_holding_code("600036", "code_display"), "600036")
+        self.assertEqual(mask_holding_code("600036", "off"), "600036")
+        self.assertEqual(mask_holding_code("", "full_anonymous"), "")
+
+    def test_is_code_masked_mode(self):
+        """is_code_masked_mode：full/summary → True；off/code_display/None → False。"""
+        self.assertTrue(is_code_masked_mode("full_anonymous"))
+        self.assertTrue(is_code_masked_mode("summary"))
+        self.assertFalse(is_code_masked_mode("off"))
+        self.assertFalse(is_code_masked_mode("code_display"))
+        self.assertFalse(is_code_masked_mode(None))
+
+    def test_mask_code_text_replaces_standalone_tokens(self):
+        """独立代码 token（HTML 单元格 / JSON 字符串 / 枚举列表）→ 折叠。"""
+        mapping = {"600036": "000XXX"}
+        self.assertEqual(mask_code_text("<td>600036</td>", mapping), "<td>000XXX</td>")
+        self.assertEqual(mask_code_text('{"code":"600036"}', mapping), '{"code":"000XXX"}')
+        self.assertEqual(mask_code_text("600036、999999", mapping), "000XXX、999999")
+        both = {"600036": "000XXX", "600519": "000XXX"}
+        self.assertEqual(mask_code_text("600036,600519", both), "000XXX,000XXX")
+
+    def test_mask_code_text_skips_numeric_substrings(self):
+        """金额 / JSON 数值 / 相邻数字中的同数字片段不被替换（数字子串误伤防护）。"""
+        mapping = {"600036": "000XXX"}
+        for text in ("金额 1600036.00", "600036.0", '{"mv":600036}', "12.600036%", "06000360", "1,600,036.00"):
+            self.assertEqual(mask_code_text(text, mapping), text, text)
+
+    def test_mask_code_text_empty_inputs_identity(self):
+        """None / 空文本 / 空映射 → 恒等。"""
+        self.assertIsNone(mask_code_text(None, {"600036": "000XXX"}))
+        self.assertEqual(mask_code_text("", {"600036": "000XXX"}), "")
+        self.assertEqual(mask_code_text("600036", None), "600036")
+        self.assertEqual(mask_code_text("600036", {}), "600036")
 
 
 class TestModeDescriptions(unittest.TestCase):

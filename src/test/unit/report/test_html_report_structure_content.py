@@ -302,7 +302,7 @@ class TestHtmlInteractiveCharts(unittest.TestCase):
         self.assertIsNone(section.find(id="chart_radar"))
 
     def test_radar_data_unavailable_placeholder(self) -> None:
-        """data_unavailable=True 时显示"持仓市值数据不可用，量化指标暂停计算"。"""
+        """data_unavailable=True 时显示降级占位（口径：数据不可用 + 原因）。"""
         overrides = {"radar": {"labels": ["夏普比率"], "datasets": [{"data": [1.2]}]}}
         order = [dict(sec) for sec in _REPORT_SECTION_DEFAULT]
         numbers = {sec["key"]: sec["number"] for sec in order}
@@ -317,7 +317,7 @@ class TestHtmlInteractiveCharts(unittest.TestCase):
         section = soup.find(id="sec-portfolio_history_drawdown")
         note = section.select_one(".chart-empty-note")
         self.assertIsNotNone(note)
-        self.assertIn("持仓市值数据不可用，量化指标暂停计算", note.get_text())
+        self.assertIn("数据不可用：未获取持仓市值数据，量化指标暂停计算", note.get_text())
         self.assertIsNone(section.find(id="chart_radar"))
 
     def test_all_chart_canvases_have_a11y_attrs(self) -> None:
@@ -542,13 +542,13 @@ class TestSummaryDateTimeValueStyles(unittest.TestCase):
         )
         self.assertRegex(
             style,
-            r"font-size:\s*1[5-9]px",
-            f"所属交易日字号应加大，style={style!r}",
+            r"font-size:\s*(?:1[5-9]px|var\(--fs-(?:h1|h2|h3|kpi)\))",
+            f"所属交易日字号应在章节/数值大字档，style={style!r}",
         )
         self.assertRegex(
             style,
-            r"color:\s*#2E75B6",
-            f"所属交易日值应为蓝色 2E75B6，style={style!r}",
+            r"color:\s*var\(--primary\)",
+            f"所属交易日值应使用品牌色 token，style={style!r}",
         )
 
     def test_kv_label_style_unaffected(self):

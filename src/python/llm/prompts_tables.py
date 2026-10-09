@@ -16,6 +16,7 @@ from __future__ import annotations
 import logging
 
 from src.python.analysis.fx_exposure import fx_exposure as _fx_exposure
+from src.python.config.anonymizer import code_masking_enabled, mask_holding_code
 from src.python.core.code_utils import get_currency_by_code
 from src.python.core.data_freshness import FRESHNESS_DEGRADED, FRESHNESS_STALE
 from src.python.llm.prompts_core import _fmt_holding_line, _fmt_wan
@@ -62,7 +63,7 @@ def _format_penetration_block(penetrated_assets: list[dict] | None, limit: int =
     assets = []
     for asset in penetrated_assets[:limit]:
         name = asset.get("name", "")
-        codes = ",".join(asset.get("codes", []))
+        codes = ",".join(mask_holding_code(c) for c in asset.get("codes", []))
         mv = asset.get("mv", 0)
         sector = asset.get("sector", "--")
         assets.append(f"{name}({codes}){_fmt_wan(mv)}/{sector}")
@@ -369,7 +370,7 @@ def _build_holdings_summary(
     lines: list[str] = []
     for i, h in enumerate(holdings[:20]):
         code = (h.code or "").strip()
-        line = f"{i + 1}. {h.name} ({code})"
+        line = f"{i + 1}. {h.name} ({mask_holding_code(code)})"
         if industry_data and code in industry_data:
             idata = industry_data[code]
             tags = []
@@ -383,7 +384,7 @@ def _build_holdings_summary(
     if penetrated_assets:
         for a in penetrated_assets[:10]:
             name = a.get("name", "")
-            codes = ",".join(a.get("codes", []))
+            codes = ",".join(mask_holding_code(c) for c in a.get("codes", []))
             line = f"    [穿透] {name} ({codes})"
             if industry_data:
                 tags = []
@@ -455,7 +456,7 @@ def _build_top3_block(
         weight = (mv / total_mv * 100) if total_mv else 0
         rate = h.get("profit_rate")
         rate_str = f"{rate:+.2f}%" if rate is not None else "--"
-        top_lines.append(f"  {i}. {name}（{code}）市值{mv:,.0f} 占比{weight:.1f}% 收益率{rate_str}")
+        top_lines.append(f"  {i}. {name}（{mask_holding_code(code)}）市值{mv:,.0f} 占比{weight:.1f}% 收益率{rate_str}")
     return "\n【持仓TOP3】\n" + "\n".join(top_lines) if top_lines else ""
 
 
@@ -498,7 +499,7 @@ def _build_data_slot_block(
         top1_code = top1.get("code", "")
         top1_mv = top1.get("market_value", 0) or 0
         top1_weight = (top1_mv / total_mv * 100) if total_mv else 0
-        lines.append(f"- 最大持仓: {top1_name}（{top1_code}）占比 {top1_weight:.1f}%")
+        lines.append(f"- 最大持仓: {top1_name}（{mask_holding_code(top1_code)}）占比 {top1_weight:.1f}%")
 
     # 各品种收益率 TOP10
     rate_lines = []
@@ -507,7 +508,7 @@ def _build_data_slot_block(
         name = h.get("name", "")
         rate = h.get("profit_rate")
         if rate is not None:
-            rate_lines.append(f"  {name}（{code}）: 收益率 {rate:+.2f}%")
+            rate_lines.append(f"  {name}（{mask_holding_code(code)}）: 收益率 {rate:+.2f}%")
     if rate_lines:
         lines.append("- 各品种盈亏比例:")
         lines.extend(rate_lines)
@@ -545,12 +546,29 @@ def _build_code_whitelist_block(
 
     # 所有合法代码
     all_codes = [h.get("code", "") for h in sorted_h if h.get("code")]
+    if not all_codes:
+        # 折叠/无代码明细（汇总模式大类行 code=""）：白名单没有可列对象，
+        # 避免输出「共 0 个：」的退化块
+        return ""
     codes_str = "、".join(all_codes)
 
     # 排名第 1 的品种
     top1 = sorted_h[0]
     top1_name = top1.get("name", "")
     top1_code = top1.get("code", "")
+
+    if code_masking_enabled():
+        # 代码折叠模式：真码不进提示词（否则 LLM 回写即从产物泄露）。此时
+        # 「列出真码」的白名单退化为「真码一律不写 + 持仓代号指代」的反幻觉约束，
+        # 否则全列出 000XXX 会让「白名单外代码禁写」自相矛盾。
+        return (
+            "【持仓代码白名单（代码已脱敏）】\n"
+            f"你的持仓共 {len(all_codes)} 个品种，全部持仓代码已脱敏，"
+            "报告与你的输出中一律以 000XXX 指代，真实 6 位代码不进本提示词。\n"
+            f"按市值排名第 1 的品种是 {top1_name}，"
+            "这是唯一可以被称作「最大持仓」「第一重仓」「首要持仓」的品种。\n"
+            "严禁在你的输出中出现任何 6 位数字代码作为持仓品种。"
+        )
 
     return (
         "【持仓代码白名单】\n"

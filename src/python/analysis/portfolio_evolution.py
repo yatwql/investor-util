@@ -59,7 +59,7 @@ def _holding_weight(h: Any, total_mv: float, total_cost: float) -> float:
 
 
 def _compute_hhi(weights: list[float]) -> float:
-    """计算 HHI 集中度——委托 metrics_risk.hhi 唯一原语（rf-529 收敛）。
+    """计算 HHI 集中度——委托 metrics_risk.hhi 唯一原语。
 
     Args:
         weights: 该期全部持仓权重列表（已归一，内部再归一为幂等）

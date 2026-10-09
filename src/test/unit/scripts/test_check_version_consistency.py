@@ -18,29 +18,19 @@ _auto_fix_header / _check_evolution_head / _auto_fix_evolution_head，
 
 from __future__ import annotations
 
-import importlib.util
+import warnings
 from pathlib import Path
 
 import pytest
+from src.test._script_loader import load_script
 
 _REPO_ROOT = Path(__file__).resolve().parents[4]  # investor-util 仓库根目录
 _SCRIPTS_DIR = _REPO_ROOT / "scripts"
 
 
-def _load_script(name: str):
-    """按文件名加载 scripts/ 下的检查脚本（规避 import 路径限制）。"""
-    fpath = _SCRIPTS_DIR / name
-    mod_name = name.replace(".py", "").replace("-", "_")
-    spec = importlib.util.spec_from_file_location(mod_name, fpath)
-    mod = importlib.util.module_from_spec(spec)
-    assert spec.loader is not None
-    spec.loader.exec_module(mod)
-    return mod
-
-
 @pytest.fixture(scope="module")
 def version_script():
-    return _load_script("check-version-consistency.py")
+    return load_script("check-version-consistency.py")
 
 
 pytestmark = [
@@ -104,11 +94,22 @@ class TestAutoFixHeader:
         assert p.read_text(encoding="utf-8") == "> 文档版本：0.10.1-dev\n"
 
     def test_fix_preserves_blank_line_before_header(self, version_script, tmp_path):
-        # 行首空白类不得吞换行：H1 与版本头之间的空行改写后必须保留
+        # 行首空白类不得吞换行：一级标题与版本头之间的空行改写后必须保留
         p = tmp_path / "doc.md"
         p.write_text("# 标题\n\n> 文档版本：0.9.13-dev\n\n## 章节\n", encoding="utf-8")
         assert version_script._auto_fix_header(p, "0.10.0") is True
         assert p.read_text(encoding="utf-8") == "# 标题\n\n> 文档版本：0.10.0\n\n## 章节\n"
+
+
+class TestScriptSyntaxWarnings:
+    r"""脚本源码无警告编译（回归：docstring 裸 `\s` 转义触发 SyntaxWarning）。"""
+
+    def test_compiles_without_syntaxwarning(self):
+        path = _SCRIPTS_DIR / "check-version-consistency.py"
+        with warnings.catch_warnings():
+            warnings.simplefilter("error", SyntaxWarning)
+            code = compile(path.read_text(encoding="utf-8"), str(path), "exec")
+        assert code is not None
 
 
 class TestDocHeaderRegistration:

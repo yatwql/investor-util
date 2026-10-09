@@ -4,7 +4,9 @@ from __future__ import annotations
 
 import re
 from pathlib import Path
+
 from _checklib import rel
+from _test_runner.modes import UNIT_DOMAIN_LABELS
 from src.python.config._config_defaults import _DEFAULT_CONFIG
 from src.python.config._llm_settings_defaults import _DEFAULT_LLM_SETTINGS
 from src.python.config.features import feature_switch_registry, switches_in_group
@@ -379,15 +381,58 @@ _COUNT_CELL = re.compile(r"^\**(\d[\d,]*)\**\s*(?:（[^）]*）)?$")
 
 _COUNT_NAME_ALIAS = {"all": "_总收集"}
 
+#: 功能域表所在章节标题（`## ` 级）：该区域内加粗标签行必须全部可映射，
+#: 区域外的加粗行（其它表）不属本核对域。
+_DOMAIN_SECTION_TITLE = "功能域对应测试源"
+
+#: 功能域表行（中文加粗标签，形如 `| **数据源 Provider** | … | 545 |`）：标签 →
+#: unit 子标记映射与 collect-test-coverage 功能域聚合单一来源
+#: （`_test_runner.modes.UNIT_DOMAIN_LABELS`）。另收表内非 unit 域的聚合行别名
+#: （`端到端业务场景` 行取 scenario 父标记计数，与 unit 功能域共表但不属映射集）。
+#: 功能域章内标签未登记 / 映射中的功能域缺行一律报出，不得静默跳过。
+_TEST_COVERAGE_DOMAIN_ROW = re.compile(r"^\|\s*\*\*([^*|]+)\*\*\s*\|")
+_DOMAIN_LABEL_TO_MARKER = {
+    **{label: marker for marker, label in UNIT_DOMAIN_LABELS.items()},
+    "端到端业务场景": "scenario",
+}
+
 
 def check_test_coverage_counts(doc_text: str, snapshot: dict[str, int]) -> list[str]:
-    """test-coverage.md 各计数行 ↔ collect-test-coverage 快照（按标记名匹配，未收录名跳过）。"""
+    """test-coverage.md 各计数行 ↔ collect-test-coverage 快照。
+
+    两类行：反引号标记行（模式/unit/场景/跨类表，按标记名比对），以及功能域章
+    内的中文加粗标签行（经共享映射反查标记）。功能域章内出现未登记标签、或映射
+    中的功能域在表中缺行，均报 finding——这类行过去以「未收录名」静默跳过，
+    实测导致该表 4 行长期无人核对。
+    """
     findings: list[str] = []
+    in_domain_section = False
+    domain_section_seen = False
+    seen_domain_markers: set[str] = set()
     for line_no, line in enumerate(doc_text.splitlines(), 1):
-        m = _TEST_COVERAGE_ROW.match(line)
-        if not m:
+        if line.startswith("## "):
+            in_domain_section = line[3:].strip() == _DOMAIN_SECTION_TITLE
+            domain_section_seen = domain_section_seen or in_domain_section
             continue
-        name = _COUNT_NAME_ALIAS.get(m.group(1), m.group(1))
+        m = _TEST_COVERAGE_ROW.match(line)
+        if m:
+            name = _COUNT_NAME_ALIAS.get(m.group(1), m.group(1))
+        else:
+            dm = _TEST_COVERAGE_DOMAIN_ROW.match(line)
+            if not dm:
+                continue
+            label = dm.group(1).strip()
+            marker = _DOMAIN_LABEL_TO_MARKER.get(label)
+            if marker is None:
+                if in_domain_section:
+                    findings.append(
+                        f"{rel(_TEST_COVERAGE_MD)}:{line_no}: 功能域行标签 `{label}` 未登记"
+                        "（映射见 `_test_runner.modes.UNIT_DOMAIN_LABELS`），计数无法核对"
+                    )
+                continue  # 功能域章外的加粗行不属本核对域
+            if in_domain_section:
+                seen_domain_markers.add(marker)
+            name = marker
         if name not in snapshot:
             continue
         got: int | None = None
@@ -400,6 +445,13 @@ def check_test_coverage_counts(doc_text: str, snapshot: dict[str, int]) -> list[
             findings.append(
                 f"{rel(_TEST_COVERAGE_MD)}:{line_no}: 标记 `{name}` 覆盖项数 {got} 与 collect-test-coverage 快照 {snapshot[name]} 不一致"
             )
+    if domain_section_seen:  # 表存在才做完整性反查（单行输入的既有用例不适用）
+        for marker, label in UNIT_DOMAIN_LABELS.items():
+            if marker not in seen_domain_markers:
+                findings.append(
+                    f"{rel(_TEST_COVERAGE_MD)}: 功能域章缺少 `{label}` 行（映射标记 `{marker}`，"
+                    "见 `_test_runner.modes.UNIT_DOMAIN_LABELS`，collect 输出已有该域）"
+                )
     return findings
 
 

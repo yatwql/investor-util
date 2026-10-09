@@ -5,7 +5,9 @@
 
     check      预检：分支 / 工作树干净 / 版本形态 / tag 未占用 / 版本一致性
     prepare    文档手术：版本全链（constants + README + --fix 传播）+ changelog
-               发布段迁入归档、指针与归档索引改写；rf 归档迁移保留人工（需语义判断）
+               发布段迁入归档、指针与归档索引改写（changelog 段由本步自动完成）；
+               rf 已解决条目 / plan 已完成任务 / docs/plan 已完成任务设计文件三项归档迁移为
+               人工强制项（未完成不得继续 gate/publish）
     refresh    数据刷新：bench --update-docs + collect-test-coverage + doc-drift --sync
     evolution  版本演进对照快照：git 清单 + 逐文件行数口径；默认只滚「当前开发版」列，
                `--release` 时发布列与增长比一并写入（发布期在 prepare 之后执行）
@@ -116,8 +118,18 @@ def render_readme_version(text: str, version: str) -> str:
     return new_text
 
 
+def normalize_release_title(title: str) -> str:
+    """剥离 `--title` 中多余的 `release: v… —— ` 前缀。
+
+    commit subject 由 publish 统一加前缀；title 自带前缀时会拼出双前缀
+    （发布提交实测）。剥离后为空（title 本身就是前缀）则按原样使用。
+    """
+    stripped = re.sub(r"^release:\s*v\S+\s*—+\s*", "", title.strip())
+    return stripped or title.strip()
+
+
 def archive_paths_for(release_version: str) -> tuple[Path, str]:
-    """按小版本推导归档目录与文件名（如 0.12.6 → docs/archive/v0.12.x/…）。"""
+    """按小版本推导归档目录与文件名（小版本号 → docs/archive/vX.Y.x/… 目录）。"""
     m = _RELEASE_VERSION_RE.match(release_version)
     if not m:
         raise ReleaseError(f"{release_version} 不是 X.Y.Z 发布版形态")
@@ -322,7 +334,7 @@ def cmd_prepare(args: argparse.Namespace, runner=None) -> int:
         print(status_out.rstrip())
     print("\n[OK] prepare 完成。后续人工项：")
     print("  1. 审阅 git diff（重点：changelog 指针/归档索引、演进列头）")
-    print("  2. review-findings 已解决条目迁入归档（语义判断，保留人工）")
+    print("  2. 发布归档迁移（强制）：rf 已解决条目 + plan 已完成任务 + docs/plan 已完成任务设计文件迁档（changelog 段已由本步自动完成），未完成不得继续 gate/publish")
     print("  3. 按序继续：refresh → evolution --release → gate → publish → devbump")
     return 0
 
@@ -562,7 +574,7 @@ def update_case_note(text: str, stats: dict[str, int]) -> str:
     """用例口径注释中的 grep / 严格定义行数；pytest 收集口径留人工核对提示。
 
     目标短语在真实文档中位于行中（非行首），不做行首锚定；模式缺失即抛
-    `ReleaseError`（历史上行首锚定导致静默不更新、旧计数滞留）。
+    `ReleaseError`（不静默漏更、不留滞留计数）。
     """
     text, n_grep = re.subn(
         r"(最初 \d+ → 当前 )[\d,]+",
@@ -670,7 +682,11 @@ def cmd_publish(args: argparse.Namespace, runner=None) -> int:
         return 1
     if staged.strip():
         _git_ok(["add", "-A"], REPO_ROOT, runner)
-        rc, out, err = _git_ok(["commit", "-m", f"release: v{release_version} —— {args.title}"], REPO_ROOT, runner)
+        rc, out, err = _git_ok(
+            ["commit", "-m", f"release: v{release_version} —— {normalize_release_title(args.title)}"],
+            REPO_ROOT,
+            runner,
+        )
         if rc != 0:
             print(f"[ERR] release 提交失败：{(err or out).strip()}")
             return rc

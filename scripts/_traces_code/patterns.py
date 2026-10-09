@@ -201,8 +201,11 @@ PATTERNS: list[tuple[str, str, str]] = [
     #   代码注释中不应出现版本号、迭代信息、项目编号等变更记录。
     #
     (r"v\d+\.\d+\.\d+(?:-dev)?", "VERSION", "版本号标记（如 v0.8.9）"),
-    #  无 v 前缀的裸版本号（本项目版本号为 0.x.y；限 0 开头避免误伤包版本 1.16.0 等）
-    (r"\b0\.\d+\.\d+(?:-dev)?\b", "VERSION", "裸版本号标记（如 0.9.9）"),
+    #  无 v 前缀的裸版本号（本项目版本号为 0.x.y；限 0 开头避免误伤包版本 1.16.0 等）。
+    #  前置 (?<![\d.]) + 后置 (?!\.\d) 排除 IPv4 内嵌子串（127.0.0.1 / 0.0.0.0
+    #  的 0.0.x 片段是地址的一部分，不是版本号）——逐 token 判定而非整行放行，
+    #  同一行内的真实版本痕迹仍会报出。
+    (r"(?<![\d.])0\.\d+\.\d+(?:-dev)?(?!\.\d)\b", "VERSION", "裸版本号标记（如 0.9.9）"),
     (r"版本\s*[:：]\s*\d+\.\d+", "VERSION", "版本号声明"),
     (r"(?:发版|发布|release)\s*(?:于|版本|v?\d)", "VERSION", "发布/发版标记"),
     (r"迭代\s*(?:\d+|任务|计划)", "VERSION", "迭代/任务标记"),
@@ -341,6 +344,8 @@ EXCLUDE_LINE: list[str] = [
     r"python_version",
     r"version_info",
     r"protobuf.*版本",  # compiler.proto version
+    # ── 文档区块名（合法） ─────────
+    r"待处理区",  # review-findings 的区块名（挂账位置），非待办标记
     # ── TODO 模式误报排除（XXX 作为掩码占位符） ──
     r"000XXX",
     r"XXX\[",
@@ -399,7 +404,12 @@ def _magic_excludes() -> list[re.Pattern]:
       - 单元格/合并/列 + 字母数字，或 A1:B1/B2~B5 范围 —— Excel 单元格引用
       - [Ss]\\d{1,2}\\b      —— 场景标记（S1~S33，conftest 官方活分类法）
       - S-P\\d+              —— 穿透场景标签（S-P1~S-P10，测试文件内组织编号）
-      - [Tt][1-9]\\d?\\b     —— 场景标记（T1~T21）与统计分位（T95）等语义值（不含 T0 阈值暗号）
+      - [Tt]\\d{1,2}\\b      —— 交易日/场景时序记法（T0 = 事件窗口锚定交易日，T1~T21 场景、T95 分位）
+      - F10                  —— 天天基金 F10 交易费率页（基金数据源域名）
+      - P0~P4                —— 门禁档位（P0/P1/P2）与价格/事件区间点位（P0~P4）
+      - MV\\d                —— 市值时点（MV0 起始市值）
+      - [Ee]1~3 / [Ww]1~2    —— 样式护栏编号（DESIGN.md「机检落地」段定义的 E/W 级）
+      - [Pp]hase\\d           —— 性能基准阶段（Phase1/2/3，perf-report 口径）
       - [Yy]\\d\\b / [Zz]\\d\\b —— 边缘测试组标签（Y1~Y6/Z1，文件内组织编号）
       - 微信\\s*X\\d+         —— 微信浏览器内核（X5）
       - ETF\\d+/主动\\d+/基金\\d+ —— 测试数据标签（基金简称）
@@ -415,7 +425,12 @@ def _magic_excludes() -> list[re.Pattern]:
         re.compile(r"(?:单元格|合并|列)\s*[A-Z]\s*[0-9](?:\s*[:~]\s*[A-Z]\s*[0-9])?|[A-Z][0-9]\s*[:~]\s*[A-Z][0-9]"),
         re.compile(r"\b[Ss]\d{1,2}\b"),
         re.compile(r"S\s*-\s*P\d+"),
-        re.compile(r"\b[Tt][1-9]\d?\b"),
+        re.compile(r"\b[Tt]\d{1,2}\b"),
+        re.compile(r"\bF10\b"),
+        re.compile(r"\bP[0-4]\b"),
+        re.compile(r"\bMV\d\b"),
+        re.compile(r"\b[EW][123]\b"),
+        re.compile(r"(?<![A-Za-z0-9])[Pp][Hh][Aa][Ss][Ee]\s*\d", re.IGNORECASE),
         re.compile(r"\b[Yy]\d\b"),
         re.compile(r"\b[Zz]\d\b"),
         re.compile(r"微信\s*X\d+"),

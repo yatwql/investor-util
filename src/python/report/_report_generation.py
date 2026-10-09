@@ -30,6 +30,7 @@ from src.python.report._report_output import (  # noqa: F401  # 产物落盘子�
 from src.python.report._chart_dataset_factory import _build_chart_datasets_for_report  # noqa: F401
 from src.python.report._full_risk_metrics import _prepare_full_risk_metrics  # noqa: F401
 from src.python.report._report_health import _collect_health_checks, _spawn_health_checks  # noqa: F401
+from src.python.report.run_integrity import bind_health, bind_perf
 from src.python.report._report_helpers import (  # noqa: F401
     _action_holdings_details,
     _compute_details,
@@ -88,12 +89,14 @@ def _generate_report_both(
     from src.python.report.html_writer import write_html_report
     from src.python.report.orchestrator import ReportResult
 
-    perf = PerfCollector(report_type="both", holdings=holdings)
+    perf = PerfCollector(report_type="both", holdings=holdings, stage_announcer=reporter.stage_progress)
+    bind_perf(perf)
     result = ReportResult()
     result.holdings_ok = True
 
     # 后台启动健康检查（与数据获取并行）
     _health_fut = _spawn_health_checks()
+    bind_health(_health_fut, "both", holdings)
 
     _enable_fund_deep_analysis = is_enable_fund_deep_analysis(config)
     _enable_news = is_enable_news(config)
@@ -164,7 +167,7 @@ def _generate_report_both(
         # 2b1. 快照差异摘要（snapshot_diff_data）：组合演进章顶部变化摘要，
         #      与演进数据同开关（同属组合演进章节）
         pipeline_data = _inject_snapshot_diff_data(pipeline_data, snapshot_namespace=snapshot_namespace)
-    # 2b2. 持仓变动复盘（实验开关 holding_change_review，默认关；独立于演进开关）：
+    # 2b2. 持仓变动复盘（报告章节与增强开关 holding_change_review，默认关；独立于演进开关）：
     #      事件清单差分须晚于本次快照捕获；开关关闭时键缺席 → 整章隐藏（见 seams）
     inject_holding_change_data(pipeline_data, config, reporter, snapshot_namespace=snapshot_namespace)
     # 2c. 品种覆盖诊断 + 可信度摘要：逐品种数据状态/新鲜度标注，注入 pipeline_data
@@ -405,10 +408,12 @@ def _generate_report_full(
     from src.python.report._snapshot import capture_snapshot
     from src.python.report.orchestrator import ReportResult, prepare_report_data
 
-    perf = PerfCollector(report_type="full", holdings=holdings)
+    perf = PerfCollector(report_type="full", holdings=holdings, stage_announcer=reporter.stage_progress)
+    bind_perf(perf)
     result = ReportResult()
     result.holdings_ok = True
     _health_fut = _spawn_health_checks()
+    bind_health(_health_fut, "full", holdings)
 
     _enable_fund_deep_analysis = is_enable_fund_deep_analysis(config)
     _enable_news = is_enable_news(config)
@@ -463,7 +468,7 @@ def _generate_report_full(
         # 2b1. 快照差异摘要（snapshot_diff_data）：组合演进章顶部变化摘要，
         #      与演进数据同开关（同属组合演进章节）
         pipeline_data = _inject_snapshot_diff_data(pipeline_data, snapshot_namespace=snapshot_namespace)
-    # 2b2. 持仓变动复盘（实验开关 holding_change_review，默认关；独立于演进开关）：
+    # 2b2. 持仓变动复盘（报告章节与增强开关 holding_change_review，默认关；独立于演进开关）：
     #      事件清单差分须晚于本次快照捕获；开关关闭时键缺席 → 整章隐藏（见 seams）
     inject_holding_change_data(pipeline_data, config, reporter, snapshot_namespace=snapshot_namespace)
     # 2b3. 调仓纪律回放（实验开关 rebalance_schedule_replay，默认关）：多期规则回放

@@ -1,6 +1,6 @@
 """What-if 交易成本对比面板（whatif_cost_panel）单元测试 — 装配契约与手算对照。
 
-覆盖（迭代 3 验收）：
+覆盖（对应验收条目）：
   - 全量装配：费率注入 + 快照批次 + 计数注入 → 成本本体 / impact 手算 / 基准对齐
   - 费率未知 → 无成本后数字（impact/candidate_after 缺席），成本块照常
   - 无回测 → 仅成本块（impact/benchmark/chart 全缺席）

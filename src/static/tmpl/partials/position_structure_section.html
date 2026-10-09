@@ -9,7 +9,7 @@
             <div class="block-title">一、持仓重合度矩阵</div>
             {% set _stale_notes = overlap_matrix.get("stale_fund_notes", []) %}
             {% if _stale_notes %}
-            <div class="notice-banner" style="margin-bottom: 8px; font-size: 12px;">
+            <div class="notice-banner" style="margin-bottom: 8px; font-size: var(--fs-table-sm);">
                 ⚠ 持仓报告期陈旧、已从矩阵剔除：{{ _stale_notes | join("；") }}
             </div>
             {% endif %}
@@ -35,7 +35,7 @@
                         <th></th>
                         <th></th>
                         {% for f in _funds %}
-                        <th style="font-size: 11px; max-width: 80px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;"
+                        <th style="font-size: var(--fs-footnote); max-width: 80px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;"
                             title="{{ _fund_names.get(f, f) }}">{{ _fund_names.get(f, f) }}</th>
                         {% endfor %}
                     </tr>
@@ -43,12 +43,12 @@
                 <tbody>
                     {% for i in range(_funds | length) %}
                     <tr>
-                        <td style="font-weight: bold; font-size: 11px; max-width: 80px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;"
+                        <td style="font-weight: bold; font-size: var(--fs-footnote); max-width: 80px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;"
                             title="{{ _fund_names.get(_funds[i], _funds[i]) }}">{{ _fund_names.get(_funds[i], _funds[i]) }}</td>
-                        <td style="font-size: 11px; color: #888;">({{ _funds[i] }})</td>
+                        <td style="font-size: var(--fs-footnote); color: #888;">({{ _funds[i] }})</td>
                         {% for j in range(_funds | length) %}
                         {% set val = _matrix[i][j] %}
-                        <td style="text-align: center; font-size: 12px;
+                        <td style="text-align: center; font-size: var(--fs-table-sm);
                             {% if val >= 0.50 %}background-color: #FF4444; color: white; font-weight: bold;
                             {% elif val >= 0.30 %}background-color: #FF8C00; color: white;
                             {% elif val >= 0.15 %}background-color: #FFD700;
@@ -66,7 +66,7 @@
             <!-- 配对明细 -->
             {% if _pairs %}
             <br>
-            <div style="font-weight: bold; font-size: 14px; margin-bottom: 6px;">配对明细（按重合度降序）</div>
+            <div style="font-weight: bold; font-size: var(--fs-body); margin-bottom: 6px;">配对明细（按重合度降序）</div>
             <table>
                 <thead>
                     <tr>
@@ -86,11 +86,11 @@
                         <td class="text-left">{{ _fund_names.get(p.fund_b, p.fund_b) }}({{ p.fund_b }})</td>
                         <td>{{ p.common_count }}</td>
                         <td>{{ "%.2f"|format(p.jaccard * 100) }}%</td>
-                        <td class="text-left" style="font-size: 12px;">
+                        <td class="text-left" style="font-size: var(--fs-table-sm);">
                             {% if p.common_stocks %}
                             {% set stock_names = [] %}
                             {% for s in p.common_stocks %}
-                            {% set _ = stock_names.append(s.name or s.code) %}
+                            {% set _ = stock_names.append(s.name or (s.code | anon_code)) %}
                             {% endfor %}
                             {{ stock_names | join("、") }}
                             {% else %}
@@ -115,7 +115,7 @@
             {% if _corr_pairs %}
             {% set _corr_top = _corr_pairs[0] %}
             <div class="notice-banner" style="margin-bottom: 12px;">
-                🔔 相关度最高：<strong>{{ _corr_top.name_a }}({{ _corr_top.code_a }})</strong> × <strong>{{ _corr_top.name_b }}({{ _corr_top.code_b }})</strong>
+                🔔 相关度最高：<strong>{{ _corr_top.name_a }}({{ _corr_top.code_a | anon_code }})</strong> × <strong>{{ _corr_top.name_b }}({{ _corr_top.code_b | anon_code }})</strong>
                 — r={{ "%.2f"|format(_corr_top.pearson) }}，p={{ "%.4f"|format(_corr_top.p_value) }}{% if _corr_top.significant %}（显著）{% else %}（不显著）{% endif %}
             </div>
             {% endif %}
@@ -128,7 +128,7 @@
                         <th></th>
                         <th></th>
                         {% for c in _corr_codes %}
-                        <th style="font-size: 11px; max-width: 80px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;"
+                        <th style="font-size: var(--fs-footnote); max-width: 80px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;"
                             title="{{ _corr_names.get(c, c) }}">{{ _corr_names.get(c, c) }}</th>
                         {% endfor %}
                     </tr>
@@ -136,9 +136,9 @@
                 <tbody>
                     {% for i in range(_corr_codes | length) %}
                     <tr>
-                        <td style="font-weight: bold; font-size: 11px; max-width: 80px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;"
+                        <td style="font-weight: bold; font-size: var(--fs-footnote); max-width: 80px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;"
                             title="{{ _corr_names.get(_corr_codes[i], _corr_codes[i]) }}">{{ _corr_names.get(_corr_codes[i], _corr_codes[i]) }}</td>
-                        <td style="font-size: 11px; color: #888;">({{ _corr_codes[i] }})</td>
+                        <td style="font-size: var(--fs-footnote); color: #888;">({{ _corr_codes[i] }})</td>
                         {% for j in range(_corr_codes | length) %}
                         {% if j == i %}
                         <td style="background-color: #f5f5f5; color: #bbb;" title="自相关">1.00</td>
@@ -191,7 +191,7 @@
             <!-- 配对明细 -->
             {% if _corr_pairs %}
             <br>
-            <div style="font-weight: bold; font-size: 14px; margin-bottom: 6px;">配对明细（按 |r| 降序）</div>
+            <div style="font-weight: bold; font-size: var(--fs-body); margin-bottom: 6px;">配对明细（按 |r| 降序）</div>
             <table>
                 <thead>
                     <tr>
@@ -208,9 +208,9 @@
                     {% for p in _corr_pairs %}
                     <tr>
                         <td>{{ loop.index }}</td>
-                        <td class="text-left">{{ p.name_a }}({{ p.code_a }})</td>
-                        <td class="text-left">{{ p.name_b }}({{ p.code_b }})</td>
-                        <td style="color: {% if p.pearson >= 0.5 %}#C00000{% elif p.pearson > 0 %}#E65C00{% elif p.pearson <= -0.5 %}#1F4E79{% else %}#2E75B6{% endif %}; font-weight: 600;">
+                        <td class="text-left">{{ p.name_a }}({{ p.code_a | anon_code }})</td>
+                        <td class="text-left">{{ p.name_b }}({{ p.code_b | anon_code }})</td>
+                        <td style="color: {% if p.pearson >= 0.5 %}#C00000{% elif p.pearson > 0 %}#E65C00{% elif p.pearson <= -0.5 %}#1F4E79{% else %}var(--primary){% endif %}; font-weight: 600;">
                             {{ "%.2f"|format(p.pearson) }}
                         </td>
                         <td>{{ "%.4f"|format(p.p_value) }}</td>
@@ -224,7 +224,7 @@
 
             {% if position_relationship_data.get("insufficient_codes") %}
             <div class="penetration-notes">
-                <div style="color:var(--warn-text);">* 下列品种重叠样本不足 {{ position_relationship_data["window"] }} 期，相关性格标为 N/A（灰色）：{{ position_relationship_data["insufficient_codes"] | join("、") }}</div>
+                <div style="color:var(--warn-text);">* 下列品种重叠样本不足 {{ position_relationship_data["window"] }} 期，相关性格标为 N/A（灰色）：{{ position_relationship_data["insufficient_codes"] | map("anon_code") | join("、") }}</div>
             </div>
             {% endif %}
             <div class="penetration-notes">
@@ -261,8 +261,8 @@
                     {% set _alert = r.get("alert_level", "") %}
                     <tr class="{% if _alert == '紧急' %}row-danger{% elif _alert == '关注' %}row-warning{% endif %}">
                         <td class="text-left">{{ r["name"] }}</td>
-                        <td>{{ r["code"] }}</td>
-                        <td style="font-size: 12px; {{ 'color: #b06a00;' if r.get('report_stale') }}">
+                        <td>{{ r["code"] | anon_code }}</td>
+                        <td style="font-size: var(--fs-table-sm); {{ 'color: #b06a00;' if r.get('report_stale') }}">
                             {{ r.get("report_period", "") }}{% if r.get("report_stale") %}（陈旧）{% endif %}
                         </td>
                         <td>{{ "%.2f"|format(r["top3_pct"]) }}%</td>

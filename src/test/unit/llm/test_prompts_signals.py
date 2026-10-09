@@ -394,9 +394,9 @@ class TestGeneratorFingerprintWiring:
     @staticmethod
     def _captured_fingerprints(generator_name, **extra):
         """调用生成函数并返回其传给 skeleton 的指纹闭包输出。"""
-        from src.python.llm import generators
+        from src.python.llm import generators, generators_singletons
 
-        with patch.object(generators, "generate_llm_module") as mock_gen:
+        with patch.object(generators_singletons, "generate_llm_module") as mock_gen:
             mock_gen.return_value = ("内容", False)
             getattr(generators, generator_name)(**{**TestGeneratorFingerprintWiring._BASE_KWARGS, **extra})
             return mock_gen.call_args.kwargs["fingerprint_fn"]()

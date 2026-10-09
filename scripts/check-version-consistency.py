@@ -16,18 +16,30 @@
 
 用法：
   python scripts/check-version-consistency.py
-    检查所有文件，不一致时报错退出（exit code 1）。
+    检查所有文件，不一致时按契约退出（退出码 2）。
 
   python scripts/check-version-consistency.py --fix
-    自动同步 pyproject.toml 的 version 字段（其他文件需手动更新）。
+    自动同步 pyproject.toml 的 version 字段（其他文件需手动更新）；仍有未同步项时退出 2。
+
+  python scripts/check-version-consistency.py --ci
+    CI 模式（只输出 文件:描述）。
+
+  python scripts/check-version-consistency.py -v
+    详细模式（逐项打印检查文件）。
+
+退出码：
+  0 — 全部一致（含 --fix 已全部修正）
+  1 — 事实源不可读（constants.py 中未找到 APP_VERSION）
+  2 — 发现不一致
 """
 
+import argparse
 import re
 import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))  # 同目录共享模块（_checklib）
-from _checklib import REPO_ROOT, rel as repo_rel  # noqa: E402
+from _checklib import REPO_ROOT, add_common_args, rel as repo_rel  # noqa: E402
 
 # ── 读取事实源 ──────────────────────────────────────────────
 
@@ -123,10 +135,11 @@ def _check_header(text: str, version: str) -> bool:
 
 
 def _auto_fix_header(path: Path, version: str) -> bool:
-    """自动修正「文档版本：」头部版本行为目标版本。
+    r"""自动修正「文档版本：」头部版本行为目标版本。
 
     行首空白类只用同行字符（`[ \t]`）——`\s` 含换行，原 `^\s*>` 在 MULTILINE 下
-    会把版本头前的空行一并吞掉（H1 与版本头之间有空行的文档会丢格式）。
+    会把版本头前的空行一并吞掉（一级标题与版本头之间有空行的文档会丢格式）。
+    本 docstring 为 raw 串：非 raw 时裸 `\s` 会触发 SyntaxWarning（invalid escape）。
     """
     text = path.read_text(encoding="utf-8")
     new_text, count = re.subn(
@@ -252,9 +265,15 @@ def _auto_fix_pyproject(path: Path, version: str) -> bool:
 
 
 def main() -> None:
+    parser = argparse.ArgumentParser(description="版本号全局一致性检查")
+    add_common_args(parser)
+    parser.add_argument(
+        "--fix", action="store_true", help="自动同步 pyproject.toml 的 version 字段与文档版本头；仍有时退出 2"
+    )
+    opts = parser.parse_args()
     version = _get_app_version()
-    do_fix = "--fix" in sys.argv
-    ci_mode = "--ci" in sys.argv
+    do_fix = opts.fix
+    ci_mode = opts.ci
 
     if not ci_mode:
         print(f"[..] 校验版本号一致性 — APP_VERSION = {version}\n     来源：{repo_rel(CONSTANTS_FILE)}\n")
@@ -313,7 +332,7 @@ def main() -> None:
             ok = False
 
         if ok:
-            if not ci_mode:
+            if opts.verbose or not ci_mode:
                 print(f"  [OK] {rel}")
         else:
             if assert_type == "header":

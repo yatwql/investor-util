@@ -153,7 +153,11 @@ class TestReportGroupSwitches:
         assert set(self.KEYS) <= flags
 
     def test_accessor_matches_registry_default(self):
-        """注册表报告组**每个**开关都有访问器，且访问器取值 == 注册表默认值（缺键回落由注册表统一表达）。"""
+        """报告组中提供 ``is_enable_*`` 读取器者，取值 == 注册表默认值（同源）。
+
+        章节类转正开关（如 ``holding_change_review``）由挂载点直读 ``is_feature_enabled``，
+        不带 config 读取器——读取器存在与否随形态，取值同源是不变式。
+        """
         from src.python.config import _core
         from src.python.config.features import (
             GROUP_REPORT,
@@ -162,8 +166,17 @@ class TestReportGroupSwitches:
         )
 
         for flag, _d in switches_in_group(GROUP_REPORT):
-            accessor = getattr(_core, f"is_enable_{flag}")
+            accessor = getattr(_core, f"is_enable_{flag}", None)
+            if accessor is None:
+                continue
             assert accessor() is bool(feature_switch_registry[flag].default), flag
+
+    def test_legacy_report_switches_keep_accessors(self):
+        """config.json 时代的报告子模块读取器不得随分组迁移丢失（既有调用点签名依赖）。"""
+        from src.python.config import _core
+
+        for flag in self.KEYS:
+            assert callable(getattr(_core, f"is_enable_{flag}", None)), flag
 
     def test_accessor_follows_runtime_override(self):
         """运行时覆盖（features.json / --feature）即时反映到访问器。"""

@@ -116,7 +116,7 @@
                     </tr>
                     {% for item in position_status.get("items") %}
                     <tr>
-                        <td style="text-align:left;">{{ item.code }}</td>
+                        <td style="text-align:left;">{{ item.code | anon_code }}</td>
                         <td style="text-align:left;">{{ item.name }}</td>
                         <td style="text-align:left;">{{ item.account }}</td>
                         <td>
@@ -131,7 +131,7 @@
                     {% endfor %}
                 </table>
                 {% else %}
-                <div class="data-status-info">&#8505; 未获取行情数据，品种覆盖无法判定</div>
+                <div class="data-status-info">&#8505; 数据不可用：未获取行情数据，品种覆盖无法判定</div>
                 {% endif %}
             </div>
             <!-- 可信度区块（数据质量仪表盘子模块，功能开关 data_quality 开启时显示） -->
@@ -148,7 +148,7 @@
                     </tr>
                     {% for item in data_freshness.get("items") %}
                     <tr>
-                        <td style="text-align:left;">{{ item.code }}</td>
+                        <td style="text-align:left;">{{ item.code | anon_code }}</td>
                         <td style="text-align:left;">{{ item.name }}</td>
                         <td style="text-align:left;">{{ item.account }}</td>
                         <td>
@@ -168,7 +168,7 @@
                     {% endfor %}
                 </table>
                 {% else %}
-                <div class="data-status-info">&#8505; 未获取可信度数据，新鲜度/跳变无法判定</div>
+                <div class="data-status-info">&#8505; 数据不可用：未获取可信度数据，新鲜度/跳变无法判定</div>
                 {% endif %}
             </div>
             {% endif %}

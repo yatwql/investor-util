@@ -142,7 +142,7 @@ def _purchase_single_rate(code: str, table: dict[str, Any] | None) -> float | No
 def fetch_fee_index(codes: list[str] | tuple[str, ...] | set[str]) -> dict[str, dict[str, Any]]:
     """按基金代码装配 ``trade_cost_model`` 费率索引（逐侧标注来源）。
 
-    逐侧优先级（设计文档 §4 迭代 2 与门槛降级判定动作）：
+    逐侧优先级（设计文档 §4 的门槛降级判定动作）：
 
       申购：F10 优惠档（f10_tier） → 全量申购状态表单档（table_single，延迟
             至少一侧需要时才取，同会话命中缓存零额外请求） → 配置兜底（config）

@@ -5,7 +5,7 @@ from __future__ import annotations
 import re
 from pathlib import Path
 
-from _traces_code.config import SKIP_FILES, _is_tool_self
+from _traces_code.config import RULE_CARRIER_DIRS, SKIP_FILES, _is_tool_self
 from _traces_code.exemptions import _is_chapter_excluded, _is_round_excluded
 from _traces_code.extract import _iter_comment_lines, _scan_identifiers
 from _traces_code.layers import _scan_core_layering
@@ -23,7 +23,8 @@ from _traces_code.patterns import (
 def scan_file(fpath: Path, verbose: bool) -> list[tuple[int, str, str, str]]:
     """扫描单个文件，返回 [(行号, 分类, 模式说明, 行内容/标识符), ...]"""
     hits: list[tuple[int, str, str, str]] = []
-    if fpath.name in SKIP_FILES or _is_tool_self(fpath.name):
+    # 载体目录（规则定义字面量）与工具自身文件均为“尺子本身”，整文件跳过
+    if fpath.name in SKIP_FILES or _is_tool_self(fpath.name) or RULE_CARRIER_DIRS.intersection(fpath.parts):
         return hits
 
     is_test_file = "src/test/" in fpath.as_posix()

@@ -4,24 +4,67 @@
  */
 
 :root {
-  --color-bg: #f3f5f8;
-  --color-surface: #ffffff;
-  --color-border: #d9dce1;
-  --color-text: #1f2328;
-  --color-text-secondary: #57606a;
-  --color-primary: #1f6fb2;
-  --color-primary-hover: #185a92;
-  --color-accent: #0e7a5f;
-  --color-ok: #1a7f37;
-  --color-warn: #9a6700;
-  --color-error: #cf222e;
-  --color-focus: #0969da;
-  --radius: 12px;
+  /* 设计 token — 跨面共享角色（DESIGN.md Colors；HTML 报告同名对齐，值按各自明暗世界） */
+  --bg: #f3f5f8;
+  --surface: #ffffff;
+  --border: #d9dce1;
+  --text: #1f2328;
+  --text-secondary: #57606a;
+  --primary: #1f6fb2;
+  --primary-hover: #185a92;
+  --accent: #0e7a5f;
+  --ok: #1a7f37;
+  --warn: #9a6700;
+  --error: #cf222e;
+  --focus: #0969da;
+  --radius: 8px;  /* DESIGN.md Layout 圆角档：卡面 8px（旧 12px 收敛） */
   --radius-sm: 8px;
   --space-card: 24px;
   --shadow-card: 0 1px 2px rgba(31, 35, 40, 0.05), 0 4px 16px rgba(31, 35, 40, 0.05);
   --shadow-card-hover: 0 2px 4px rgba(31, 35, 40, 0.06), 0 10px 28px rgba(31, 35, 40, 0.09);
   --font-stack: "PingFang SC", "Microsoft YaHei", "Noto Sans SC", system-ui, -apple-system, sans-serif;
+  /* 旧名兼容映射（一版过渡，后续版本移除；新代码一律用上方角色名） */
+  --color-bg: var(--bg);
+  --color-surface: var(--surface);
+  --color-border: var(--border);
+  --color-text: var(--text);
+  --color-text-secondary: var(--text-secondary);
+  --color-primary: var(--primary);
+  --color-primary-hover: var(--primary-hover);
+  --color-accent: var(--accent);
+  --color-ok: var(--ok);
+  --color-warn: var(--warn);
+  --color-error: var(--error);
+  --color-focus: var(--focus);
+}
+
+/* ── 暗色主题（data-theme="dark"；与 HTML 报告暗色世界同值，品牌蓝不调）── */
+[data-theme="dark"] {
+  --bg: #121212;
+  --surface: #1e1e1e;
+  --border: #3a3a3a;
+  --text: #e0e0e0;
+  --text-secondary: #c0c0c0;
+  --ok: #66bb6a;
+  --warn: #f0a35e;
+  --error: #e74c3c;
+  --shadow-card: 0 1px 2px rgba(0, 0, 0, 0.5);
+  --shadow-card-hover: 0 4px 14px rgba(0, 0, 0, 0.6);
+  /* --primary/--focus/--accent 不覆盖：品牌蓝暗色不调（同报告则） */
+}
+/* 暗色下组件亮色硬底适配 */
+[data-theme="dark"] .upload-zone {
+  background: #1a1a1a;
+}
+[data-theme="dark"] .upload-zone:focus-within {
+  background: #10203a;
+}
+[data-theme="dark"] #formal-options {
+  background: #1a1a1a;
+}
+[data-theme="dark"] .formal-warning {
+  background: #2b1518;
+  color: #ff9aa2;
 }
 
 * {
@@ -53,8 +96,8 @@
 body {
   margin: 0;
   font-family: var(--font-stack);
-  background: var(--color-bg);
-  color: var(--color-text);
+  background: var(--bg);
+  color: var(--text);
   line-height: 1.6;
   -webkit-font-smoothing: antialiased;
 }
@@ -74,7 +117,7 @@ body {
 
 .subtitle {
   margin: 6px 0 0;
-  color: var(--color-text-secondary);
+  color: var(--text-secondary);
   font-size: 0.95rem;
 }
 
@@ -88,8 +131,8 @@ body {
 }
 
 .card {
-  background: var(--color-surface);
-  border: 1px solid var(--color-border);
+  background: var(--surface);
+  border: 1px solid var(--border);
   border-radius: var(--radius);
   padding: 20px var(--space-card);
   box-shadow: var(--shadow-card);
@@ -103,12 +146,12 @@ body {
 .card h2 {
   margin: 0 0 14px;
   font-size: 1.05rem;
-  color: var(--color-text);
+  color: var(--text);
 }
 
 /* ── 上传区 ── */
 .upload-zone {
-  border: 2px dashed var(--color-border);
+  border: 2px dashed var(--border);
   border-radius: var(--radius);
   padding: 30px 16px;
   text-align: center;
@@ -118,12 +161,12 @@ body {
 
 .upload-zone:hover,
 .upload-zone:focus-within {
-  border-color: var(--color-primary);
+  border-color: var(--primary);
   background: #f0f6ff;
 }
 
 .upload-zone.drag-over {
-  border-color: var(--color-primary);
+  border-color: var(--primary);
   background: #e8f1fb;
   transform: translateY(-1px);
 }
@@ -134,13 +177,13 @@ body {
   align-items: center;
   gap: 8px;
   cursor: pointer;
-  color: var(--color-text-secondary);
+  color: var(--text-secondary);
   font-size: 0.95rem;
 }
 
 .upload-icon {
   font-size: 1.5rem;
-  color: var(--color-primary);
+  color: var(--primary);
 }
 
 .status-text {
@@ -150,15 +193,15 @@ body {
 }
 
 .status-ok {
-  color: var(--color-ok);
+  color: var(--ok);
 }
 
 .status-busy {
-  color: var(--color-text-secondary);
+  color: var(--text-secondary);
 }
 
 .status-error {
-  color: var(--color-error);
+  color: var(--error);
 }
 
 /* ── 生成区 ── */
@@ -177,7 +220,7 @@ body {
 
 .field-row label {
   font-size: 0.9rem;
-  color: var(--color-text-secondary);
+  color: var(--text-secondary);
 }
 
 .field-check {
@@ -192,14 +235,14 @@ body {
   align-items: center;
   gap: 8px;
   font-size: 0.9rem;
-  color: var(--color-text);
+  color: var(--text);
   cursor: pointer;
 }
 
 .check-label input[type='checkbox'] {
   width: 15px;
   height: 15px;
-  accent-color: var(--color-primary);
+  accent-color: var(--primary);
 }
 
 /* ── 生成区：生成用途/输入来源单选 + 正式模式展开区 ── */
@@ -219,7 +262,7 @@ body {
 .field-label {
   font-size: 0.9rem;
   font-weight: 600;
-  color: var(--color-text-secondary);
+  color: var(--text-secondary);
 }
 
 .radio-label {
@@ -227,7 +270,7 @@ body {
   align-items: flex-start;
   gap: 8px;
   font-size: 0.9rem;
-  color: var(--color-text);
+  color: var(--text);
   cursor: pointer;
 }
 
@@ -235,12 +278,12 @@ body {
   width: 15px;
   height: 15px;
   margin-top: 3px;
-  accent-color: var(--color-primary);
+  accent-color: var(--primary);
 }
 
 #formal-options {
   padding: 12px 14px;
-  border: 1px dashed var(--color-border);
+  border: 1px dashed var(--border);
   border-radius: var(--radius-sm);
   background: #fafbfc;
 }
@@ -248,7 +291,7 @@ body {
 /* 红底警示条（正式覆盖承诺，role=alert） */
 .formal-warning {
   background: #fff0f0;
-  border: 1px solid var(--color-error);
+  border: 1px solid var(--error);
   color: #b02a37;
   border-radius: 6px;
   padding: 8px 12px;
@@ -261,17 +304,17 @@ select {
   font-family: inherit;
   font-size: 0.95rem;
   padding: 8px 10px;
-  border: 1px solid var(--color-border);
+  border: 1px solid var(--border);
   border-radius: 6px;
-  background: var(--color-surface);
-  color: var(--color-text);
+  background: var(--surface);
+  color: var(--text);
 }
 
 select:focus,
 .btn:focus,
 .check-label input:focus-visible,
 .radio-label input:focus-visible {
-  outline: 2px solid var(--color-focus);
+  outline: 2px solid var(--focus);
   outline-offset: 1px;
 }
 
@@ -289,12 +332,12 @@ select:focus,
 }
 
 .btn-primary {
-  background: var(--color-primary);
+  background: var(--primary);
   color: #fff;
 }
 
 .btn-primary:hover:not(:disabled) {
-  background: var(--color-primary-hover);
+  background: var(--primary-hover);
 }
 
 .btn-primary:disabled {
@@ -303,13 +346,13 @@ select:focus,
 }
 
 .btn-secondary {
-  background: var(--color-surface);
-  color: var(--color-primary);
-  border-color: var(--color-border);
+  background: var(--surface);
+  color: var(--primary);
+  border-color: var(--border);
 }
 
 .btn-secondary:hover {
-  border-color: var(--color-primary);
+  border-color: var(--primary);
 }
 
 .btn-sm {
@@ -322,7 +365,7 @@ select:focus,
 .progress-phase {
   margin: 0 0 10px;
   font-size: 0.9rem;
-  color: var(--color-text-secondary);
+  color: var(--text-secondary);
 }
 .progress-track {
   height: 8px;
@@ -335,7 +378,7 @@ select:focus,
 .progress-bar {
   height: 100%;
   width: 0%;
-  background: linear-gradient(90deg, var(--color-primary), var(--color-accent));
+  background: linear-gradient(90deg, var(--primary), var(--accent));
   border-radius: 999px;
   transition: width 0.35s ease;
 }
@@ -361,7 +404,7 @@ select:focus,
   min-width: 1.6em;
   text-align: right;
   font-size: 0.8rem;
-  color: var(--color-text-secondary);
+  color: var(--text-secondary);
   font-variant-numeric: tabular-nums;
 }
 
@@ -369,19 +412,19 @@ select:focus,
   flex: none;
   width: 1.1em;
   text-align: center;
-  color: var(--color-text-secondary);
+  color: var(--text-secondary);
 }
 
 .event-ok .event-icon {
-  color: var(--color-ok);
+  color: var(--ok);
 }
 
 .event-warn .event-icon {
-  color: var(--color-warn);
+  color: var(--warn);
 }
 
 .event-error .event-icon {
-  color: var(--color-error);
+  color: var(--error);
 }
 
 /* ── 结果区 ── */
@@ -397,28 +440,28 @@ select:focus,
 }
 
 .result-badge-ok {
-  color: var(--color-ok);
+  color: var(--ok);
 }
 
 .result-badge-warn {
-  color: var(--color-warn);
+  color: var(--warn);
 }
 
 .result-badge-error {
-  color: var(--color-error);
+  color: var(--error);
 }
 
 .result-errors ul {
   margin: 0;
   padding-left: 20px;
-  color: var(--color-text-secondary);
+  color: var(--text-secondary);
   font-size: 0.9rem;
 }
 
 .result-tip {
   margin: 10px 0 0;
   font-size: 0.9rem;
-  color: var(--color-text-secondary);
+  color: var(--text-secondary);
 }
 
 .result-footer {
@@ -435,7 +478,7 @@ select:focus,
 .status-card h3 {
   margin: 0 0 8px;
   font-size: 0.95rem;
-  color: var(--color-text);
+  color: var(--text);
 }
 
 .health-list,
@@ -460,7 +503,7 @@ select:focus,
   align-items: baseline;
   gap: 8px;
   padding: 4px 0;
-  border-bottom: 1px solid var(--color-border);
+  border-bottom: 1px solid var(--border);
 }
 
 .system-row:last-child {
@@ -468,7 +511,7 @@ select:focus,
 }
 
 .system-row dt {
-  color: var(--color-text-secondary);
+  color: var(--text-secondary);
   min-width: 3.2em;
   flex-shrink: 0;
 }
@@ -479,36 +522,36 @@ select:focus,
 }
 
 .system-llm-on {
-  color: var(--color-ok);
+  color: var(--ok);
   font-weight: 600;
 }
 
 .system-llm-off {
-  color: var(--color-error);
+  color: var(--error);
   font-weight: 600;
 }
 
 /* 持仓文件就绪状态（对齐 TUI [OK] / [!!] 语义色） */
 .system-status-ok {
-  color: var(--color-ok);
+  color: var(--ok);
   font-weight: 600;
 }
 
 .system-status-err {
-  color: var(--color-error);
+  color: var(--error);
   font-weight: 600;
 }
 
 .system-llm-hint {
   display: block;
-  color: var(--color-text-secondary);
+  color: var(--text-secondary);
   margin-top: 2px;
   word-break: break-all;
 }
 
 .system-llm-detail {
   margin-top: 6px;
-  border-top: 1px dashed var(--color-border);
+  border-top: 1px dashed var(--border);
   padding-top: 6px;
 }
 
@@ -517,7 +560,7 @@ select:focus,
   align-items: baseline;
   gap: 8px;
   padding: 4px 0;
-  border-bottom: 1px solid var(--color-border);
+  border-bottom: 1px solid var(--border);
 }
 
 .health-row:last-child {
@@ -526,7 +569,7 @@ select:focus,
 
 .health-name {
   flex: 1;
-  color: var(--color-text);
+  color: var(--text);
   word-break: break-all;
 }
 
@@ -548,16 +591,16 @@ select:focus,
 }
 
 .health-ok .health-status {
-  color: var(--color-ok);
+  color: var(--ok);
 }
 
 .health-err .health-status {
-  color: var(--color-error);
+  color: var(--error);
 }
 
 .health-meta {
   flex: none;
-  color: var(--color-text-secondary);
+  color: var(--text-secondary);
   font-size: 0.8rem;
   max-width: 40%;
   overflow: hidden;
@@ -574,7 +617,7 @@ select:focus,
 
 .history-time {
   flex: none;
-  color: var(--color-text);
+  color: var(--text);
   font-variant-numeric: tabular-nums;
 }
 
@@ -584,16 +627,16 @@ select:focus,
 }
 
 .history-status-ok {
-  color: var(--color-ok);
+  color: var(--ok);
 }
 
 .history-status-err {
-  color: var(--color-error);
+  color: var(--error);
 }
 
 .history-meta {
   flex: 1;
-  color: var(--color-text-secondary);
+  color: var(--text-secondary);
   font-size: 0.8rem;
   text-align: right;
 }
@@ -604,7 +647,7 @@ select:focus,
   padding: 6px 8px;
   font-size: 0.8rem;
   line-height: 1.4;
-  color: var(--color-text);
+  color: var(--text);
   background: rgba(240, 173, 78, 0.12);
   border: 1px solid rgba(240, 173, 78, 0.4);
   border-radius: 6px;
@@ -627,7 +670,7 @@ select:focus,
   margin: 10px 0 2px;
   font-size: 0.8rem;
   font-weight: 600;
-  color: var(--color-text-secondary);
+  color: var(--text-secondary);
   letter-spacing: 0.04em;
 }
 
@@ -640,7 +683,7 @@ select:focus,
   padding: 5px 8px;
   font-size: 0.8rem;
   line-height: 1.4;
-  color: var(--color-text);
+  color: var(--text);
   background: rgba(240, 173, 78, 0.12);
   border: 1px solid rgba(240, 173, 78, 0.4);
   border-radius: 6px;
@@ -657,20 +700,20 @@ select:focus,
 }
 
 .log-controls label {
-  color: var(--color-text-secondary);
+  color: var(--text-secondary);
 }
 
 .log-level-select {
   padding: 6px 10px;
   font-size: 0.9rem;
-  border: 1px solid var(--color-border);
+  border: 1px solid var(--border);
   border-radius: var(--radius-sm);
-  background: var(--color-surface);
-  color: var(--color-text);
+  background: var(--surface);
+  color: var(--text);
 }
 
 .log-level-select:focus-visible {
-  outline: 2px solid var(--color-focus);
+  outline: 2px solid var(--focus);
   outline-offset: 1px;
 }
 
@@ -681,9 +724,9 @@ select:focus,
 .log-list {
   max-height: 420px;
   overflow-y: auto;
-  border: 1px solid var(--color-border);
+  border: 1px solid var(--border);
   border-radius: var(--radius-sm);
-  background: var(--color-surface);
+  background: var(--surface);
   font-size: 0.82rem;
 }
 
@@ -693,7 +736,7 @@ select:focus,
 }
 
 .log-entry {
-  border-bottom: 1px solid var(--color-border);
+  border-bottom: 1px solid var(--border);
 }
 
 .log-entry:last-child {
@@ -704,7 +747,7 @@ select:focus,
   padding: 6px 10px;
   cursor: pointer;
   user-select: none;
-  color: var(--color-text);
+  color: var(--text);
   word-break: break-all;
   display: flex;
   gap: 6px;
@@ -715,7 +758,7 @@ select:focus,
 }
 
 .log-entry[open] summary {
-  border-bottom: 1px solid var(--color-border);
+  border-bottom: 1px solid var(--border);
 }
 
 .log-body {
@@ -723,7 +766,7 @@ select:focus,
   padding: 8px 10px;
   white-space: pre-wrap;
   word-break: break-all;
-  color: var(--color-text-secondary);
+  color: var(--text-secondary);
   font-family: ui-monospace, SFMono-Regular, Consolas, "Liberation Mono", monospace;
   font-size: 0.78rem;
   line-height: 1.5;
@@ -733,23 +776,23 @@ select:focus,
 /* 日志级别语义色（对齐 TUI 级别着色） */
 .log-entry.log-error summary,
 .log-entry.log-critical summary {
-  color: var(--color-error);
+  color: var(--error);
 }
 
 .log-entry.log-warning summary {
-  color: var(--color-warn);
+  color: var(--warn);
 }
 
 /* 装饰性横幅/分隔线（实验性提示等）置灰 */
 .log-decorative summary {
-  color: var(--color-text-secondary);
+  color: var(--text-secondary);
 }
 
 /* ── 配置编辑面板（与 TUI 菜单一致，即改即存）── */
 .config-note {
   margin: 0 0 12px;
   font-size: 0.85rem;
-  color: var(--color-text-secondary);
+  color: var(--text-secondary);
   line-height: 1.5;
 }
 
@@ -760,7 +803,7 @@ select:focus,
 }
 
 .config-group {
-  border-top: 1px dashed var(--color-border);
+  border-top: 1px dashed var(--border);
   padding: 12px 0 4px;
 }
 
@@ -773,7 +816,7 @@ select:focus,
   margin: 0 0 8px;
   font-size: 0.9rem;
   font-weight: 600;
-  color: var(--color-text);
+  color: var(--text);
 }
 
 .config-row {
@@ -793,7 +836,7 @@ select:focus,
   flex: none;
   min-width: 5.5em;
   font-size: 0.9rem;
-  color: var(--color-text-secondary);
+  color: var(--text-secondary);
 }
 
 .config-path-row input[type='text'] {
@@ -809,13 +852,13 @@ select:focus,
 .config-row-status {
   flex: none;
   font-size: 0.8rem;
-  color: var(--color-text-secondary);
+  color: var(--text-secondary);
 }
 
 .config-note-sub {
   margin: 8px 0 0;
   font-size: 0.8rem;
-  color: var(--color-text-secondary);
+  color: var(--text-secondary);
   line-height: 1.5;
 }
 
@@ -858,7 +901,7 @@ select:focus,
 }
 
 .config-error {
-  color: var(--color-error);
+  color: var(--error);
 }
 
 /* 文本框通用样式（与 select 视觉对齐） */
@@ -866,14 +909,14 @@ input[type='text'] {
   font-family: inherit;
   font-size: 0.95rem;
   padding: 8px 10px;
-  border: 1px solid var(--color-border);
+  border: 1px solid var(--border);
   border-radius: 6px;
-  background: var(--color-surface);
-  color: var(--color-text);
+  background: var(--surface);
+  color: var(--text);
 }
 
 input[type='text']:focus {
-  outline: 2px solid var(--color-focus);
+  outline: 2px solid var(--focus);
   outline-offset: 1px;
 }
 
@@ -882,8 +925,8 @@ input[type='text']:focus {
   position: sticky;
   top: 0;
   z-index: 20;
-  background: var(--color-bg);
-  border-bottom: 1px solid var(--color-border);
+  background: var(--bg);
+  border-bottom: 1px solid var(--border);
 }
 
 .tab-bar-inner {
@@ -900,7 +943,7 @@ input[type='text']:focus {
   font-family: inherit;
   font-size: 0.95rem;
   font-weight: 600;
-  color: var(--color-text-secondary);
+  color: var(--text-secondary);
   background: transparent;
   border: 1px solid transparent;
   border-radius: 999px;
@@ -911,17 +954,17 @@ input[type='text']:focus {
 
 .tab-btn:hover {
   background: rgba(31, 111, 176, 0.08);
-  color: var(--color-text);
+  color: var(--text);
 }
 
 .tab-btn[aria-selected='true'] {
-  background: var(--color-primary);
-  border-color: var(--color-primary);
+  background: var(--primary);
+  border-color: var(--primary);
   color: #fff;
 }
 
 .tab-btn:focus-visible {
-  outline: 2px solid var(--color-focus);
+  outline: 2px solid var(--focus);
   outline-offset: 2px;
 }
 
@@ -972,21 +1015,21 @@ input[type='text']:focus {
   font-family: inherit;
   font-size: 0.95rem;
   padding: 6px 8px;
-  border: 1px dashed var(--color-border);
+  border: 1px dashed var(--border);
   border-radius: 6px;
-  background: var(--color-surface);
-  color: var(--color-text);
+  background: var(--surface);
+  color: var(--text);
 }
 
 .file-input-plain:focus-visible {
-  outline: 2px solid var(--color-focus);
+  outline: 2px solid var(--focus);
   outline-offset: 1px;
 }
 
 .field-hint {
   margin: 4px 0 0;
   font-size: 0.82rem;
-  color: var(--color-text-secondary);
+  color: var(--text-secondary);
 }
 
 /* ── 状态卡操作行（缓存统计等）── */
@@ -1007,11 +1050,90 @@ input[type='text']:focus {
   max-width: 760px;
   margin: 0 auto;
   padding: 0 var(--space-card) 32px;
-  color: var(--color-text-secondary);
+  color: var(--text-secondary);
   font-size: 0.8rem;
 }
 
-/* ── 响应式（375px 移动端不溢出）── */
+/* ── 设计契约：主题切换与组件状态矩阵（DESIGN.md Components）── */
+.theme-toggle {
+  margin-left: auto;
+  align-self: center;
+  padding: 8px 14px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+  color: var(--text-secondary);
+  font-family: inherit;
+  font-size: 0.9rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+.theme-toggle:hover {
+  color: var(--text);
+  border-color: var(--primary);
+}
+.theme-toggle[aria-pressed="true"] {
+  background: var(--text);
+  color: var(--bg);
+  border-color: var(--text);
+}
+
+/* 全局焦点可见性兜底（键盘/辅助导航，永不移除） */
+a:focus-visible,
+button:focus-visible,
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible,
+[tabindex]:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
+}
+
+/* 按钮进行中态（aria-busy：提交 → 生成完成全程） */
+.btn[aria-busy="true"] {
+  opacity: 0.65;
+  cursor: progress;
+}
+
+/* 表单字段错误态（校验类挂上即生效） */
+.has-error input,
+.has-error select,
+.has-error textarea {
+  border-color: var(--error);
+}
+.field-error {
+  color: var(--error);
+  font-size: 0.8rem;
+  margin-top: 4px;
+}
+
+/* 空态占位（与报告 empty-note 同名同义；文案口径见 DESIGN.md Data States） */
+.empty-note {
+  color: var(--text-secondary);
+  font-size: 0.85rem;
+  line-height: 1.5;
+  padding: 6px 0;
+}
+
+/* 链接态 */
+a:hover {
+  text-decoration: underline;
+}
+
+/* ── 触屏档（≤768）：触控目标 ≥44px（DESIGN Responsive 契约）── */
+@media (max-width: 768px) {
+  .tab-btn,
+  .theme-toggle,
+  .btn,
+  input[type='text'],
+  input[type='file'],
+  select,
+  textarea {
+    min-height: 44px;
+  }
+}
+
+/* ── 响应式（窄屏移动端不溢出）── */
 @media (max-width: 480px) {
   .app-header,
   .app-main,

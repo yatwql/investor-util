@@ -1,5 +1,5 @@
 # 投资复盘助手 — 质量控制与测试标准
-> 文档版本：0.12.6
+> 文档版本：0.12.7
 
 ---
 
@@ -460,6 +460,7 @@
 | R-OUT-10 | `src/test/unit/report/test_html_report_structure.py` + `src/test/unit/report/test_feature_interactive.py` | 批 4 |
 | R-OUT-11 | `src/test/unit/report/test_theme_js.py` + `src/test/unit/report/test_feature_interactive.py` | 批 4 |
 | R-OUT-12 | `src/test/unit/report/test_html_report_structure.py` | 批 4 |
+| R-OUT-13 | `src/test/unit/report/test_run_integrity.py` | 批 9 |
 | R-PERF-01 | `src/test/unit/news/test_news_aggregator.py` | 批 4 |
 | R-PERF-02 | `src/test/unit/llm/test_generate_all_llm.py` | 批 4 |
 | R-PERF-03 | `src/test/unit/fetcher/test_batch.py` | 批 4 |

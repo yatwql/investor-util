@@ -277,7 +277,7 @@ def _write_profit_summary(
 def _write_a_share_indices(ws: Worksheet, row: int, a_indices: dict[str, dict[str, Any]] | None) -> int:
     """写入 A 股指数（本日 + 上日）。"""
     if not a_indices:
-        return _write_kv_row(ws, row, "── A股指数 ──", "暂无数据")
+        return _write_kv_row(ws, row, "── A股指数 ──", "暂无指数数据")
 
     row = _write_kv_row(ws, row, "── A股指数（本日）──", "")
     a_list = [
@@ -308,7 +308,7 @@ def _write_a_share_indices(ws: Worksheet, row: int, a_indices: dict[str, dict[st
 def _write_us_indices(ws: Worksheet, row: int, us_indices: dict[str, dict[str, Any]] | None) -> int:
     """写入美股指数（最新 + 上日）。"""
     if not us_indices:
-        return _write_kv_row(ws, row, "── 美股指数 ──", "暂无数据")
+        return _write_kv_row(ws, row, "── 美股指数 ──", "暂无指数数据")
 
     row = _write_kv_row(ws, row, "── 美股指数（最新）──", "")
     us_list = [

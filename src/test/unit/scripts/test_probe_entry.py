@@ -9,14 +9,13 @@
 
 from __future__ import annotations
 
-import importlib
-import importlib.util
 import sys
 from pathlib import Path
 from typing import Any
 from unittest.mock import patch
 
 import pytest
+from src.test._script_loader import load_script
 
 _REPO_ROOT = Path(__file__).resolve().parents[4]
 _SCRIPTS_DIR = _REPO_ROOT / "scripts"
@@ -32,21 +31,10 @@ _ensure_scripts_on_path()  # 模块级唯一注入点：契约测试在测试体
 pytestmark = [pytest.mark.unit, pytest.mark.unit_scripts]
 
 
-def _load_script(rel_path: str, mod_name: str):
-    """按路径加载脚本模块（scripts/ 目录下的扁平脚本没有包语境）。"""
-    fpath = _REPO_ROOT / rel_path
-    spec = importlib.util.spec_from_file_location(mod_name, fpath)
-    mod = importlib.util.module_from_spec(spec)
-    assert spec.loader is not None
-    sys.modules[mod_name] = mod
-    spec.loader.exec_module(mod)
-    return mod
-
-
 @pytest.fixture(scope="module")
 def probe_entry():
     # 路径注入已在模块级单点完成（probe.py 加载时自身亦会插入同目录）——此处不再重复注入
-    return _load_script("scripts/probe.py", "probe_entry")
+    return load_script("probe.py", module_name="probe_entry")
 
 
 # ═══ probe 入口 ═══

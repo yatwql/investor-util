@@ -5,7 +5,7 @@
             <table class="kv-table">
                 <tr><td>API 调用次数</td><td>{{ llm_session_usage["call_count"] }} 次</td></tr>
                 <tr><td>模型</td><td>{{ llm_session_usage["model_display"] }}</td></tr>
-                <tr><td>Endpoint</td><td style="word-break: break-all; font-size: 13px;">{{ llm_endpoint or "—" }}</td></tr>
+                <tr><td>Endpoint</td><td style="word-break: break-all; font-size: var(--fs-table);">{{ llm_endpoint or "—" }}</td></tr>
                 <tr><td>输入 token</td><td>{{ llm_session_usage["input_tokens"] | thousands }}</td></tr>
                 <tr><td>输出 token</td><td>{{ llm_session_usage["output_tokens"] | thousands }}</td></tr>
                 <tr><td>总 token</td><td>{{ llm_session_usage["total_tokens"] | thousands }}</td></tr>
@@ -20,7 +20,7 @@
             {% endif %}
 
             {% if llm_module_info %}
-            <div style="margin-top: 14px; font-size: 13px; color: var(--text-secondary);">
+            <div style="margin-top: 14px; font-size: var(--fs-table); color: var(--text-secondary);">
                 <strong>各模块明细：</strong>
                 <table class="kv-table" style="margin-top: 6px;">
                     <tr style="background: var(--row-first-check-bg);">
@@ -90,13 +90,13 @@
             {% endif %}
 
             {# 调用次数 vs 模块明细差异注释 #}
-            <div style="margin-top: 8px; font-size: 11px; color: var(--text-faint);">
+            <div style="margin-top: 8px; font-size: var(--fs-footnote); color: var(--text-faint);">
                 注：API 调用次数统计实际发起的 API 请求总数（含截断后自动重试等），
                 各模块明细仅列最终结果；两者不一致属正常现象。
             </div>
 
             {% if cache_stats and cache_stats.get("total", 0) > 0 %}
-            <div style="margin-top: 16px; font-size: 13px; color: var(--text-secondary);">
+            <div style="margin-top: 16px; font-size: var(--fs-table); color: var(--text-secondary);">
                 <strong>系统数据缓存：</strong>
                 <table class="kv-table" style="margin-top: 6px;">
                     <tr><td>缓存命中</td><td>{{ cache_stats["hits"] }} 次</td></tr>

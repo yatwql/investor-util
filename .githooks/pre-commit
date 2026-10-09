@@ -21,6 +21,11 @@
 
 set -e
 
+# Windows 编码：守护经 run_bg 重定向到日志文件，Python 按 locale ANSI（cp936）落盘
+# 会在 UTF-8 终端把回放内容读成乱码；UTF-8 模式统一按 UTF-8 写（Linux/CI 本就是
+# UTF-8，行为不变）；守护详情可读性见 `scripts/_checklib.py::_force_utf8_stream`。
+export PYTHONUTF8=1
+
 # 优先项目虚拟环境解释器（CLAUDE.md：Python 命令一律走 .venv）。
 # Windows 布局（.venv/Scripts/python.exe）优先：裸 python/python3 会命中系统
 # 解释器，缺 pandas 等依赖且 pytest 收集口径不同（实测 7964 vs 8173），

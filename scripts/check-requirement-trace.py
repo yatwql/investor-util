@@ -22,7 +22,8 @@
   python scripts/check-requirement-trace.py --ci  # CI 模式：仅输出 文件名:描述，退出码 2
 
 退出码：
-  0 — 全部通过  2 — 发现 finding
+  0 — 全部通过
+  2 — 发现 finding（与 _checklib.report 返回值域一致）
 """
 
 from __future__ import annotations

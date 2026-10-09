@@ -88,9 +88,9 @@ def _merge_holdings(holdings: list[Holding]) -> dict[str, dict[str, Any]]:
 
 
 def _compute_hhi(holdings_index: dict[str, dict[str, Any]]) -> float:
-    """成本口径集中度——委托 metrics_risk.hhi 唯一原语（rf-529 收敛）。
+    """成本口径集中度——委托 metrics_risk.hhi 唯一原语。
 
-    权重已按成本归一（Σ=1），hhi 内部再次归一为幂等运算，结果与旧实现一致。
+    权重已按成本归一（Σ=1），hhi 内部再次归一为幂等运算，结果不受重复归一影响。
     """
     return hhi([e["weight"] for e in holdings_index.values()])
 

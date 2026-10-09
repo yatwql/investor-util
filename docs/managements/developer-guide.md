@@ -1,6 +1,6 @@
 # 开发者指南
 
-> 文档版本：0.12.6
+> 文档版本：0.12.7
 
 ## 概述
 
@@ -109,7 +109,7 @@ ln -sf "$PWD/.pi/models.json" ~/.pi/agent/models.json
 .venv/bin/python scripts/check-requirement-trace.py --ci   # 需求 ID ↔ 验证载体追溯（已补全域全覆盖 + 载体文件存在）
 .venv/bin/python scripts/check-version-consistency.py --ci   # 版本号全局一致性（APP_VERSION ↔ README/pyproject/管理文档 10 份）
 .venv/bin/python scripts/check-doc-links.py --ci              # 文档死链/死锚点/重复标题/层级/编号序列/§引用机检
-.venv/bin/python scripts/check-file-length.py --ci         # 单文件行数红线（主程序 >800 行 / 测试 >1200 行）
+.venv/bin/python scripts/check-file-length.py --ci         # 单文件行数红线（主程序/脚本 >1000 行 / 测试 >1200 行）
 ```
 
 > **`--sync` 统计快照口径（CI 分叉坑）**：`check-doc-drift --sync`（及 pre-commit 自动回写）按**工作区**实测写入 `folders.md` 行数，而 CI 的 `check-doc-drift` 按 **committed** 树实测——若受检目录存在**长期不提交的修改**（本地游离改动），本地已同步的数字会在 CI 上判「不一致」，连带 guards / test / portability 三个 job 同时红。提交前确认受检文件全部纳入本次提交；有长期游离修改时先提交它们、再 `--sync`。
@@ -155,6 +155,8 @@ PYTHONWARNDEFAULTENCODING=1 .venv/bin/python -m pytest src/test/unit -q
 
 > 为何不直接跑 Windows runner：GitHub 的 `windows-latest` 是 en-US/cp1252（单字节，只会乱码不会报错），装不住 GBK 类 locale 回退；为何不在 ubuntu 上装 GB18030 跑全套件：中文**文件名**在 POSIX `fsencoding=ascii` 下会失败（18 处中文报表文件名），而 cp936 Windows 反而正常——那是探测方法的伪影，不是缺陷。两道探针因此取「精确模拟消费方」而非「换整个 locale 跑全套件」。
 
+> **钩子与守护输出的编码**：pre-commit 以 `export PYTHONUTF8=1` 统一守护子进程的日志编码，`scripts/_checklib.py` 导入时把非 UTF-8 的真实 stdout/stderr 收敛到 UTF-8（`_force_utf8_stream`，已 UTF-8 或 `StringIO` 桩零改写）——中文 Windows 上 stdout 重定向到文件按 locale ANSI（cp936）落盘，UTF-8 终端回放 `run_bg` 守护日志会成乱码；前台直打走控制台 `WriteConsoleW` 本就无损。
+
 > P1/P2 的完整要求（含手动验证项）见 [testplan.md](testplan.md) → 回归测试清单 / 门禁章节。
 
 ### 日志回显纪律（要求改配置必给现值）
@@ -177,7 +179,7 @@ PYTHONWARNDEFAULTENCODING=1 .venv/bin/python -m pytest src/test/unit -q
 | 新报告章节 | `registry.py` 注册表 → `reports-instruction.md`（目录/章节表/分组表/可见性总表/页签上限）→ `requirements.md` 章清单 → `technical.md`（结果区计数/`report_section_order`）→ `how-to-use-tui-menu.md`（报告块编号段）→ `folders.md`（新 partial/模板）→ `report_template.html` include |
 | 新功能开关 | `features.py` 注册表 → `how-to-config.md`（开关表+计数+实验/常规分列+Web 面板行）→ `how-to-use-tui-menu.md`（开关区行与编号）→ `technical.md`（语义命名表/开关计数）→ `testplan.md`（若涉门禁） |
 | 新文件/目录 | `folders.md` 目录树（`check-doc-drift --sync` 回写统计表）→ 若为 `scripts/*`：本文件「辅助脚本速查」一览与分类段 |
-| 新测试 | `conftest.py` marker 注册（若需）→ `.venv/bin/python scripts/collect-test-coverage.py` 刷新 `test-coverage.md` → 边缘用例入 `*_edge.py` |
+| 新测试 | `conftest.py` marker 注册（若需）→ `.venv/bin/python scripts/collect-test-coverage.py --update-docs` 回写 `test-coverage.md`/`folders.md` 计数行（不带标志仅输出供人工对照）→ 边缘用例入 `*_edge.py` |
 | 新 LLM 模块/seam | `registry.py` + 统一附录（`skeleton._build_prompt_appendix`）+ `technical.md`（语义命名表/seam 表/附录 H）→ 指纹条件并入用例 |
 | 每个计划收尾（通用） | `plan.md`（状态翻转+归档 note）→ 当期计划归档文档（归档段+设计文档索引，入 0.12 期归档）→ `review-findings.md`（rf 登记，rf-next 递增）→ `changelog.md`（含 rf token）→ `test-coverage.md`/`folders.md` 计数刷新 → 涉版本时 `check-version-consistency` |
 
@@ -808,6 +810,17 @@ def test_ttl_during_trading_hours_returns_30s(self):
 def test_qdii_nav_date_delayed_t2(self):
 ```
 
+**加载 `scripts/` 下脚本（动态加载）**：
+
+```python
+from src.test._script_loader import load_script
+
+mod = load_script("check-svg.py")                                            # 模块名由文件名派生
+mod = load_script("_test_runner/modes.py", module_name="modes_under_test")   # 子路径 + 显式模块名
+```
+
+> 唯一实现为 `src/test/_script_loader.py`：按文件名/子路径加载 `scripts/` 下脚本、每次调用重新执行返回新实例、注册进 `sys.modules`（`@dataclass` 按 `cls.__module__` 回查命名空间依赖它）。**禁止**在测试文件里再手写 `importlib.util.spec_from_file_location` 样板或自定义 `_load_script`——`unit/scripts/test_script_loader.py` 的样板唯一性机检会检出（除 loader 自身外出现动态加载样板、或定义同名本地加载器均判失败）。
+
 **新增后必须更新的文件**：
 
 1. **`test-coverage.md` 场景测试分组表** — 新增 S/T/D 场景时补充条目（含测试类参考列）
@@ -829,12 +842,14 @@ def test_qdii_nav_date_delayed_t2(self):
 
 | 指标 | 警告线 | 红线 | 措施 |
 |:-----|:------:|:----:|:-----|
+| 主程序单文件行数（`src/python/`） | > 500 行 | > 1000 行 | 按职责域下沉拆分（域下沉 + 门面 re-export，消费方导入面不变） |
+| 脚本单文件行数（`scripts/` 递归含包内子模块） | > 400 行 | > 1000 行 | 按职责拆包（评测核心 / 阶段编排 / CLI 等），入口仅留 CLI 与原面 re-export |
+| 测试单文件行数（`src/test/`） | > 800 行 | > 1200 行 | 考虑按被测函数 / 场景类型拆分 |
 | 单文件测试数 | > 80 项 | > 120 项 | 拆分到子文件 `test_xxx_part1.py` / `test_xxx_part2.py` |
-| 单文件行数 | > 800 行 | > 1200 行 | 考虑按被测函数 / 场景类型拆分 |
 | 单类方法数 | > 15 项 | > 25 项 | 拆为多个 Test 类或拆分文件 |
 | 单方法 mock 数 | > 5 个 patch | > 8 个 patch | 重构被测函数以降低耦合 |
 
-> **门禁**：红线列由 `scripts/check-file-length.py --ci` 强制——**主程序 >800 行**（硬上限，review-findings 文件过长登记区）与**测试 >1200 行**即 finding 退出 2；豁免路径须与 review-findings 挂账同步（拆分后自动提示移除豁免）。`-v` 另输出可选优化区间清单（主程序 >500 / 测试 >800），review-findings「文件过长」登记表以该清单为派生源。
+> **门禁**：红线列由 `scripts/check-file-length.py --ci` 强制——**主程序 >1000 行**（硬上限，review-findings 文件过长登记区）、**脚本 >1000 行**与**测试 >1200 行**即 finding 退出 2；豁免路径须与 review-findings 挂账同步（拆分后自动提示移除豁免）。`-v` 另输出可选优化区间清单（主程序 >500 / 脚本 >400 / 测试 >800），review-findings「文件过长」登记表以该清单为派生源。
 
 ### 常见问题
 
@@ -875,15 +890,17 @@ A: 运行 `.venv/bin/python scripts/check-test-markers.py`，脚本会静态扫�
 | `check-semantic-index.py` | 测试 | 功能语义命名表正反向一致性校验（功能开关注册表表外键 / 僵尸条目 / 合并章 key 缺失） |
 | `check-doc-drift.py` | 测试 | 文档与实现一致性校验（章节表/章节数量、开关表/分组计数/默认值断言、配置与 LLM 默认值表、TUI 面板编号、目录树、项目统计表；`--sync` 自动回写统计快照） |
 | `check-doc-links.py` | 测试 | 文档链接与结构一致性校验（死链/死锚点/重复标题/层级/编号序列/§引用） |
-| `check-file-length.py` | 测试 | 单文件行数红线守护（主程序 >800 行 / 测试 >1200 行；豁免登记与 review-findings 挂账同步，`-v` 输出可选优化区间清单供登记表派生） |
+| `check-file-length.py` | 测试 | 单文件行数红线守护（主程序/脚本 >1000 行 / 测试 >1200 行；豁免登记与 review-findings 挂账同步，`-v` 输出可选优化区间清单供登记表派生） |
 | `check-test-redundancy.py` | 测试 | 测试用例冗余与无效检查（死用例 / 无断言 / 完全重复 / 自证用例 / 硬编码演进总数） |
 | `check-requirement-trace.py` | 测试 | 需求 ID ↔ 验证载体追溯（单段 ID 全域覆盖 / 载体文件存在 / ID 双向一致） |
 | `install-claude-hook.py` | 测试 | 安装/卸载 Claude Code PostToolUse hook（任务编号一致性自动校验） |
 | `llm-hallucination-sampler.py` | 测试 | 10 组标准持仓 × LLM 幻觉率采样（薄 CLI，实现在 `_halluc_sampler/` 包） |
 | `calibrate-dedup-threshold.py` | 测试 | 新闻去重阈值校准分析 |
-| `collect-test-coverage.py` | 测试 | 测试覆盖计数收集（`--collect-only` 快照，供 test-coverage.md 更新） |
+| `collect-test-coverage.py` | 测试 | 测试覆盖计数收集（`--collect-only` 快照；`--update-docs` 回写 test-coverage/folders 计数行） |
 | `smoke-web.py` | 测试 | Web 模式 HTTP 冒烟脚本（test_client 进程内全链路断言，可独立运行） |
 | `check-version-consistency.py` | 质量 | 版本号全局一致性检查（P0/P2 守护脚本 + 发布流程必跑） |
+| `check-style-guardrails.py` | 质量 | 设计护栏机检（DESIGN.md 护栏样式面；E 级：强调色越权/明暗同步/双面 token 对表判 finding，W 级：裸色值/圆角档位观察统计——**观察期**未入钩子与 CI） |
+| `check-script-contract.py` | 质量 | scripts 顶层脚本契约机检（退出码声明 ⊆ {0,2} 白名单、check-* 统一 `add_common_args` CLI 面、文本 I/O 显式 encoding、脚本↔测试覆盖映射，四条规则——**观察期**未入钩子与 CI） |
 | `release.py` | 发布 | 发布流程分步编排（check/prepare/refresh/evolution/gate/publish/devbump，每步独立可审阅、失败即停） |
 | `perf-report.py` | 诊断 | 端到端报告生成管线性能基准（独立脚本，mock 外部数据源） |
 | `perf-view.py` | 诊断 | 性能历史趋势查看（读取 perf_history.jsonl → 跨版本耗时对比） |
@@ -1202,16 +1219,18 @@ sh .githooks/install-hooks.sh --off   # 停用
 
 **`collect-test-coverage.py` — 测试覆盖计数收集**
 
-只做 `.venv/bin/python -m pytest --collect-only`（收集测试项，**不执行测试**，耗时约 2s），按 `test-runner.py` MODES 的 marker 表达式本地归类计数，输出各模式 / unit 子标记 / scenario 分组 / 跨类标记 / 功能域 / 文件分布的项数，供 `docs/managements/test-coverage.md` 快照更新使用。
+只做 `.venv/bin/python -m pytest --collect-only`（收集测试项，**不执行测试**，耗时约 2s），模式计数谓词由 `_test_runner/modes.py::MODES` 的 marker 表达式现场编译，输出各模式 / unit 子标记 / scenario 分组 / 跨类标记 / 功能域 / 文件分布的项数，供 `docs/managements/test-coverage.md` 快照更新使用。
 
 ```bash
-.venv/bin/python scripts/collect-test-coverage.py
+.venv/bin/python scripts/collect-test-coverage.py                 # 仅输出（人工对照改文档）
+.venv/bin/python scripts/collect-test-coverage.py --update-docs   # 按本次快照回写计数行
 ```
 
 **说明**：
 - 只收集不执行——测试体不会运行，不影响测试结果，也不会触发真实数据源 / LLM 调用
 - 项数随版本迭代变化，属撰写时快照，精确计数以本脚本实时输出为准
-- 计数口径与 `test-runner.py` 的 `MODES` marker 表达式对齐（verify / dev-verify 等组合模式同样本地复现）
+- **`--update-docs` 回写**：按本次快照改写 `test-coverage.md` 计数行（反引号标记行 + 能映射到标记的加粗标签行，比对域与 `check-doc-drift` 的计数核对同构、复用其行匹配原语，写后必然通过 `--with-test-count` 核对）与 `folders.md` 项目统计表「测试用例」行；只改数字、粗体/千分位/后缀原样保留，内容一致则零变更（幂等）；收集退出码非 0/5（如收集期校验中断）时**跳过回写**并告警，错数不落盘。与 `test-runner --mode bench --update-docs`（写耗时对照表）互不重叠
+- 计数口径直接取自 `MODES` 的 marker 表达式（复用 pytest 自身的 `-m` 求值器，`verify` / `dev-verify` 等组合模式与阶段 marker 回落同源），表达式只在 `modes.py` 定义一处、模式增删自动跟随；`all`（已由「总收集: N」表达）与 `live`（默认收集宇宙排除，计数恒 0）为显式豁免并在脚本内注记理由
 
 ### 质量类
 
@@ -1290,7 +1309,7 @@ sh .githooks/install-hooks.sh --off   # 停用
 | 最短/最长 | 该阶段历史最小/最大耗时 |
 | 次数 | 该阶段出现次数（条件阶段如历史走势仅在启用时出现） |
 
-**数据来源**：每次 `generate_report()` 调用时自动记录到 `data/state/perf_history.jsonl`，无需手动触发。
+**数据来源**：每次 `generate_report()` 调用时自动记录到 `data/state/perf_history.jsonl`，无需手动触发；中断运行以 `status=interrupted` 记录（含 `interrupted_stage`），与成功完成（`completed`）区分，页头状态行据显「已中断」。
 
 **`probe.py` — 探测统一入口（target 分发 registry）**
 
@@ -1732,7 +1751,7 @@ DataModuleDef("我的 LLM 分析", "llm_my_analysis",
 
 > **读侧增强类开关也应转正（第三类首例：`deterministic_signal` / `module_quality_gate` / `decision_header_parse` / `llm_debate_conditional` / `datasource_credential_ready`）**：判据落在「**开启的代价是否只在读侧**」——只在既有提示词或既有产物流水线上追加一段由**已算出的**数据派生的内容，不新增 LLM 调用次数、不写新的持久化文件、无隐式网络与耗时；且该段内容有确定的收益（方向性结论替代裸数值、结构化契约替代表格猜测、质量分级提示读者降级参考、缺凭据时给可读指引）。此类开关默认关的实际代价是**机制在生产路径从不执行**，用户手上的产物看不到这层增强；用户若逐项去 `features.json` 里打开它，等于用配置承担了本该由默认值表达的取舍（转正判据的可观测量：见 core/experiment_stats.py 的启用次数统计与 doctor 账本概览）。转正口径：① 声明改到 `GROUP_STANDARD` 且 `default` 置 `True`；② `affects_report` **照实答 `True`**——它们确实改变产物内容（`deterministic_signal` 注入信号块、`module_quality_gate` 注入质量横幅、`decision_header_parse` 追加契约行、`llm_debate_conditional` 追加情景段、`datasource_credential_ready` 改变数据源就绪行为），故 Web 面板照常带「（影响报告）」标记；③ 开关保留为关闭杠杆，`features.json` 置 false 即回到「未引入本机制」的行为；④ 凡开关改变提示词者，其缓存后缀函数（`structured_header_cache_suffix()` → `_dh`、`debate_feature_cache_suffix()` → `_c`、`prompts_signals._signal_digest_cache_suffix()`、`core.signal_ledger.summary_cache_suffix()` → `_sg`）随之由「默认返回空」变为「默认返回非空」——**升级后首次运行会换键重生成一次**，属预期行为，须在变更记录中写明；⑤ 测试补四向——默认值、不在实验组、显式关闭仍走未引入前的路径（关闭基线必须**显式**置 false，不能再依赖 `reset_feature_flags()`，它现在返回的是已转正的默认值）、默认配置下走增强路径（见 `test_features.py::TestReadSidePromotion`）。
 >
-> **章节/页签类开关转正目标是报告组（第四类，首例待定：`holding_change_review` / `whatif_trade_cost` / `event_window_impact` 经真实启用验证后按此执行）**：判据落在「产物形态」——独立章节/页签类能力验证通过后的归宿是「报告章节与增强」组而非常规组：`default` 保持 `False`（默认产物字节不因转正变化，读者拿到的报告不因转正多出章节），面板入口随分组自动延续（实验块 → 报告块，`--experiment` 取值域随实验组身份同步退出），产物自述与启用统计随实验组身份移除（「质量可能不稳定」警示只属于未验证功能，统计的观测使命随转正完成）。转正定义因此为「**移出实验组、目标组按功能形态选**」。
+> **章节/页签类开关转正目标是报告组（第四类首例：`holding_change_review` / `whatif_trade_cost` / `event_window_impact` 已按此转入「报告章节与增强」组，default 保持 `False`）**：判据落在「产物形态」——独立章节/页签类能力验证通过后的归宿是「报告章节与增强」组而非常规组：`default` 保持 `False`（默认产物字节不因转正变化，读者拿到的报告不因转正多出章节），面板入口随分组自动延续（实验块 → 报告块，`--experiment` 取值域随实验组身份同步退出），产物自述与启用统计随实验组身份移除（「质量可能不稳定」警示只属于未验证功能，统计的观测使命随转正完成）。转正定义因此为「**移出实验组、目标组按功能形态选**」。
 >
 > **刻意不转正的两类（判据的反面）**：**写盘积累型**——`decision_reflection` 仍留在实验组（账本结算样本尚不足以判转正，撤销死线见 plan.md）。`signal_ledger`（确定性信号沉淀）不再单独设开关：其真实积累已验证（账本有存量数据、写盘幂等开销可忽略），并入 `deterministic_signal` 转正为常规开关；**调用次数放大型**——`llm_debate_procon` 把一次 `expert_review` 调用换成最多三次（pro → con → synthesis），默认开启直接改变费用与耗时量级，留实验组由用户按需开启。集中度问答不再受开关控制（原 `llm_debate_qa_concentration` 已撤销），改为辩论流程内建段落（阈值触发）。实验功能的真实使用情况可用 `core/experiment_stats.py`（启用计数）加 `doctor` 账本概览观测，作为转正/撤销的客观数据。
 
@@ -1820,11 +1839,11 @@ registry 的测试在 `src/test/unit/core/test_registry.py`，验证 TTL 默认�
 发布版本前，必须运行：
 
 ```bash
-.venv/bin/python scripts/collect-test-coverage.py
+.venv/bin/python scripts/collect-test-coverage.py --update-docs
 ```
 
-按实时收集结果核对/更新以下文档的数据快照（非版本号），保证统计与目录结构时效性：
-- `test-coverage.md` — 模式/unit 子标记/跨类/功能域各项测试计数
+按实时收集结果回写/核对以下文档的数据快照（非版本号），保证统计与目录结构时效性：
+- `test-coverage.md` — 模式/unit 子标记/跨类/功能域各项测试计数（`--update-docs` 自动回写）
 - `folders.md` — 项目统计表及目录树新增/重命名文件；**版本演进对照表（`## 版本演进对照`）每次发布必须更新**：「最新发布」列按新 tag 重跑快照统计（复现方法见 folders.md 表头：`git ls-tree` + `git cat-file --batch` 计行 + `git grep -c "def test_"` 数用例），「当前开发版」列同步重跑；列头版本号与 tag/日期由 `check-version-consistency.py --fix`（`evolution_head`/`release_tag` 断言）同步，只改版本号不刷演进表数据行属发布遗漏
 - `datasource.md` + `datasource-reliability.md` — 数据源清单/路由归属/可靠性描述与实际代码配置一致
 
@@ -1866,3 +1885,4 @@ git checkout dev
 - **缺陷自测**：发现并修复缺陷时，**必须**为该缺陷编写可自测的回归测试用例，避免再次回退；新增功能时**必须**同步编写测试用例覆盖
 - **目录结构同步**：新增/重命名任何非排除文件或目录时，**必须**同步更新 `folders.md` 中的目录树，并确保每个文件都有简短说明
 - **文件归属三原则**：中间计划文件 → `docs/plan/`；运行时临时产物 → `docs/tmp/`；`.claude/` 全局目录只存放 Claude Code 工具自动管理的运行时数据，**禁止主动写入**任何文件
+- **设计契约**：Web/报告 UI 改动（样式、token、组件状态、版式、空态文案）前先读仓库根 [DESIGN.md](../../DESIGN.md)——Colors 角色表 / Typography 字阶 / 组件六态 / 断点表 / Do-Don't 护栏 / 迭代指引；新增声明取自契约档位，验收见 `src/test/unit/report/test_design_doc.py`

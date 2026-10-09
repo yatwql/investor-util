@@ -190,10 +190,10 @@ def _fetch_llm_and_news(
 
         purchase_constraint_block = extract_purchase_constraint_block(pipeline_data)
 
-        # ── 事件窗对照（实验开关 event_window_impact，默认关）：开启时新闻先行 ──
+        # ── 事件窗对照（报告章节与增强开关 event_window_impact，默认关）：开启时新闻先行 ──
         # 事件表须以本次新闻（含逐条 LLM 判定极性）装配，装配完成再提交 LLM 生成，
         # 分歧例块才进分析章提示词与指纹（news 与 LLM 并行会引入装配竞态，故此处
-        # 改为串行）；开关关闭 → 走下方并行原路径，行为逐字节不变。
+        # 走串行）；开关关闭 → 走下方并行原路径，行为逐字节不变。
         from src.python.config.features import is_feature_enabled
 
         if is_feature_enabled("event_window_impact") and enable_news:

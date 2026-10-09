@@ -26,6 +26,7 @@ from src.python.providers.news_dedup_rules import (  # noqa: F401
     _CROSS_DIRECT_RATIO,
     _CROSS_SAFE_RATIO,
     _ENG_PLACEHOLDER,
+    _GENERIC_TOKENS,
     _OPPOSITE_PAIRS,
     _RATIO_CLEAN,
     _SAME_SRC_BIGRAM_MIN,
@@ -35,10 +36,12 @@ from src.python.providers.news_dedup_rules import (  # noqa: F401
     _eng_len_placeholder,
     _extract_entity_bigrams,
     _has_opposite_direction,
+    has_proper_noun_token,
     _mask_stop,
     _normalize_title,
     _overlap_of_norms,
     _pair_similarity,
+    proper_noun_tokens,
     _ratio_of_norms,
     _rules_fingerprint,
 )
@@ -225,9 +228,11 @@ def _dedup_by_title(
       - 跨源候选区：``_CROSS_CANDIDATE_RATIO``(0.35) ≤ ratio < 0.50，阶梯判定：
         ③ 共享 ≥ ``_CROSS_BIGRAM_MIN``(3) 个实体 bigram → 合并（高实体重叠，低 ratio 门槛）
         ④ 共享 ≥ 2 个实体 bigram 且 ratio ≥ bg=2 梯度阈值（0.375）且共享项含**真专名**
-           （英数 token 需含字母，纯数字不算；见 ``_TOKEN_LIKE``）→ 合并
+           （英数 token 需含字母、不在泛词否决表，纯数字不算；见 ``_TOKEN_LIKE`` /
+           ``_GENERIC_TOKENS``）→ 合并
            （CPI/PPI、荣耀IPO 类共享专名 token 的真重复；纯中文公司名共享
-           如"英伟达/伟达"、仅共享数字如"某指数 100 vs 另一指数 100"不代表同一事件）
+           如"英伟达/伟达"、仅共享数字如"某指数 100 vs 另一指数 100"、
+           跨主体泛词共现如"两只 ETF 各自的行情"不代表同一事件）
         ⑤ 方向对立（上涨vs下跌/加息vs降息/站稳vs跌破分属两标题）且共享实体 → 不合并
         ⑥ 否则跳过（实体重叠不足或 ratio 太低）
 
@@ -304,9 +309,11 @@ def _dedup_by_title(
                     _record_anchor(_make_anchor(item, existing_item, ratio, overlap, True, "cross_merge"))
                     break
                 # ⑤ bg=2 梯度：中高 ratio + 共享**真专名** → 合并
-                #    英数 token 需含字母（纯数字共享不算专名证据）、或 _tk 虚拟专名；
-                #    CPI/PPI、荣耀IPO 等共享专名 token 的真重复靠此规则捕获。
-                elif overlap >= 2 and ratio >= _CROSS_BG2_RATIO and any(_TOKEN_LIKE.match(s) for s in shared):
+                #    英数 token 需含字母（纯数字共享不算专名证据）、或 _tk 虚拟专名，
+                #    且不在泛词否决表（ai/etf/cm 跨主体高频串，锚点抽样中靠它们
+                #    过闸的合并绝大多数为误合并）；CPI/PPI、荣耀IPO 等真发布会/
+                #    公司缩写照常，靠此规则捕获。
+                elif overlap >= 2 and ratio >= _CROSS_BG2_RATIO and has_proper_noun_token(shared):
                     is_dup = True
                     _record_anchor(_make_anchor(item, existing_item, ratio, overlap, True, "cross_merge_bg2"))
                     break

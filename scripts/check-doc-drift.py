@@ -7,7 +7,7 @@
 那边管「不该写的内容」，这边管「写了但与实现不符的内容」）。
 
 十七项检查（权威源 → 受检文档）：
-  1.  报告章节表        core/registry.py `_REPORT_SECTION_DEFAULT`      → manuals/reports-instruction.md
+  1.  报告章节表        core/report_section_registry.py `_REPORT_SECTION_DEFAULT` → manuals/reports-instruction.md
   2.  章节数量断言      同上（`页签编号 1~N` / `默认顺序（N 项` / `返回 result（N 项` / `N 个报告章节`）→ 全库文档
   3.  功能开关表        config/features.py `feature_switch_registry`    → manuals/how-to-config.md
   4.  开关分组计数断言  同上（`⚗实验 A / 常规 B / 报告章节与增强 C`、`实验组（A 项`（含加粗组名与 `报告章节与增强组`）、`共/提供 N 项开关`、`完整 N 项与分组清单` 等）→ 全库文档

@@ -395,3 +395,21 @@ class TestCostPanelSwitch(unittest.TestCase):
         result, _, _, data = self._run(True, panel_side_effect=RuntimeError("boom"))
         self.assertTrue(result.ok)
         self.assertNotIn("cost", data)
+
+
+# ── 开关注册表 ───────────────────────────────────────────
+
+
+class TestCostPanelSwitchRegistry:
+    """whatif_trade_cost 已登记于报告章节与增强组（页签类转正）、默认关、影响报告。"""
+
+    def test_switch_registered_in_report_group_off_by_default(self):
+        """分组/默认值/产物影响随注册表声明（结构关系断言，不写死分组计数）。"""
+        from src.python.config.features import feature_switch_registry, is_feature_enabled
+
+        sw = feature_switch_registry["whatif_trade_cost"]
+        assert sw.label == "What-if 交易成本对比"
+        assert sw.group == "report"
+        assert sw.default is False
+        assert sw.affects_report is True
+        assert is_feature_enabled("whatif_trade_cost") is False

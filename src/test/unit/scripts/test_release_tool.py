@@ -18,14 +18,13 @@
 from __future__ import annotations
 
 import argparse
-import importlib.util
 import subprocess
 from pathlib import Path
 
 import pytest
+from src.test._script_loader import load_script
 
 _REPO_ROOT = Path(__file__).resolve().parents[4]
-_SCRIPTS_DIR = _REPO_ROOT / "scripts"
 
 pytestmark = [
     pytest.mark.unit,
@@ -33,18 +32,9 @@ pytestmark = [
 ]
 
 
-def _load_release_module():
-    fpath = _SCRIPTS_DIR / "release.py"
-    spec = importlib.util.spec_from_file_location("release_tool", fpath)
-    mod = importlib.util.module_from_spec(spec)
-    assert spec.loader is not None
-    spec.loader.exec_module(mod)
-    return mod
-
-
 @pytest.fixture(scope="module")
 def rel():
-    return _load_release_module()
+    return load_script("release.py", module_name="release_tool")
 
 
 def ns(**kwargs) -> argparse.Namespace:
@@ -561,6 +551,22 @@ class TestPublish:
                 (["scripts/test-runner.py"], (verify_rc, verify_out, "")),
             ]
         )
+
+    def test_normalize_release_title_variants(self, rel):
+        # 带前缀 / 单破折号前缀 → 纯描述；纯描述不变；剥离后为空回退原值
+        assert rel.normalize_release_title("release: v0.12.6 —— 发布主题") == "发布主题"
+        assert rel.normalize_release_title("release: v0.12.6 — 发布主题") == "发布主题"
+        assert rel.normalize_release_title("纯描述") == "纯描述"
+        assert rel.normalize_release_title("release: v0.12.6 ——") == "release: v0.12.6 ——"
+
+    def test_title_prefix_normalized_to_single_subject(self, rel, tmp_path):
+        self._fixture(rel, tmp_path, "0.12.6")
+        runner = self._dirty_runner()
+        rc = rel.cmd_publish(ns(title="release: v0.12.6 —— 发布主题", push=False), runner=runner)
+        assert rc == 0
+        commit = next(c for c in runner.calls if len(c) > 2 and c[1] == "commit")
+        assert commit[-1] == "release: v0.12.6 —— 发布主题"
+        assert commit[-1].count("release: v0.12.6 ——") == 1  # 不得双前缀
 
     def test_commit_verify_merge_tag_order(self, rel, tmp_path):
         self._fixture(rel, tmp_path, "0.12.6")

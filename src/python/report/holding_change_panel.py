@@ -44,7 +44,7 @@ LIMITATIONS_NOTE = (
     "分红再投与份额折算会混入份额变动。全部结论限定结构级，不构成逐笔胜率或持有期结论。"
 )
 
-# 窗口截断判定余量：起点距今 ≥ 保留期 − 余量 即视为窗口曾被滚动清理
+# 窗口截断判定余量：起点距今 ≥ 保留期 − 余量 即视为起点已滑出保留窗（数据会被滚动清理）
 TRUNCATION_SLACK_DAYS = 3
 
 EVENT_HEADER = ["区间起", "区间止", "品种", "代码", "方向", "份额变动", "市值变动(元)"]
@@ -84,7 +84,7 @@ def build_holding_change_panel(
           - sample（复盘样本门槛回显：≥12 期且 ≥10 事件）
           - events / event_count / indeterminate_count / metrics
           - limitations_note（「区间净额推断、非逐笔」常驻标注）
-          - llm_review（LLM 归因文本占位；迭代 4 经 LLM 阶段注入，None=缺席）
+          - llm_review（LLM 归因文本占位；由 LLM 阶段注入，None=缺席）
     """
     raw = build_holding_change_events(snapshot_namespace=snapshot_namespace)
     retention_days = _resolve_retention_days(config)
@@ -416,7 +416,7 @@ def write_holding_change_sheet(ws: Any, holding_change_data: dict[str, Any] | No
         for line in view["intent_lines"]:
             row = write_data_row(ws, row, [line] + [""] * (_ncols - 1))
 
-    # ── 5. LLM 归因块（迭代 4 注入 llm_review 后出现；缺席 = 分支隐藏） ──
+    # ── 5. LLM 归因块（llm_review 注入后出现；缺席 = 分支隐藏） ──
     if view["llm_review_paragraphs"]:
         row += 1
         row = write_block_title(ws, row, LLM_BLOCK_TITLE, ncols=_ncols)

@@ -362,6 +362,7 @@ class TestPurchaseStatusTemplate:
         from jinja2 import Environment
 
         from src.python.report.html_jinja_env import (
+            _ENV,
             _jinja_money,
             _jinja_pct,
             _jinja_price,
@@ -377,6 +378,8 @@ class TestPurchaseStatusTemplate:
                 "profit_color": _jinja_profit_color,
             }
         )
+        # 片段取自真实模板 partials，须继承生产过滤器（含匿名化代码列 anon_code）
+        self.env.filters.update(_ENV.filters)
         tmpl_path = os.path.normpath(
             os.path.join(os.path.dirname(__file__), "..", "..", "..", "static", "tmpl", "report_template.html")
         )
@@ -458,7 +461,7 @@ class TestPurchaseStatusTemplate:
     def test_footnote_rendered_with_channel_caveat(self):
         """脚注区块：列展示时恒在，文案与 Excel 同源（单源函数产出）。"""
         frag = self._extract(
-            '{% if purchase_status_display %}\n            <div style="padding: 4px 8px; font-size: 12px; color:'
+            '{% if purchase_status_display %}\n            <div style="padding: 4px 8px; font-size: var(--fs-table-sm); color:'
         )
         data = _contract()
         display = {"footnote": ps.purchase_status_footnote(data), "level": "fresh"}
@@ -469,7 +472,7 @@ class TestPurchaseStatusTemplate:
     def test_footnote_stale_level_uses_warning_style(self):
         """stale 档脚注用告警色（黄标；文案本身仍为单源同一条）。"""
         frag = self._extract(
-            '{% if purchase_status_display %}\n            <div style="padding: 4px 8px; font-size: 12px; color:'
+            '{% if purchase_status_display %}\n            <div style="padding: 4px 8px; font-size: var(--fs-table-sm); color:'
         )
         html = self._render(frag, purchase_status_display={"footnote": "x", "level": "stale"})
         assert "#B8860B" in html
@@ -698,6 +701,7 @@ class TestCategoryPurchaseTemplate:
         from jinja2 import Environment
 
         from src.python.report.html_jinja_env import (
+            _ENV,
             _jinja_money,
             _jinja_pct,
             _jinja_price,
@@ -713,6 +717,8 @@ class TestCategoryPurchaseTemplate:
                 "profit_color": _jinja_profit_color,
             }
         )
+        # 片段取自真实模板 partials，须继承生产过滤器（含匿名化代码列 anon_code）
+        self.env.filters.update(_ENV.filters)
         tmpl_path = os.path.normpath(
             os.path.join(os.path.dirname(__file__), "..", "..", "..", "static", "tmpl", "report_template.html")
         )

@@ -510,8 +510,8 @@ def _eng_len_placeholder(match: re.Match) -> str:
 #   - 安全区：ratio ≥ 0.65 直接合并（改写型重复）；0.50~0.65 需专名 bg ≥ 2
 #     （防"算力服务合同""指数上涨 N%"等模板骨架把 ratio 推到 0.5+ 的误合并）
 #   - 候选区：ratio ≥ 0.35 进区；bg ≥ 3 合并；bg=2 需 ratio ≥ 0.375
-#     且共享 bigram 含英数/数字 token（纯中文公司名共享如"英伟达/伟达"
-#     不代表同一事件，不再触发）
+#     且共享 bigram 含英数 token（含字母、非泛词否决表；纯中文公司名共享
+#     如"英伟达/伟达"、共享数字如"纳斯达克100 vs KSE100"不代表同一事件）
 # 阈值一律以这些常量为唯一来源（校准工具从本模块读，不自写一份数字——
 # 两处各写一份会漂移，如工具正文写 0.30 而代码为 0.35，据此得到的建议无意义）。
 _CROSS_CANDIDATE_RATIO = 0.35
@@ -553,6 +553,25 @@ _OPPOSITE_PAIRS: tuple[tuple[str, str], ...] = (
 # 梯度被误合并（实测 cross_merge_bg2 147 条中 27 条仅靠数字证据成立）。
 # 数字共享不代表同一事件，不再作为专名证据。
 _TOKEN_LIKE = re.compile(r"^(?=.*[a-z])[a-z0-9]+$|^_tk:[a-z]+$")
+
+# bg=2 梯度的泛词否决表（锚点 7.8 万对实测定档）：ai/etf 这类 2~3 字母串既是
+# 跨主体高频共现的泛词、又与指标/板块缩写同形，仅凭「含字母」无法区分——
+# 靠这些词过闸的 bg=2 合并抽样绝大多数为误合并（不同基金各自行情、不同指数、
+# "20cm" 俚语、CE 认证标记）；CPI/PPI/IPO/AMD 类真发布会与公司缩写不在表内、
+# 照常作专名证据。误合并会静默丢掉一篇独立报道，可见重复不会，故宁可少合并
+# 不错合；新泛词在校准抽样中现身时按同口径扩表（与 _STOP_BIGRAMS/
+# _OPPOSITE_PAIRS 同为词表维护项）。本表已入规则指纹，改动自动分锚点时代。
+_GENERIC_TOKENS: frozenset[str] = frozenset({"ai", "etf", "cm", "gb", "ce", "pcb"})
+
+
+def proper_noun_tokens(tokens: set[str]) -> list[str]:
+    """共享项中的专名证据 token：``_TOKEN_LIKE`` 命中且不在泛词否决表（升序）。"""
+    return sorted(t for t in tokens if _TOKEN_LIKE.match(t) and t not in _GENERIC_TOKENS)
+
+
+def has_proper_noun_token(tokens: set[str]) -> bool:
+    """共享项中是否含专名证据（``proper_noun_tokens`` 非空）。"""
+    return bool(proper_noun_tokens(tokens))
 
 
 #: 指纹探针：走一遍归一化 + 实体提取的真实路径，使指纹覆盖模板词表/正则/
@@ -596,6 +615,7 @@ def _rules_fingerprint() -> str:
         ",".join(sorted(_STOP_BIGRAMS)),
         ",".join(f"{a}>{b}" for a, b in _OPPOSITE_PAIRS),
         _TOKEN_LIKE.pattern,
+        ",".join(sorted(_GENERIC_TOKENS)),
         _RATIO_CLEAN.pattern,
         _ENG_PLACEHOLDER.pattern,
         probes,

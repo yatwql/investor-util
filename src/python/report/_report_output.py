@@ -4,7 +4,7 @@
 实验/常规开关分流、失败登记与 `result` 标志位回填），使 `_report_generation.py` 只负责
 管线编排。由编排模块导入使用（`_generate_report_full` 经门面命名空间解析，可被 mock patch）。
 
-拆分动因：`_report_generation.py` 逼近 800 行硬上限（rf-582），按「编排 vs 输出包装」轴
+拆分动因：`_report_generation.py` 逼近 800 行硬上限，按「编排 vs 输出包装」轴
 把 full 路径 HTML 落盘 `_generate_full_html_report` 一并收入，与 `_generate_full_excel_report` 同居。
 """
 

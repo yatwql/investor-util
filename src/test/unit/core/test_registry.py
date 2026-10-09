@@ -440,7 +440,7 @@ class TestReportSheetNames:
         for key, name in _REPORT_SHEET_NAMES.items():
             entry = next(sec for sec in _REPORT_SECTION_DEFAULT if sec["key"] == key)
             assert name == entry["name"], f"{key} 页签名 {name!r} 与注册表显示名 {entry['name']!r} 不一致"
-        # LLM 章差集显式声明：走 get_llm_module_name() 第四条路径的五章恰好在此
+        # LLM 章差集显式声明：走 get_llm_module_name() 第四条路径的 5 个 LLM 章节恰好在此
         assert _LLM_SHEET_NAME_KEYS == {
             "news_correlation",
             "global_macro",
@@ -478,7 +478,7 @@ class TestNavGroupRegistry:
         assert len(labels) == len(set(labels))
 
     def test_llm_supported_pins_semantic_boundary(self):
-        """🧠 标记集合覆盖 LLM 语义边界：门控四章 + 新闻关联 + API 用量，且 llm 组 ⊆ 🧠。"""
+        """🧠 标记集合覆盖 LLM 语义边界：门控 4 个章节 + 新闻关联 + API 用量，且 llm 组 ⊆ 🧠。"""
         from src.python.core.registry import LLM_MODULE_GATED_SECTIONS
 
         llm_keys = {sec["key"] for sec in _REPORT_SECTION_DEFAULT if sec.get("llm_supported")}
@@ -671,3 +671,27 @@ def test_fund_purchase_cache_registered_ttl_aligned_with_nav():
     assert not set(purchase.cache_groups) & {"refresh", "preload"}
     # 类型映射：过期清理与派生查询认识该精确键
     assert get_exact_type_map()["fund_purchase_status_table"] == "fund_purchase"
+
+
+class TestFacadeReexports:
+    """两域子模块下沉后门面同一性（回归：导入面与 patch 面不破坏、职责不交叠）。"""
+
+    def test_domain_symbols_are_same_objects(self) -> None:
+        """data_registry.__all__ 每个名字经门面可得且为同一对象（门面即子模块，非副本）。"""
+        from src.python.core import data_registry, registry
+
+        for name in data_registry.__all__:
+            assert getattr(registry, name) is getattr(data_registry, name), name
+
+    def test_report_symbols_are_same_objects(self) -> None:
+        """report_section_registry.__all__ 每个名字经门面可得且为同一对象。"""
+        from src.python.core import registry, report_section_registry
+
+        for name in report_section_registry.__all__:
+            assert getattr(registry, name) is getattr(report_section_registry, name), name
+
+    def test_domain_contract_is_disjoint(self) -> None:
+        """两域 __all__ 互不相交（注册职责边界不重叠，拆分不产生双属主）。"""
+        from src.python.core import data_registry, report_section_registry
+
+        assert set(data_registry.__all__) & set(report_section_registry.__all__) == set()

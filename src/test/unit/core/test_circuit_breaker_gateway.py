@@ -154,3 +154,28 @@ class TestRegistrationHooks:
         assert "llm" in cb._BREAKER_SNAPSHOT_PROVIDERS
         # 快照可真取（结构性断言，非硬编码条数）
         assert set(cb.gateway._get_llm_status().keys()) >= set()
+
+    def test_circuit_text_defaults_when_no_provider(self, monkeypatch):
+        """上游未注册 → 展示文案按「正常」降级（不依赖上层模块加载）。"""
+        from src.python.core import circuit_breaker as cb
+
+        monkeypatch.setattr(cb, "_CIRCUIT_TEXT_PROVIDER", None)
+        assert cb.circuit_text("https://llm.example/v1") == "正常"
+
+    def test_circuit_text_delegates_to_registered_provider(self, monkeypatch):
+        """注册后按注册判定出文案（晚绑定回调，展示层不复制上游归一规则）。"""
+        from src.python.core import circuit_breaker as cb
+
+        # 先置空以记录原值，teardown 自动还原在册 provider
+        monkeypatch.setattr(cb, "_CIRCUIT_TEXT_PROVIDER", None)
+        cb.register_circuit_text(lambda endpoint: f"命中:{endpoint}")
+        assert cb.circuit_text("https://llm.example/v1") == "命中:https://llm.example/v1"
+
+    def test_circuit_display_reads_gateway_provider(self, monkeypatch):
+        """展示原语必须经 core 网关取文案：注册替换后返回其结果（回退直连上层即红）。"""
+        from src.python.core import circuit_breaker as cb
+        from src.python.core.system_info import circuit_display
+
+        monkeypatch.setattr(cb, "_CIRCUIT_TEXT_PROVIDER", None)
+        cb.register_circuit_text(lambda endpoint: f"网关:{endpoint}")
+        assert circuit_display("https://llm.example/v1") == "网关:https://llm.example/v1"
