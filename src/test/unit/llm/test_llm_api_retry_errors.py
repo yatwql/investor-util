@@ -1,7 +1,7 @@
 """测试：LLM API 基础模块 — call_llm_with_retry 错误分支（api_base.py 分片）。
 
 覆盖：
-  - HTTP 错误分支：429/503 重试、退避取自策略表、表外锁最后延迟、超时与成功穿插
+  - HTTP 错误分支：429 首试即熔断（零重试）、503 重试、退避取自策略表、表外锁最后延迟、超时与成功穿插
   - 响应解析错误 / 内容过滤 / 截断分支的重试与耗尽行为
   - 截断警告文案标记（`_make_mock_response` 等响应桩助手随本分片）
 
@@ -118,25 +118,26 @@ class TestCallLlmWithRetryHttpErrors(unittest.TestCase):
 
     @patch("src.python.llm.api_base._cb_record_success")
     @patch("time.sleep")
-    def test_retry_on_429_then_success(self, mock_sleep, mock_success):
-        """429 → 重试 → 成功。"""
+    def test_429_fails_first_attempt_without_retry(self, mock_sleep, mock_success):
+        """429 属配额终态：首试即失败，不发第二次请求（零退避重试）。"""
         from src.python.llm.api_base import call_llm_with_retry
 
-        succeed = _make_mock_response(200, {"content": [{"type": "text", "text": "OK"}]})
-        self.client.post.side_effect = [_make_mock_response(429), succeed]
+        self.client.post.return_value = _make_mock_response(429)
         result, usage = call_llm_with_retry(**self.base_kw)
-        self.assertEqual(result, "OK")
-        self.assertEqual(self.client.post.call_count, 2)
-        mock_success.assert_called_once()
+        self.assertIsNone(result)
+        self.assertIsNone(usage)
+        self.assertEqual(self.client.post.call_count, 1)
+        mock_sleep.assert_not_called()
+        mock_success.assert_not_called()
 
     @patch("src.python.llm.api_base._cb_record_success")
     @patch("time.sleep")
     def test_retry_delays_come_from_policy_table(self, mock_sleep, mock_success):
-        """两次重试分别等待 1s、3s（退避数值来自统一策略，而非本模块自算）。"""
+        """两次重试分别等待 1s、3s（退避数值来自统一策略，而非本模块自算；用 503——429 已不重试）。"""
         from src.python.llm.api_base import call_llm_with_retry
 
         succeed = _make_mock_response(200, {"content": [{"type": "text", "text": "OK"}]})
-        self.client.post.side_effect = [_make_mock_response(429), _make_mock_response(429), succeed]
+        self.client.post.side_effect = [_make_mock_response(503), _make_mock_response(503), succeed]
         result, _usage = call_llm_with_retry(**self.base_kw)
         self.assertEqual(result, "OK")
         self.assertEqual([c.args[0] for c in mock_sleep.call_args_list], [1.0, 3.0])
@@ -144,10 +145,10 @@ class TestCallLlmWithRetryHttpErrors(unittest.TestCase):
     @patch("src.python.llm.api_base._cb_record_failure")
     @patch("time.sleep")
     def test_retry_beyond_table_locks_last_delay(self, mock_sleep, mock_failure):
-        """max_retries 超过退避表长度时不越界，末位值重复使用。"""
+        """max_retries 超过退避表长度时不越界，末位值重复使用（用 503——429 已不重试）。"""
         from src.python.llm.api_base import _RETRY_DELAYS, call_llm_with_retry
 
-        self.client.post.return_value = _make_mock_response(429)
+        self.client.post.return_value = _make_mock_response(503)
         kw = dict(self.base_kw, max_retries=len(_RETRY_DELAYS) + 2)
         result, usage = call_llm_with_retry(**kw)
         self.assertIsNone(result)
@@ -179,31 +180,39 @@ class TestCallLlmWithRetryHttpErrors(unittest.TestCase):
 
     @patch("src.python.llm.api_base._cb_record_failure")
     @patch("time.sleep")
-    def test_retry_on_429_all_fail(self, mock_sleep, mock_failure):
-        """429 全部重试失败 → (None, None)。"""
+    def test_429_fails_single_attempt_all(self, mock_sleep, mock_failure):
+        """429 只发一次请求即失败 → (None, None)，零退避重试。"""
         from src.python.llm.api_base import call_llm_with_retry
 
         self.client.post.return_value = _make_mock_response(429)
         result, usage = call_llm_with_retry(**self.base_kw)
         self.assertIsNone(result)
         self.assertIsNone(usage)
-        self.assertEqual(self.client.post.call_count, 3)
+        self.assertEqual(self.client.post.call_count, 1)
+        mock_sleep.assert_not_called()
 
     @patch("src.python.llm.api_base._cb_record_failure")
     @patch("time.sleep")
-    def test_429_exhausted_forces_long_cooldown(self, mock_sleep, mock_failure):
-        """重试耗尽仍 429 → 以 cooldown=600 + force=True 立即长冷却熔断，消除后续无效先试。"""
-        from src.python.llm.api_base import _RATE_LIMIT_RECOVERY, call_llm_with_retry
+    def test_429_first_try_forces_long_cooldown(self, mock_sleep, mock_failure):
+        """429 首试即以 cooldown=600 + force=True 熔断（零重试），失败原因归配额类。"""
+        from src.python.llm.api_base import (
+            _RATE_LIMIT_RECOVERY,
+            FAIL_REASON_QUOTA_EXCEEDED,
+            call_llm_with_retry,
+            _get_last_llm_failure,
+        )
 
         self.client.post.return_value = _make_mock_response(429)
         result, usage = call_llm_with_retry(**self.base_kw)
 
         self.assertIsNone(result)
+        self.assertEqual(self.client.post.call_count, 1, "429 不得退避重试")
         mock_failure.assert_called_once()
         _args, kwargs = mock_failure.call_args
         self.assertEqual(kwargs.get("cooldown"), _RATE_LIMIT_RECOVERY)
         self.assertEqual(kwargs.get("cooldown"), 600)
         self.assertIs(kwargs.get("force"), True)
+        self.assertEqual(_get_last_llm_failure(), FAIL_REASON_QUOTA_EXCEEDED)
 
     @patch("src.python.llm.api_base._cb_record_failure")
     @patch("time.sleep")

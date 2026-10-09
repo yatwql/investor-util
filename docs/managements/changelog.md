@@ -16,8 +16,8 @@
 - **修复/LLM**：**provider 链路 429 长冷却与全挂延迟重试（rf-647，72h 日志分析立账）**——429 重试耗尽后以 `cooldown=600s + force=True` 立即熔断（`circuit_breaker` 新增参数，非 429 保持阈值语义），消除 kimi-main 每次调用白试 1~3 次的无效先试；`_execute_llm_with_finalize` 对瞬时类失败（network/timeout/api_error）延迟 `llm_full_fail_retry_delay`（默认 30s）整链重试 1 次，配额/熔断终态不重试；回归 7 用例（circuit force/cooldown 2 + 429 分支 2 + skeleton 重试 3）。
 - **修复/日志**：**实验横幅级别纠正（rf-649）**——`log_experimental_features` 横幅（`====` + `⚗` 各行）`ERROR` → `INFO`，72h 内 68 条 ERROR 中 65 条为该横幅的统计污染消除；回归用例断言横幅行全 INFO、零 ERROR。
 - **修复/数据**：**东财 push2 请求节流与穿透写入空数据降级（rf-650）**——push2 每次请求前随机间隔 0.05~0.2s 防同速批量触发反爬断连；`write_penetration_sheet` 空数据分支改 `.get("top10")` 消除 KeyError 整表写入失败（降级占位空 dict 路径），edge 用例回归「暂无穿透数据」优雅降级。
-- **修复/数据**：**财报链路 source_hint 命名空间碰撞（rf-648，根因经真实探测确认）**——主源索引条目自带自由文本 `source="巨潮资讯网 (cninfo)"` 直传 `source_hint` 致两适配器双双静默拒服务（主源整条 7 天无命中，靠巨潮备源+缓存兜底；13 次 HTTP 探测两源全 200，排除网络/反爬/报告期）；修复：`_candidate_source` 来源归一（仅精确 cninfo 判备源，使用点归一兼容旧缓存）+ `_index_source_of` 精确匹配、sections/全文两阶段透传 source（备源候选不再打主源 sections，消除每轮 10 次 404 与历史挂起）、异源拒服务写 `last_reason` + DEBUG（不再伪装成源返回空）。回归用例 8 项（归一 6 + 拒服务原因 2）。
-- **日志分析/财报**：**财报 44 只两源全空定性修正与日志定位增强（rf-648，未闭环）**——定性修正：标的经 `collect_a_share_targets` 过滤后全为 A 股个股（原「基金噪音」判断错误），属真故障待根因探测；已完成：chain 失败日志补 doc_id 定位标识（`_tag_key = code or doc_id`），下轮生成可直接反查标的。
+- **修复/数据**：**财报链路 source_hint 命名空间碰撞（rf-648，根因经真实探测确认）**——主源索引条目自带自由文本 `source="巨潮资讯网 (cninfo)"` 直传 `source_hint` 致两适配器双双静默拒服务（主源整条 7 天无命中，靠巨潮备源+缓存兜底；13 次 HTTP 探测两源全 200，排除网络/反爬/报告期）；修复：`_candidate_source` 来源归一（仅精确 cninfo 判备源，使用点归一兼容旧缓存）+ `_index_source_of` 精确匹配、sections/全文两阶段透传 source（备源候选不再打主源 sections，消除单次生成 10 次 404 与历史挂起）、异源拒服务写 `last_reason` + DEBUG（不再伪装成源返回空）；同批：chain 失败日志补 doc_id 定位标识（`_tag_key = code or doc_id`），定性修正（标的全为 A 股个股，原「基金噪音」判断错误）。回归用例 8 项（归一 6 + 拒服务原因 2）。
+- **修复/LLM**：**429 首试即熔断（零退避重试）+ kimi 端点节流调大**——429 属配额/风控终态，`_attempt_api_call` 归入 `quota` 不再进退避表，首试即 `force` 600s 熔断，撞限首波代价 10~35s→<1s（503/超时保留重试；失败原因归 `quota_exceeded`，全挂延迟重试不空转）；配套 kimi 双端点 `pacing.min_interval` 1s→5s（`llm_providers.json`，改前备份）降低 RPM 撞限频率。回归：429 单次请求/首试熔断/失败原因 3 处改写 + 底层 kind 断言。
 
 
 （本次发布内容见下方归档索引）

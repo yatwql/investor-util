@@ -30,7 +30,7 @@
 | 亮点 | 说明 |
 |:---|:---|
 | **一次持仓，三种用法** | 同一套引擎、三种入口，产物与配置完全一致：**TUI**（全键盘菜单，18 项 + 子菜单）· **CLI**（参数驱动，Windows 任务计划 / cron 无人值守）· **Web**（浏览器上传 → 选格式 → 看进度 → 预览/下载 + 配置编辑面板） |
-| **全量专业报告，双格式** | **Excel** 最多 17 个条件页签（按开关自动显隐，不留空壳）；**HTML** 单页自包含、响应式布局、**9 张 Chart.js 交互图表**（悬停看精确值、可缩放、一键导出 PNG）+ 深浅色主题切换——手机上看也不翻车 |
+| **全量专业报告，双格式** | **Excel** 最多 19 个页签（条件页签按开关自动显隐，不留空壳）；**HTML** 单页自包含、响应式布局、**最多 10 张 Chart.js 交互图表**（悬停看精确值、可缩放、一键导出 PNG）+ 深浅色主题切换——手机上看也不翻车 |
 | **穿透到真实持仓** | 基金/ETF 拆解为底层标的合并排序（TOP10），**ETF 联接基金按目标 ETF 穿透**；标注各基金报告期与「未折算持有比例」，不做精确性误导 |
 | **量化风控成体系** | Beta 置信区间 + t/p 检验、6 种涨跌情景回撤推演（CI 传播）、尾部风险（VaR 95/99、最长连跌、恢复天数）、再平衡超限告警、流动性变现天数、币种敞口——机构风控的个人版 |
 | **真正把 LLM 用成智囊团** | 三阶段圆桌复盘（召集令→辩论→定音锤）+ 可选正反辩论/条件推理/集中度问答；输出自动附**事实校验**（数值/品种/排名回查）与**质量分级** A~F；多 Provider 链式分发（priority / weighted / cost_first / fallback_only），失败自动递补；分析先核对申购限购可执行性（限大额 / 暂停申购不进不实建议） |
@@ -116,7 +116,7 @@ git clone https://github.com/yatwql/investor-util.git && cd investor-util
 
 | 能力域 | 一句话介绍 | 深入阅读 |
 |:---|:---|:---|
-| 📄 报告与行情 | 多账户核算、双格式报告（Excel 17 页签 + HTML 9 图）、智能缓存、主备链路与「命中源」可追溯 | [报告文件结构](docs/manuals/reports-instruction.md) · [数据源一览](docs/manuals/datasource.md) |
+| 📄 报告与行情 | 多账户核算、双格式报告（Excel 19 页签 + HTML 10 图）、智能缓存、主备链路与「命中源」可追溯 | [报告文件结构](docs/manuals/reports-instruction.md) · [数据源一览](docs/manuals/datasource.md) |
 | 📰 新闻增强 | 5 源财经新闻并行采集、去重、按持仓关键词关联；盈利预测、分红历史、市场情绪热点 | [报告文件结构](docs/manuals/reports-instruction.md) |
 | 🤖 LLM 智囊团 | 圆桌复盘 + 正反辩论、事实校验、质量分级 A~F、多 Provider 链式分发、深度档位、幻觉率评估 | [LLM 配置指引](docs/manuals/how-to-config-llm.md) · [LLM 技术要点](docs/managements/llm-technical.md) |
 | 📈 量化风控 | Beta 置信区间 + 统计检验、情景回撤推演、VaR 尾部风险、再平衡告警、流动性变现天数、币种敞口 | [报告文件结构](docs/manuals/reports-instruction.md) |
@@ -153,7 +153,7 @@ git clone https://github.com/yatwql/investor-util.git && cd investor-util
 
 **这是一个把工程质量当真的一人项目**，对贡献者意味着：
 
-- ✅ **8,000+ 测试用例**（verify + regression 近 5,800 项）+ 场景化回归套件，改动有底气
+- ✅ **9,800+ 测试用例**（dev-verify 门禁 6,400+ 项）+ 场景化回归套件，改动有底气
 - ✅ **10 个 CI 守护脚本**把历史教训变成硬门禁：代码/文档痕迹、任务编号、语义命名、文档一致性、测试冗余、需求追溯、版本号、文档链接、行数红线——文档与代码永不漂移
 - ✅ **P0/P1/P2 三级门禁**：提交、合并、发布各有明确的通过标准，CI 矩阵覆盖 Python 3.11/3.12/3.13 + Windows 可移植性 + 非 UTF-8 locale 探测
 - ✅ **清晰的协作契约**：[开发者指南](docs/managements/developer-guide.md) 写明了工作流、任务编号规范与发布流程；[需求文档](docs/managements/requirements.md) 与 [测试标准](docs/managements/testplan.md) 让每个需求可追溯、每个缺陷有回归用例

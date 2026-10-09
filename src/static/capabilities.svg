@@ -24,7 +24,7 @@
   <text x="38" y="132" font-size="20">🔍</text>
   <text x="74" y="132" font-size="16" font-weight="700" fill="#e8f1fb">报告与行情</text>
   <text x="38" y="170" font-size="13" fill="#9fb6d0">多账户 · 实时行情 · 智能缓存</text>
-  <text x="38" y="194" font-size="13" fill="#9fb6d0">最多 17 条件页签 · 双格式输出</text>
+  <text x="38" y="194" font-size="13" fill="#9fb6d0">最多 19 页签 · 双格式输出</text>
 
   <!-- 卡2 新闻增强 -->
   <rect x="345" y="96" width="310" height="132" rx="14" fill="#1d3557" stroke="#2e4a6e"/>
@@ -94,9 +94,9 @@
   <rect x="20" y="540" width="960" height="60" rx="14" fill="#1d3557" stroke="#2e4a6e"/>
   <text x="130" y="578" font-size="18">📗</text>
   <text x="175" y="577" font-size="17" font-weight="700" fill="#34d399">Excel 报告</text>
-  <text x="305" y="577" font-size="14" fill="#9fb6d0">17 条件页签 · 页签专业</text>
+  <text x="305" y="577" font-size="14" fill="#9fb6d0">19 页签 · 页签专业</text>
   <line x1="500" y1="552" x2="500" y2="588" stroke="#2e4a6e" stroke-width="2"/>
-  <text x="547" y="577" font-size="14" fill="#9fb6d0">9 交互图表 · 单页自包含</text>
+  <text x="547" y="577" font-size="14" fill="#9fb6d0">10 交互图表 · 单页自包含</text>
   <text x="745" y="577" font-size="17" font-weight="700" fill="#fbbf24">HTML 报告</text>
   <text x="852" y="578" font-size="18">📈</text>
 

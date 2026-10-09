@@ -74,7 +74,7 @@ __all__ = [
 
 # ── 上次失败的详细原因（供调用方区分失败类型，不改变函数签名） ──
 
-_RATE_LIMIT_RECOVERY = 600  # 429 重试耗尽后的端点熔断冷却（秒）：限速属配额/风控终态，
+_RATE_LIMIT_RECOVERY = 600  # 429 首试熔断的端点冷却（秒）：限速属配额/风控终态，
 # 常规 60s 冷却会在下一批调用时再次撞限速并重复整段重试，长冷却消除无效先试
 
 _last_llm_failure_reason: str | None = None
@@ -584,7 +584,8 @@ def _attempt_api_call(
 
     Returns:
         ("success", data) — 调用成功，data 为解析后的 JSON
-        ("retryable", detail) — 可重试（detail 可为 int 状态码或 str 描述）
+        ("retryable", detail) — 可重试（503 / 传输失败；detail 为 int 状态码或 str 描述）
+        ("quota", detail) — 配额/限速/风控拒绝（403/429，不重试）
         ("fatal", error_msg) — 不可恢复（响应解析失败）
     """
     try:
@@ -596,6 +597,9 @@ def _attempt_api_call(
                     _sanitize_endpoint(url),
                     _concurrency_hint(endpoint_key),
                 )
+                # 限速属配额/风控终态：首试即终止（不进退避重试——重试都是
+                # 无效请求与日志噪音），交由下游长冷却熔断
+                return ("quota", resp.status_code)
             return ("retryable", resp.status_code)
         if resp.status_code == 403:
             # 端点配额/风控拒绝（订阅制端点的 5 小时窗口、并发上限、月度额度等）：
@@ -715,18 +719,19 @@ def call_llm_with_retry(
         )
 
     if kind == "quota":
-        # 配额/风控拒绝：不重试（窗口按时间滚动），直接降级到下一 provider
-        _cb_record_failure(url)
+        # 配额/限速/风控拒绝：均不重试（窗口按时间滚动，重试无益），降级到下一 provider
+        if info == 429:
+            # 限速终态：首试即 force 长冷却熔断，后续调用在冷却期内零请求秒切下家
+            logger.warning("%s API 429 限速终态：首试即熔断 %ss，跳过退避重试", label, _RATE_LIMIT_RECOVERY)
+            _cb_record_failure(url, cooldown=_RATE_LIMIT_RECOVERY, force=True)
+        else:
+            _cb_record_failure(url)
         _last_llm_failure_reason = FAIL_REASON_QUOTA_EXCEEDED
         return (None, None)
 
     if kind == "retryable":
         logger.warning("%s API %s（已重试 %d 次）", label, _retry_detail(info), max_retries)
-        if info == 429:
-            # 重试耗尽仍 429 = 端点限速终态：立即长冷却熔断，避免后续调用反复无效先试
-            _cb_record_failure(url, cooldown=_RATE_LIMIT_RECOVERY, force=True)
-        else:
-            _cb_record_failure(url)
+        _cb_record_failure(url)
         _last_llm_failure_reason = FAIL_REASON_TIMEOUT if info is None else FAIL_REASON_NETWORK_ERROR
         return (None, None)
 

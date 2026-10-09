@@ -42,14 +42,14 @@ class TestAttemptApiCall(unittest.TestCase):
         self.assertEqual(info, {"content": "hello"})
 
     def test_rate_limit_429(self) -> None:
-        """429 → ('retryable', 429)。"""
+        """429 属限速终态 → ('quota', 429)（不进退避重试，交下游长冷却熔断）。"""
         mock_client = MagicMock(spec=httpx.Client)
         mock_response = MagicMock()
         mock_response.status_code = 429
         mock_client.post.return_value = mock_response
 
         kind, info = self._attempt_api_call(mock_client, "https://api.test.com", {}, {}, 30.0)
-        self.assertEqual(kind, "retryable")
+        self.assertEqual(kind, "quota")
         self.assertEqual(info, 429)
 
     def test_rate_limit_429_log_hints_both_concurrency_knobs(self) -> None:
