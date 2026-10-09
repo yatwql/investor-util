@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" role="img" aria-label="投资复盘助手">
+  <title>投资复盘助手</title>
+  <!-- 品牌蓝底（--primary 同源，单强调色）+ 白色上升折线：投资复盘的净值增长语义 -->
+  <rect x="2" y="2" width="28" height="28" rx="6" fill="#1f6fb2"/>
+  <path d="M7 22 L13.5 15.5 L17.5 19 L25 10.5" fill="none" stroke="#ffffff" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M19.5 10.5 L25 10.5 L25 16" fill="none" stroke="#ffffff" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/>
+</svg>

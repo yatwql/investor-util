@@ -100,7 +100,7 @@ class TestFetchSymbolReport:
             "fetch_report_documents",
             lambda symbol, **k: [{"id": 7, "report_period": "2025-12-31", "doc_type": "annual"}],
         )
-        monkeypatch.setattr(fr, "_fetch_sections", lambda doc_id: ["第三节管理层讨论与分析"])
+        monkeypatch.setattr(fr, "_fetch_sections", lambda doc_id, source=None: ["第三节管理层讨论与分析"])
         monkeypatch.setattr(
             fr,
             "_fetch_document",
@@ -128,7 +128,7 @@ class TestFetchSymbolReport:
         calls: list = []
         monkeypatch.setattr(fr, "cache_get", lambda *a, **k: [{"id": 9}])
         monkeypatch.setattr(fr.datasink, "fetch_report_documents", lambda *a, **k: calls.append(1) or None)
-        monkeypatch.setattr(fr, "_fetch_sections", lambda doc_id: None)
+        monkeypatch.setattr(fr, "_fetch_sections", lambda doc_id, source=None: None)
         monkeypatch.setattr(fr, "_fetch_document", lambda doc_id, section, **_kw: {"doc_id": doc_id, "content": "x"})
         rec = fr.fetch_symbol_report("600519.SS")
         assert rec is not None and rec["doc_id"] == 9
@@ -230,7 +230,7 @@ class TestReportPeriodBacktrack:
                 {"id": 3, "report_period": "2025-12-31", "doc_type": "annual"},
             ],
         )
-        monkeypatch.setattr(fr, "_fetch_sections", lambda doc_id: ["第三节 管理层讨论与分析"])
+        monkeypatch.setattr(fr, "_fetch_sections", lambda doc_id, source=None: ["第三节 管理层讨论与分析"])
         monkeypatch.setattr(
             fr,
             "_fetch_document",
@@ -249,7 +249,9 @@ class TestReportPeriodBacktrack:
     def test_degenerate_section_list_falls_back_to_direct_names(self, monkeypatch):
         """章节清单非空但残缺（只有无关章节）时回退偏好名直取，不白丢整篇。"""
         self._patch_index(monkeypatch, [{"id": 810006, "report_period": "2026-06-30"}])
-        monkeypatch.setattr(fr, "_fetch_sections", lambda doc_id: ["一、有限售条件股份", "二、无限售条件股份"])
+        monkeypatch.setattr(
+            fr, "_fetch_sections", lambda doc_id, source=None: ["一、有限售条件股份", "二、无限售条件股份"]
+        )
         seen: list[str] = []
 
         def _doc(doc_id, section, **_kw):
@@ -271,7 +273,7 @@ class TestReportPeriodBacktrack:
                 {"id": 2, "report_period": "2025-12-31", "doc_type": "annual"},
             ],
         )
-        monkeypatch.setattr(fr, "_fetch_sections", lambda doc_id: ["第三节 管理层讨论与分析"])
+        monkeypatch.setattr(fr, "_fetch_sections", lambda doc_id, source=None: ["第三节 管理层讨论与分析"])
         monkeypatch.setattr(
             fr,
             "_fetch_document",
@@ -294,7 +296,7 @@ class TestReportPeriodBacktrack:
                 {"id": 2, "report_period": "2025-12-31", "doc_type": "annual", "title": "某行2025年度报告"},
             ],
         )
-        monkeypatch.setattr(fr, "_fetch_sections", lambda doc_id: ["第三节 管理层讨论与分析"])
+        monkeypatch.setattr(fr, "_fetch_sections", lambda doc_id, source=None: ["第三节 管理层讨论与分析"])
         monkeypatch.setattr(fr, "_fetch_document", lambda doc_id, section, **_kw: {"doc_id": doc_id, "content": "正文"})
         rec = fr.fetch_symbol_report("601939.SS")
         assert rec["doc_id"] == 2
@@ -302,7 +304,7 @@ class TestReportPeriodBacktrack:
     def test_fulltext_fallback_locates_keyword(self, monkeypatch):
         """章节阶全失败 → 整篇下载后按偏好关键词定位片段（不取封面/目录）。"""
         self._patch_index(monkeypatch, [{"id": 9, "report_period": "2025-12-31", "doc_type": "annual"}])
-        monkeypatch.setattr(fr, "_fetch_sections", lambda doc_id: ["附件"])
+        monkeypatch.setattr(fr, "_fetch_sections", lambda doc_id, source=None: ["附件"])
         full = "封面：某行2025年度报告\n公司简介……\n主要财务数据\n营业收入 100 亿元"
         monkeypatch.setattr(
             fr,
@@ -318,7 +320,7 @@ class TestReportPeriodBacktrack:
     def test_fulltext_fallback_skips_toc_occurrence(self, monkeypatch):
         """关键词首次命中在目录行（点线引导）时跳到正文那一次，不把目录当摘要。"""
         self._patch_index(monkeypatch, [{"id": 9, "report_period": "2025-12-31", "doc_type": "annual"}])
-        monkeypatch.setattr(fr, "_fetch_sections", lambda doc_id: ["附件"])
+        monkeypatch.setattr(fr, "_fetch_sections", lambda doc_id, source=None: ["附件"])
         full = (
             "目录\n董事会报告 ................................ 12\n第一章 公司简介\n"
             "董事会报告\n主要业务：提供银行及相关金融服务\n利润及股息分配……"
@@ -335,7 +337,7 @@ class TestReportPeriodBacktrack:
     def test_fulltext_fallback_head_when_no_keyword(self, monkeypatch):
         """全文里没有任何偏好关键词 → 退化为正文开头片段（仍有内容，不判失败）。"""
         self._patch_index(monkeypatch, [{"id": 9, "report_period": "2025-12-31", "doc_type": "annual"}])
-        monkeypatch.setattr(fr, "_fetch_sections", lambda doc_id: ["附件"])
+        monkeypatch.setattr(fr, "_fetch_sections", lambda doc_id, source=None: ["附件"])
         monkeypatch.setattr(
             fr,
             "_fetch_document",
@@ -348,7 +350,7 @@ class TestReportPeriodBacktrack:
     def test_sections_hit_marks_section_source(self, monkeypatch):
         """章节阶命中时标记取用方式为 sections（排查时区分两阶）。"""
         self._patch_index(monkeypatch, [{"id": 1, "report_period": "2025-12-31", "doc_type": "annual"}])
-        monkeypatch.setattr(fr, "_fetch_sections", lambda doc_id: ["第三节 管理层讨论与分析"])
+        monkeypatch.setattr(fr, "_fetch_sections", lambda doc_id, source=None: ["第三节 管理层讨论与分析"])
         monkeypatch.setattr(fr, "_fetch_document", lambda doc_id, section, **_kw: {"doc_id": doc_id, "content": "正文"})
         rec = fr.fetch_symbol_report("600900.SS")
         assert rec["section_source"] == fr.SECTION_SOURCE_SECTIONS
@@ -360,7 +362,7 @@ class TestReportPeriodBacktrack:
         assert fr.fetch_symbol_report_detailed("601398.SS") == (None, fr.REASON_INDEX_EMPTY)
 
         self._patch_index(monkeypatch, [{"id": 1, "report_period": "2026-06-30"}])
-        monkeypatch.setattr(fr, "_fetch_sections", lambda doc_id: ["一、股份变动情况"])
+        monkeypatch.setattr(fr, "_fetch_sections", lambda doc_id, source=None: ["一、股份变动情况"])
         monkeypatch.setattr(fr, "_fetch_document", lambda doc_id, section, **_kw: None)
         rec, reason = fr.fetch_symbol_report_detailed("601398.SS")
         assert rec is None
@@ -497,7 +499,7 @@ class TestLatestPeriodAndSectionResolution:
     def test_uses_exact_section_name_from_list(self, monkeypatch):
         """按实际章节名（第三节管理层讨论与分析）请求正文，而非硬编码裸名。"""
         self._index(monkeypatch, [{"id": 7, "doc_type": "annual", "report_period": "2025-12-31"}])
-        monkeypatch.setattr(fr, "_fetch_sections", lambda doc_id: ["第三节管理层讨论与分析"])
+        monkeypatch.setattr(fr, "_fetch_sections", lambda doc_id, source=None: ["第三节管理层讨论与分析"])
         seen: list[str] = []
 
         def _doc(doc_id, section, **_kw):
@@ -512,7 +514,7 @@ class TestLatestPeriodAndSectionResolution:
         """首选项章节 404 → 继续试下一候选（不整只标的判失败）。"""
         self._index(monkeypatch, [{"id": 7, "doc_type": "annual", "report_period": "2025-12-31"}])
         monkeypatch.setattr(
-            fr, "_fetch_sections", lambda doc_id: ["第三节管理层讨论与分析", "五、主要会计数据和财务指标"]
+            fr, "_fetch_sections", lambda doc_id, source=None: ["第三节管理层讨论与分析", "五、主要会计数据和财务指标"]
         )
 
         def _doc(doc_id, section, **_kw):
@@ -614,3 +616,69 @@ class TestIndexSourceStatus:
         # ② 事件在「财报全文」类别的健康矩阵行中可见（无论计为 failed 还是 degraded）
         row = next(r for r in build_data_source_matrix() if r["key"] == "financial_report")
         assert row["failed"] + row["degraded"] >= 1
+
+
+class TestSourceNormalization:
+    """候选来源归一与命名空间隔离（source_hint 根因回归：主源索引自由文本 source 直传
+    source_hint 令两适配器双双静默拒服务，主源整条失效）。"""
+
+    def test_datasink_free_text_normalizes_to_primary(self):
+        """DataSinking 索引条目自带「巨潮资讯网 (cninfo)」自由文本 → 归一为主源 datasink。"""
+        from src.python.fetcher import financial_report as fr
+
+        assert fr._candidate_source({"source": "巨潮资讯网 (cninfo)"}) == "datasink"
+
+    def test_exact_cninfo_literal_stays_backup(self):
+        """cninfo provider 写入的精确字面量 → 备源 cninfo（备源接管语义不变）。"""
+        from src.python.fetcher import financial_report as fr
+
+        assert fr._candidate_source({"source": "cninfo"}) == "cninfo"
+
+    def test_missing_or_other_text_defaults_to_primary(self):
+        """无 source/其他自由文本 → 主源（宁可主源尝试，不得双槽同拒）。"""
+        from src.python.fetcher import financial_report as fr
+
+        assert fr._candidate_source({}) == "datasink"
+        assert fr._candidate_source({"source": "DataSinking, Inc."}) == "datasink"
+
+    def test_index_source_attribution_exact_match_only(self):
+        """取用标记归属只认精确 cninfo：主源自由文本条目不得错记到备源名下。"""
+        from src.python.fetcher import financial_report as fr
+
+        assert fr._index_source_of([{"id": 1, "source": "巨潮资讯网 (cninfo)"}]) == fr._SRC_INDEX_DATASINK
+        assert fr._index_source_of([{"id": 2, "source": "cninfo"}]) == fr._SRC_INDEX_CNINFO
+        assert fr._index_source_of([{"id": 3}]) == fr._SRC_INDEX_DATASINK
+
+    def test_sections_fetch_skipped_for_backup_source(self, monkeypatch):
+        """章节清单仅主源提供：备源候选不打 datasink /sections（每轮 404 与历史挂起的次生根因）。"""
+        from src.python.fetcher import financial_report as fr
+
+        calls: list = []
+        monkeypatch.setattr(fr.datasink, "fetch_report_sections", lambda d: calls.append(d) or ["节一"])
+
+        assert fr._fetch_sections(999001001, source="cninfo") is None
+        assert calls == [], "备源候选不得触发主源章节清单请求"
+
+        assert fr._fetch_sections(999001002, source="datasink") == ["节一"]
+        assert calls == [999001002]
+
+    def test_fulltext_ladder_passes_source_and_meta(self, monkeypatch):
+        """全文阶 _fetch_document 必须带 source/meta（漏传曾致单次生成 1 次跨源 404）。"""
+        from src.python.fetcher import financial_report as fr
+
+        seen: dict = {}
+
+        def _fake_fetch(doc_id, section, source=None, meta=None):
+            seen.update({"doc_id": doc_id, "source": source, "meta": meta})
+            return {"doc_id": doc_id, "content": "全文内容"}
+
+        monkeypatch.setattr(fr, "_fetch_document", _fake_fetch)
+        monkeypatch.setattr(fr, "_locate_from_fulltext", lambda *a, **k: ("关键词片段", "关键词"))
+        monkeypatch.setattr(fr, "_collect_doc_sections", lambda *a, **k: (None, []))
+
+        meta = {"id": 555001, "source": "cninfo", "report_period": "2026-06-30"}
+        result = fr._attempt_candidates([meta], "600000.SS", ["管理层讨论"], 1000, [])
+
+        assert result is not None, "全文阶应命中"
+        assert seen["source"] == "cninfo", "全文阶必须携带归一后的 source"
+        assert seen["meta"]["id"] == 555001, "全文阶必须透传候选 meta"

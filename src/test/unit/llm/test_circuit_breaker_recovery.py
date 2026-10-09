@@ -367,5 +367,41 @@ class TestCircuitBreakerEndpoint(unittest.TestCase):
         self.assertFalse(_cb_is_open("https://api.unknown.com/v1"))
 
 
+class TestCircuitBreakerForce(unittest.TestCase):
+    """force/cooldown 覆盖参数：限速终态失败立即进入长冷却。"""
+
+    def setUp(self):
+        from src.python.llm.circuit_breaker import _circuit_failures, _circuit_open_until
+
+        _circuit_failures.clear()
+        _circuit_open_until.clear()
+
+    def tearDown(self):
+        from src.python.llm.circuit_breaker import _circuit_failures, _circuit_open_until
+
+        _circuit_failures.clear()
+        _circuit_open_until.clear()
+
+    def test_force_opens_on_first_failure_with_custom_cooldown(self):
+        """force=True：首次失败即开熔断，冷却取指定值而非默认 60s。"""
+        import time
+
+        from src.python.llm.circuit_breaker import _cb_is_open, _cb_record_failure, _circuit_open_until
+
+        _cb_record_failure("https://api.limited.example.com/v1", cooldown=600, force=True)
+
+        self.assertTrue(_cb_is_open("https://api.limited.example.com/v1"))
+        remaining = _circuit_open_until["api.limited.example.com"] - time.time()
+        self.assertGreater(remaining, 590)
+        self.assertLessEqual(remaining, 600)
+
+    def test_default_still_requires_threshold(self):
+        """不传 force 时保持阈值语义：单次失败不开熔断。"""
+        from src.python.llm.circuit_breaker import _cb_is_open, _cb_record_failure
+
+        _cb_record_failure("https://api.normal.example.com/v1")
+        self.assertFalse(_cb_is_open("https://api.normal.example.com/v1"))
+
+
 if __name__ == "__main__":
     unittest.main()

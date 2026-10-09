@@ -19,6 +19,8 @@ from src.python.llm.api_base import (
     _build_cache_hint_and_record,
     _get_last_llm_failure,
     clear_last_llm_failure,
+    FAIL_REASON_NETWORK_ERROR,
+    FAIL_REASON_TIMEOUT,
 )
 from src.python.llm.fingerprint import get_cache_ttl_llm
 from src.python.llm.markdown import markdown_to_html
@@ -313,34 +315,51 @@ def _execute_llm_with_finalize(
             （如辩论模式虚构代码过滤），作用于带换行的 Markdown 文本。
     """
     clear_last_llm_failure()
-    _t0 = time.monotonic()
-    result, usage, provider_info = call_llm(
-        system_prompt,
-        user_prompt,
-        llm_config,
-        timeout=timeout,
-        http_client=http_client,
-        max_tokens=max_tokens,
-        config_field=config_field,
-        temperature=temperature,
-        model=model,
-    )
-    _duration = time.monotonic() - _t0
-    result, usage = _handle_truncation(
-        result,
-        usage,
-        max_tokens,
-        system_prompt,
-        user_prompt,
-        llm_config,
-        timeout,
-        http_client,
-        config_field,
-        temperature,
-        model,
-    )
-    if raw_filter_fn and result:
-        result = raw_filter_fn(result)
+
+    def _attempt_once() -> tuple[Any, Any, Any, float]:
+        _start = time.monotonic()
+        res, usg, p_info = call_llm(
+            system_prompt,
+            user_prompt,
+            llm_config,
+            timeout=timeout,
+            http_client=http_client,
+            max_tokens=max_tokens,
+            config_field=config_field,
+            temperature=temperature,
+            model=model,
+        )
+        elapsed = time.monotonic() - _start
+        res, usg = _handle_truncation(
+            res,
+            usg,
+            max_tokens,
+            system_prompt,
+            user_prompt,
+            llm_config,
+            timeout,
+            http_client,
+            config_field,
+            temperature,
+            model,
+        )
+        if raw_filter_fn and res:
+            res = raw_filter_fn(res)
+        return res, usg, p_info, elapsed
+
+    result, usage, provider_info, _duration = _attempt_once()
+    if not result:
+        # 瞬时故障（网络/超时/接口异常）全链路失败后，延迟整链重试一次：全挂通常由
+        # 出口网络抖动或端点瞬时故障引发，固定窗口后再试可自愈；配额耗尽/熔断中
+        # 属终态（窗口滚动/冷却未到），重试无益，不进入此分支。
+        _fail_reason = _get_last_llm_failure()
+        if _fail_reason in {FAIL_REASON_NETWORK_ERROR, FAIL_REASON_TIMEOUT, FAIL_REASON_API_ERROR}:
+            delay = float(llm_config.get("llm_full_fail_retry_delay", 30) or 0)
+            if delay > 0:
+                logger.warning("LLM 调用全链路失败（%s），%.0fs 后重试 1 次: %s", _fail_reason, delay, cache_key)
+                time.sleep(delay)
+            clear_last_llm_failure()
+            result, usage, provider_info, _duration = _attempt_once()
 
     if result:
         provider_name = provider_info.get("name") if provider_info else None

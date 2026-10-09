@@ -474,12 +474,14 @@ def enabled_experimental_features() -> list[tuple[str, str]]:
 
 
 def log_experimental_features() -> None:
-    """如果已启用实验性功能，在日志中以红色高亮显示具体开启了什么功能。
+    """如果已启用实验性功能，在日志中输出醒目标记，说明具体开启了什么功能。
 
     唯一调用点为报告入口 ``report/orchestrator.generate_report``（在配置初始化
     之后），故 TUI / CLI / Web 三条入口在生成报告时均会提示——「本次报告受哪些
     实验功能影响」正是需要看到这条信息的时刻。
-    通过 ``logger.error()`` 输出以触发 ``_ColoredFormatter`` 的红色着色。
+    级别取 ``INFO``：横幅是生成条件提示而非错误，用 ``ERROR`` 会污染错误统计
+    （实测一次运行 68 条 ERROR 中 65 条为本横幅，真错误被淹没）；醒目由
+    ``log_reader`` 的装饰横幅标记与报告产物自身的实验标注承担。
     """
     enabled = enabled_experimental_features()
     if not enabled:
@@ -490,12 +492,12 @@ def log_experimental_features() -> None:
     logger = logging.getLogger("invest")
     sep = "=" * 48
 
-    logger.error(sep)
-    logger.error("  ⚗ 实验性功能已开启！")
-    logger.error(sep)
+    logger.info(sep)
+    logger.info("  ⚗ 实验性功能已开启！")
+    logger.info(sep)
     for flag, name in enabled:
-        logger.error("  ⚗ %s — %s", name, feature_switch_registry[flag].desc)
-    logger.error(sep)
+        logger.info("  ⚗ %s — %s", name, feature_switch_registry[flag].desc)
+    logger.info(sep)
 
     # 使用统计（尽力而为，绝不影响报告主链路）：每次生成报告时记录各实验开关
     # 的累计启用次数与最近启用日期，供「转正 / 撤销」决策用客观数据支撑。

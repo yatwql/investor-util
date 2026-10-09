@@ -164,14 +164,14 @@ def _mark_used(source_key: str) -> None:
 def _index_source_of(items: Any) -> str:
     """已取回（或缓存命中）的索引条目 → 类别级取用标记的 source_key。
 
-    主源（DataSinking）条目无 ``source`` 字段；巨潮备源条目带 ``source=cninfo``
-    （见 ``providers/cninfo.fetch_report_listings``），据此如实归属，避免备源接管
-    时把「本次使用」错记到主源名下。
+    仅认**精确字面量** ``cninfo``（cninfo provider 写入的备源条目）——
+    DataSinking 索引条目自带自由文本 ``source="巨潮资讯网 (cninfo)"``（描述文档
+    爬取出处），子串匹配会把主源索引错记到备源名下（数据源说明表归属错误）。
     """
     if isinstance(items, list):
         for it in items:
-            label = str((it or {}).get("source") or "").lower()
-            if "cninfo" in label or "巨潮" in label:
+            label = str((it or {}).get("source") or "").strip().lower()
+            if label == cninfo.SOURCE_ID:
                 return _SRC_INDEX_CNINFO
     return _SRC_INDEX_DATASINK
 
@@ -246,12 +246,31 @@ def _fetch_index(symbol: str, doc_types: tuple[str, ...] = ()) -> list[dict[str,
     return picked
 
 
-def _fetch_sections(doc_id: int | str) -> list[str] | None:
+def _candidate_source(meta: dict[str, Any]) -> str:
+    """候选条目 → 规范来源标识（``datasink`` / ``cninfo``），链路 ``source_hint`` 只认此值。
+
+    上游自由文本不可直传：DataSinking 索引条目自带 ``source="巨潮资讯网 (cninfo)"``
+    （描述文档爬取出处），直传会让 ``DataSinkReportAdapter``（要求 datasink）与
+    ``CninfoReportAdapter``（要求 cninfo）双双判异源而**静默拒服务**——两槽同毫秒
+    全空、零 HTTP、无失败原因（主源整条失效的根因）。归一规则：仅精确的
+    ``cninfo`` 字面量（cninfo provider 写入的备源条目）判备源，其余一律归主源。
+    """
+    if str(meta.get("source") or "").strip().lower() == cninfo.SOURCE_ID:
+        return cninfo.SOURCE_ID
+    return datasink.SOURCE_ID
+
+
+def _fetch_sections(doc_id: int | str, source: str | None = None) -> list[str] | None:
     """取该文档的**实际章节名清单**（带缓存）；不可得时返回 None（调用方回退偏好名直取）。
 
     传输级失败（连接级重试已耗尽而上抛）同样归入「不可得」：章节清单只是**优选**路径，
     拿不到就回退偏好名直取，不得因它中断整篇取数。
+
+    章节清单是 DataSinking 独有能力：备源（cninfo）候选的公告 ID 打主源必 404
+    （单次生成会发起 10 次无效探测，历史还造成过 20~27s 连接挂起），故非主源直接跳过。
     """
+    if (source or datasink.SOURCE_ID) != datasink.SOURCE_ID:
+        return None
     cache_key = f"{SECTIONS_PREFIX}{doc_id}"
     cached = cache_get(cache_key, get_ttl("report", cache_key))
     if isinstance(cached, list):
@@ -340,7 +359,7 @@ def _collect_doc_sections(
     Returns:
         ``(首个非空正文记录 | None, 正文列表)``
     """
-    resolved = _pick_sections(_fetch_sections(doc_id), tuple(preferences)) or list(preferences)
+    resolved = _pick_sections(_fetch_sections(doc_id, source=source), tuple(preferences)) or list(preferences)
     record: dict[str, Any] | None = None
     contents: list[str] = []
     for section in resolved:
@@ -448,7 +467,7 @@ def _attempt_candidates(
     """
     for meta in candidates:
         doc_id = meta.get("id")
-        source = str(meta.get("source") or datasink.SOURCE_ID)
+        source = _candidate_source(meta)
         tried.append(str(meta.get("report_period") or meta.get("title") or doc_id))
         record, contents = _collect_doc_sections(doc_id, preferences, source=source, meta=meta)
         if record is None or not contents:
@@ -458,12 +477,12 @@ def _attempt_candidates(
     # ② 全文阶：源侧章节未解析出来时，整篇下载后按关键词定位片段
     for meta in candidates[:_FULLTEXT_FALLBACK_LIMIT]:
         doc_id = meta.get("id")
-        source = str(meta.get("source") or datasink.SOURCE_ID)
+        source = _candidate_source(meta)
         excerpt, matched = _locate_from_fulltext(doc_id, preferences, max_chars, source=source, meta=meta)
         if not excerpt.strip():
             continue
         logger.info("[financial_report] %s 走全文兜底（doc=%s，命中关键词=%s）", symbol, doc_id, matched or "无")
-        full_record = _fetch_document(doc_id, "") or meta
+        full_record = _fetch_document(doc_id, "", source=source, meta=meta) or meta
         return _assemble_record(full_record, meta, symbol, excerpt, max_chars, section_source=SECTION_SOURCE_FULLTEXT)
     return None
 

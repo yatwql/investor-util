@@ -4,6 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>{{ app_name }} v{{ app_version }}</title>
+  <link rel="icon" href="/static/favicon.svg?v={{ app_version }}" type="image/svg+xml">
   <script>
     /* 主题防闪：与存储键同源，CSS 解析前恢复暗色（main.js 同键读写） */
     try { if (localStorage.getItem('investor-theme-dark') === '1') document.documentElement.setAttribute('data-theme', 'dark'); } catch (e) {}

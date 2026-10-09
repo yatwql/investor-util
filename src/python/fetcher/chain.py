@@ -81,7 +81,8 @@ def _try_provider_fetch(
         ``(结果, 失败原因)``。成功时原因为空串；失败时结果为 ``None`` 或
         ``TRANSPORT_FAILURE``，原因是一行可读短句（供诊断上屏，不再只进日志）。
     """
-    _code_tag = f" [{kwargs.get('code', '')}]" if kwargs.get("code") else ""
+    _tag_key = kwargs.get("code") or kwargs.get("doc_id")
+    _code_tag = f" [{_tag_key}]" if _tag_key else ""
     # 尝试前先清「失败原因」载体：该载体只在 provider 返回 None 时被消费，若上一次
     # 调用的原因未经消费就残留（直连调用/缓存命中直接返回），会把「上一条命令的失败
     # 原因」串到本次诊断上。先清后调即保证本次读到的只可能是本次 provider 写的。
@@ -168,7 +169,8 @@ def fetch_with_fallback(
     """
     chain = _get_chain(data_type)
     kwargs = fn_kwargs or {}
-    _code_tag = f" [{kwargs.get('code', '')}]" if kwargs.get("code") else ""
+    _tag_key = kwargs.get("code") or kwargs.get("doc_id")
+    _code_tag = f" [{_tag_key}]" if _tag_key else ""
 
     # 1) 读缓存（准入判据不符 → 丢弃重取，避免旧语义载荷遮蔽修复）
     cached = cache_get(cache_key, cache_ttl)

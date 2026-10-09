@@ -15,8 +15,8 @@
       "credentials_ref": "kimi-main",
       "priority": 10,
       "timeout": 120,
-      // 主端点（优先级最高）在途并发上限 1 + 最小间隔 1s：429 自保护
-      "pacing": { "min_interval": 1, "max_concurrency": 1 }
+      // 主端点（优先级最高）在途并发上限 1 + 最小间隔 5s：429 自保护（撞配额时段降低 RPM）
+      "pacing": { "min_interval": 5, "max_concurrency": 1 }
     },
     {
       "name": "kimi-code",
@@ -24,8 +24,8 @@
       "credentials_ref": "kimi-code",
       "priority": 15,
       "timeout": 120,
-      // 订阅制端点收紧节流（与按量端点放开相对）：最小间隔 1s + 在途并发 1
-      "pacing": { "min_interval": 1, "max_concurrency": 1 }
+      // 订阅制端点收紧节流（与按量端点放开相对）：最小间隔 5s + 在途并发 1
+      "pacing": { "min_interval": 5, "max_concurrency": 1 }
     },
     {
       "name": "deepseek-main",

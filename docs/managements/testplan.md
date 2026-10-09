@@ -1,5 +1,5 @@
 # 投资复盘助手 — 质量控制与测试标准
-> 文档版本：0.12.7
+> 文档版本：0.12.8
 
 ---
 
@@ -328,7 +328,7 @@
 
 ### 2.1 需求 ID ↔ 验证载体映射
 
-`requirements.md` 的**每条单段需求 ID**（35 域 / 289 条）在测试侧均有确定载体，**全量已补全**。由 `scripts/check-requirement-trace.py --ci` 断言：映射表格式齐备 + ID 均存在于需求侧 + ID 唯一 + **全域全覆盖** + 载体文件真实存在。新增需求条目时须同步在表内补行（门禁会拦截漏映射）。**口径说明**：本表覆盖 `R-<域>-<序号>` 形式的单段 ID（脚本按此正则提取）；`requirements.md` §7.2–§7.8.4 另有一批双段子域 ID（如 `R-LLM-GM-01`、`R-LLM-DB-PROCON-01`，共 60 条），按现有约定不在本追溯表范围内、亦不参与门禁断言。
+`requirements.md` 的**每条单段需求 ID**（38 域 / 310 条）在测试侧均有确定载体，**全量已补全**。由 `scripts/check-requirement-trace.py --ci` 断言：映射表格式齐备 + ID 均存在于需求侧 + ID 唯一 + **全域全覆盖** + 载体文件真实存在。新增需求条目时须同步在表内补行（门禁会拦截漏映射）。**口径说明**：本表覆盖 `R-<域>-<序号>` 形式的单段 ID（脚本按此正则提取）；`requirements.md` §7.2–§7.8.4 另有一批双段子域 ID（如 `R-LLM-GM-01`、`R-LLM-DB-PROCON-01`，共 60 条），按现有约定不在本追溯表范围内、亦不参与门禁断言。
 
 | 需求 ID | 验证载体（`测试文件::用例`，粗粒度时仅列文件） | 补全批次 |
 |:--|:--|:--:|
@@ -637,6 +637,12 @@
 | R-SR-03 | `src/test/unit/report/test_schedule_replay_wiring.py` + `src/test/integration/test_report_chapter_consistency.py` + `src/test/scenario/basic/test_scenario_section_order.py` | 批 10 |
 | R-SR-04 | `src/test/unit/llm/test_schedule_replay_injection.py` | 批 10 |
 | R-SR-05 | `src/test/unit/report/test_schedule_replay_wiring.py` + `src/test/unit/report/test_experimental_seams.py` | 批 10 |
+| R-EW-01 | `src/test/unit/analysis/test_event_window_impact.py` + `src/test/unit/analysis/test_event_window_impact_edge.py` | 批 11 |
+| R-EW-02 | `src/test/unit/analysis/test_event_window_impact_edge.py` + `src/test/unit/report/test_event_impact_panel_edge.py` + `src/test/unit/report/test_event_impact_wiring.py` | 批 11 |
+| R-EW-03 | `src/test/unit/report/test_event_impact_panel.py` + `src/test/unit/report/test_event_impact_panel_edge.py` | 批 11 |
+| R-EW-04 | `src/test/unit/report/test_event_impact_wiring.py` + `src/test/unit/report/test_excel_generator.py` | 批 11 |
+| R-EW-05 | `src/test/unit/report/test_event_impact_wiring.py` + `src/test/unit/report/test_event_impact_panel.py` | 批 11 |
+| R-EW-06 | `src/test/unit/llm/test_event_impact_injection.py` + `src/test/unit/llm/test_module_fingerprint.py` | 批 11 |
 <!-- requirement-trace:end -->
 ---
 

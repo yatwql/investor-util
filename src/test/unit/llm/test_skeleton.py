@@ -190,5 +190,88 @@ class TestMaxTokensOverride(unittest.TestCase):
         self.assertEqual(result, 8192)
 
 
+class TestFullFailRetry(unittest.TestCase):
+    """全链路失败后的延迟整链重试（瞬时故障自愈，终态失败不重试）。"""
+
+    @staticmethod
+    def _run(llm_config, call_llm_mock, get_reason_mock, sleep_mock):
+        from unittest.mock import patch
+
+        from src.python.llm import skeleton
+
+        with (
+            patch.object(skeleton, "call_llm", call_llm_mock),
+            patch.object(skeleton, "_get_last_llm_failure", get_reason_mock),
+            patch.object(skeleton, "_handle_truncation", side_effect=lambda r, u, *a, **k: (r, u)),
+            patch.object(skeleton, "_finalize_and_cache", return_value=("OUT", True)),
+            patch.object(skeleton.time, "sleep", sleep_mock),
+        ):
+            return skeleton._execute_llm_with_finalize(
+                "sys",
+                "usr",
+                llm_config,
+                60,
+                None,
+                4096,
+                "cfg_field",
+                None,
+                None,
+                "ut_full_fail_key",
+                "",
+                False,
+            )
+
+    def test_transient_failure_retries_once_after_delay_and_succeeds(self):
+        """网络类全挂 → 延迟 llm_full_fail_retry_delay 后整链重试一次并成功。"""
+        from unittest.mock import Mock
+
+        from src.python.llm.api_base import FAIL_REASON_NETWORK_ERROR
+
+        calls = Mock(side_effect=[(None, None, None), ("好", {}, {"name": "p", "model": "m"})])
+        reason = Mock(return_value=FAIL_REASON_NETWORK_ERROR)
+        sleep = Mock()
+
+        result, ok = self._run({"llm_full_fail_retry_delay": 5}, calls, reason, sleep)
+
+        self.assertEqual(result, "OUT")
+        self.assertTrue(ok)
+        self.assertEqual(calls.call_count, 2)
+        sleep.assert_called_once_with(5.0)
+
+    def test_quota_failure_does_not_retry(self):
+        """配额耗尽属终态（窗口滚动）→ 不进入延迟重试，单次即返回失败。"""
+        from unittest.mock import Mock
+
+        from src.python.llm.api_base import FAIL_REASON_QUOTA_EXCEEDED
+
+        calls = Mock(return_value=(None, None, None))
+        reason = Mock(return_value=FAIL_REASON_QUOTA_EXCEEDED)
+        sleep = Mock()
+
+        result, ok = self._run({"llm_full_fail_retry_delay": 5}, calls, reason, sleep)
+
+        self.assertIsNone(result)
+        self.assertFalse(ok)
+        self.assertEqual(calls.call_count, 1)
+        sleep.assert_not_called()
+
+    def test_zero_delay_retries_immediately_without_sleep(self):
+        """llm_full_fail_retry_delay=0（显式关闭等待）→ 重试但不 sleep。"""
+        from unittest.mock import Mock
+
+        from src.python.llm.api_base import FAIL_REASON_TIMEOUT
+
+        calls = Mock(side_effect=[(None, None, None), ("好", {}, {"name": "p", "model": "m"})])
+        reason = Mock(return_value=FAIL_REASON_TIMEOUT)
+        sleep = Mock()
+
+        result, ok = self._run({"llm_full_fail_retry_delay": 0}, calls, reason, sleep)
+
+        self.assertEqual(result, "OUT")
+        self.assertTrue(ok)
+        self.assertEqual(calls.call_count, 2)
+        sleep.assert_not_called()
+
+
 if __name__ == "__main__":
     unittest.main()

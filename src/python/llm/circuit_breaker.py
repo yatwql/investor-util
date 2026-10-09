@@ -38,17 +38,23 @@ def _cb_endpoint(url: str) -> str:
         return "unknown"
 
 
-def _cb_record_failure(url: str) -> None:
-    """记录一次失败，达到阈值时开启熔断。"""
+def _cb_record_failure(url: str, cooldown: float | None = None, force: bool = False) -> None:
+    """记录一次失败，达到阈值时开启熔断。
+
+    Args:
+        cooldown: 覆盖默认冷却秒数（不传用 ``_CIRCUIT_BREAKER_RECOVERY``）。
+        force: 跳过连续失败阈值立即开启熔断——供「限速终态失败」（重试耗尽仍 429）
+            使用：该信号明确表示端点限速/配额，继续按常规节奏试错只会反复无效
+            先试并加剧风控画像，须立即进入长冷却。
+    """
     ep = _cb_endpoint(url)
+    cd = float(cooldown) if cooldown is not None else float(_CIRCUIT_BREAKER_RECOVERY)
     with _circuit_lock:
         _circuit_failures[ep] = _circuit_failures.get(ep, 0) + 1
-        if _circuit_failures[ep] >= _CIRCUIT_BREAKER_THRESHOLD:
-            expiry = time.time() + _CIRCUIT_BREAKER_RECOVERY
+        if force or _circuit_failures[ep] >= _CIRCUIT_BREAKER_THRESHOLD:
+            expiry = time.time() + cd
             _circuit_open_until[ep] = expiry
-            logger.warning(
-                "熔断器已开启: %s (连续失败 %d 次, 冷却 %.0fs)", ep, _circuit_failures[ep], _CIRCUIT_BREAKER_RECOVERY
-            )
+            logger.warning("熔断器已开启: %s (连续失败 %d 次, 冷却 %.0fs)", ep, _circuit_failures[ep], cd)
 
 
 def _cb_record_success(url: str) -> None:

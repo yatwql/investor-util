@@ -34,6 +34,9 @@ pytestmark = [pytest.mark.unit, pytest.mark.unit_report]
 _TEMPLATE_PATH = os.path.normpath(
     os.path.join(os.path.dirname(__file__), "..", "..", "..", "static", "tmpl", "report_template.html"),
 )
+_WHATIF_TEMPLATE_PATH = os.path.normpath(
+    os.path.join(os.path.dirname(__file__), "..", "..", "..", "static", "tmpl", "whatif_template.html"),
+)
 
 # 默认注册表 key（按默认顺序，与 registry.py 对齐）
 _ALL_KEYS_DEFAULT = [
@@ -872,3 +875,27 @@ class TestFactorCatalogSection(unittest.TestCase):
         assert "四、因子目录" in text
         assert "因子目录数据不足（股票池为空）" in text
         assert "RSI(14)" not in text
+
+
+class TestFaviconInline:
+    """报告 tab 图标内联 data URI（单文件产物零外链纪律）。"""
+
+    @staticmethod
+    def _icon_href(path: str) -> str:
+        with open(path, encoding="utf-8") as f:
+            content = f.read()
+        m = re.search(r'<link rel="icon" href="([^"]+)"', content)
+        assert m, f"模板应声明标签页图标: {path}"
+        return m.group(1)
+
+    def test_report_template_inline_icon(self):
+        """主报告模板图标须内联 data URI 且用报告侧品牌蓝（外链会破坏单文件产物）。"""
+        href = self._icon_href(_TEMPLATE_PATH)
+        assert href.startswith("data:image/svg+xml,"), "图标须内联 data URI，报告单文件零外链"
+        assert "%232E75B6" in href, "报告侧图标底色须为报告品牌蓝（DESIGN.md Colors 双面各系）"
+
+    def test_whatif_template_inline_icon(self):
+        """What-if 模板同样内联声明（与主报告同款图标）。"""
+        href = self._icon_href(_WHATIF_TEMPLATE_PATH)
+        assert href.startswith("data:image/svg+xml,"), "What-if 页图标须内联 data URI"
+        assert "%232E75B6" in href, "What-if 页与报告同侧品牌蓝"

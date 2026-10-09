@@ -13,8 +13,9 @@
   5. 载体真实性：映射表载体列中出现的 `src/test/**/*.py` 路径必须真实存在于磁盘
      （防测试文件改名/删除后文档留悬空引用）
 
-**覆盖进度**：六批已全部完成，`_COVERED_DOMAINS` == `_ALL_DOMAINS`（34 域 / 276 条
-需求 ID 全量断言）。后续新增需求域时，把域前缀同时加入两个常量即可。
+**覆盖进度**：`_COVERED_DOMAINS` == `_ALL_DOMAINS`，requirements.md 全部需求域均全量断言
+（域清单见两常量，真值计数以 requirements.md 为准）。后续新增需求域时，把域前缀
+同时加入两个常量即可。
 
 用法：
   python scripts/check-requirement-trace.py       # 检查全部已补域
@@ -86,6 +87,7 @@ _COVERED_DOMAINS: tuple[str, ...] = (
     "R-HCR",
     "R-FCT",
     "R-SR",
+    "R-EW",
 )
 
 #: requirements.md 中全部需求域前缀（真值来源；与 `_COVERED_DOMAINS` 比对即得覆盖进度）
@@ -127,6 +129,7 @@ _ALL_DOMAINS: tuple[str, ...] = (
     "R-HCR",
     "R-FCT",
     "R-SR",
+    "R-EW",
 )
 
 

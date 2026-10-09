@@ -1,6 +1,6 @@
 # 开发者指南
 
-> 文档版本：0.12.7
+> 文档版本：0.12.8
 
 ## 概述
 
@@ -1885,4 +1885,4 @@ git checkout dev
 - **缺陷自测**：发现并修复缺陷时，**必须**为该缺陷编写可自测的回归测试用例，避免再次回退；新增功能时**必须**同步编写测试用例覆盖
 - **目录结构同步**：新增/重命名任何非排除文件或目录时，**必须**同步更新 `folders.md` 中的目录树，并确保每个文件都有简短说明
 - **文件归属三原则**：中间计划文件 → `docs/plan/`；运行时临时产物 → `docs/tmp/`；`.claude/` 全局目录只存放 Claude Code 工具自动管理的运行时数据，**禁止主动写入**任何文件
-- **设计契约**：Web/报告 UI 改动（样式、token、组件状态、版式、空态文案）前先读仓库根 [DESIGN.md](../../DESIGN.md)——Colors 角色表 / Typography 字阶 / 组件六态 / 断点表 / Do-Don't 护栏 / 迭代指引；新增声明取自契约档位，验收见 `src/test/unit/report/test_design_doc.py`
+- **设计契约**：Web/报告 UI 改动（样式、token、组件状态、版式、空态文案）前先读 [DESIGN.md](DESIGN.md)（`docs/managements/`）——Colors 角色表 / Typography 字阶 / 组件六态 / 断点表 / Do-Don't 护栏 / 迭代指引；新增声明取自契约档位，验收见 `src/test/unit/report/test_design_doc.py`

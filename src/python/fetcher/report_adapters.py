@@ -12,12 +12,16 @@
 
 from __future__ import annotations
 
+import logging
 from typing import Any, ClassVar
 
 from src.python.fetcher.report_locate import locate_keyword_excerpt
 from src.python.fetcher.source_adapter import SourceAdapter, register_adapter
 from src.python.providers import cninfo, datasink
+from src.python.providers._utils import set_last_reason
 from src.python.schemas.datasource_fields import DOMAIN_FINANCIAL_REPORT
+
+logger = logging.getLogger("invest")
 
 
 class DataSinkReportAdapter(SourceAdapter):
@@ -37,6 +41,10 @@ class DataSinkReportAdapter(SourceAdapter):
         """
         hint = query.get("source_hint")
         if hint not in (None, "", datasink.SOURCE_ID):
+            # 异源拒服务是命中而非故障：写下原因供链路诊断回显，否则日志只剩
+            # 「返回空（返回空）」，把命名空间隔离伪装成源返回空（排查误导）
+            set_last_reason(f"异源候选拒服务(hint={hint})")
+            logger.debug("[financial_report] DataSinking 拒异源候选 hint=%s doc=%s", hint, query.get("doc_id"))
             return None
         return datasink.fetch_report_document(query.get("doc_id"), query.get("section"))
 
@@ -60,6 +68,10 @@ class CninfoReportAdapter(SourceAdapter):
         ``meta``（候选元数据：标题/报告期/文种/披露时间/下载路径）。
         """
         if query.get("source_hint") != cninfo.SOURCE_ID:
+            set_last_reason(f"异源候选拒服务(hint={query.get('source_hint')})")
+            logger.debug(
+                "[financial_report] 巨潮拒异源候选 hint=%s doc=%s", query.get("source_hint"), query.get("doc_id")
+            )
             return None
         announcement_id = str(query.get("doc_id") or "").strip()
         if not announcement_id:
