@@ -1,6 +1,6 @@
 # 投资复盘助手 - 自我审查问题记录
 > 文档版本：0.12.7-dev
-> **编号源**：`rf-next = 642`（新增问题取此编号，完成后更新为 +1；已用最大 rf-641，递增保证唯一，归档不回收。若与历史归档冲突，运行 `scripts/check-task-numbering.py` 校验）
+> **编号源**：`rf-next = 643`（新增问题取此编号，完成后更新为 +1；已用最大 rf-642，递增保证唯一，归档不回收。若与历史归档冲突，运行 `scripts/check-task-numbering.py` 校验）
 
 ---
 
@@ -46,6 +46,8 @@
 | **rf-78** | `fetcher/batch.py` | 520 | 维持现状（BatchDispatcher 本身内聚，复核确认不拆；2026-10-02 实测 520，回落至登记值附近（rf-522 重试退避原语收编后下降）） | BatchDispatcher 本身内聚，可维持现状（不拆） |
 
 ## 已解决问题
+
+- rf-642 已处置（2026-10-09，新闻去重阈值校准判读，结论记录无代码变更）：锚点文件 26.8MB、78,168 唯一标题对（当前指纹时代 26,450 + 历史时代 51,718 按现行规则重算），有效跨源 17,486（≥100）/ 同源 54,407（≥50）达校准节奏。三项判读：① **不降 `_CROSS_BG2_RATIO`（0.375→0.350 不采纳）**——114 条含真专名候选抽读 10 条仅 1 条真漏判（Coreweave 印尼数据中心同事件两报），其余为同实体不同事件（paypal 上调目标价 vs 致股东信、chinajoy 金山 WPS vs 腾讯游戏、anthropic 算力协议 vs 任命高管）或泛词同现（etf/ai/api 各对互不相干）；误合并 = 静默丢一篇独立报道，代价不对称，校准脚本自身输出亦持保守口径；② **cross bg=3 边界 775 条维持不抬阈值**——抽样两可（真合并：兆易创新回购同事件两报；误合并：中际旭创暗盘 vs 资金抢筹、以色列两对、摩根大通杠杆ETF平仓 vs 韩国救市），实体计数无法区分「同实体不同事件」属规则天花板，抬阈值会连真合并一起打掉；误合并样例出现时按校准脚本指引优先扩模板词表/方向对，本次抽样样本留档作观察基线；③ **观察项**——锚点文件 26.8MB 达告警线 34MB 的 79%，后续需归档/封顶机制；8,361 条与记录时判定不一致属规则分代正常、无动作。附带发现存量 `cross_merge_bg2`（209 条）存在泛短词驱动的明显误合并（沙特GDP vs 欧元区GDP r=0.476、股票型ETF吸金 vs ETF市场回暖、MLCC涨价 vs 概念拉升——`_TOKEN_LIKE` 第一备选仅要求含字母，etf/gdp/mlcc 均过闸），收紧方向待量化后另立编号跟进
 
 - rf-641 已修复（2026-10-09，计数回写效率自查，当批修复）：测试计数刷新缺轻量回写入口——`check-doc-drift --with-test-count` 只读核对不落盘，实施收尾刷一次计数被迫整跑 `bench --update-docs`（14 模式、分钟级）；已定流程纪律 bench 只在发布刷新/换机跑，两者之间计数行长期无人回写。新增 `collect-test-coverage.py --update-docs`：按本次收集快照回写 `test-coverage.md` 计数行（反引号标记行 + 能映射到标记的加粗标签行，比对域与 `check_test_coverage_counts` **同构**、行匹配/标签映射复用 check-doc-drift 原语）与 `folders.md` 项目统计表「测试用例」行；只改计数数字（粗体/千分位/` 个` 后缀原样保留），一致零变更幂等；收集退出非 0/5 跳过回写并告警，错数不落盘；快照单源 `_build_snapshot()`（输出分节与快照同出一份，`edge/data/smoke/scenario_extreme` 同名键覆盖次序与子进程 `_parse_collect_stdout` 逐行后写同义，重叠四处谓词与裸标记判定已实测同值）。子标记清单提升为模块常量 `UNIT_SUBS`/`SCEN_SUBS`/`CROSS_SUBS`（输出与回写同一来源）。回归 7 项：保形改写（粗体/别名 `all`/聚合行/章外同标签行/folders 后缀）、非计数行跳过（未入快照键/无计数格/未映射标签）、写后过 `check_test_coverage_counts` 反漂移断言、幂等二轮零变更、CLI 摘要、收集失败跳过且不碰文件、空收集放行回写
 - rf-640 已修复（2026-10-09，Windows 钩子回放乱码自查，当批修复）：pre-commit 十守护经 `run_bg` 把 stdout 重定向到日志文件，中文 Windows 上 Python 按 locale ANSI（cp936/GBK）落盘，`cat` 回放到 UTF-8 终端即成乱码（GBK `CE B4`=「未」被读作 `δ`；前台直打走控制台 `WriteConsoleW` 正常——与「前台正常、回放段落乱码」的分界完全吻合），纯显示问题、退出码与判定不受影响，但守护详情在 Windows 上不可读。修复三点：① 钩子 `set -e` 后 `export PYTHONUTF8=1`（UTF-8 模式统一按 UTF-8 写日志，Linux/CI 本就是 UTF-8、行为不变）；② `scripts/_checklib.py` 导入时 `_force_utf8_stdio()` 把**非 UTF-8 的真实 stdout/stderr**收敛到 UTF-8（`_force_utf8_stream`：已 UTF-8 不动、`StringIO` 等测试输出桩跳过），模块 docstring「无副作用原语」例外清单同步为两项；③ 回归 4 项：cp936 文本流收敛、已 UTF-8 零改写、非 TextIOWrapper 跳过、`_force_utf8_stdio` 对当前 stdio 生效

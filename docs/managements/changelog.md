@@ -9,6 +9,8 @@
 
 ## [0.12.7-dev] - 开发中（未发布）
 
+- **分析/记录**：**新闻去重阈值校准判读（2026-10-09）**——锚点 7.8 万唯一标题对达校准节奏（跨源 17,486 / 同源 54,407）；判读：`_CROSS_BG2_RATIO` 0.375 不降（114 含专名候选抽读 10 条仅 1 条真漏判，误合并静默丢稿代价不对称）、cross bg=3 边界 775 条不抬阈值（样本两可留档观察，误合并样例优先扩模板词/方向对）、锚点体积 26.8/34MB 挂观察（79%，需归档/封顶机制）；附带发现 bg2 存量泛短词误合并（etf/gdp 过闸）待量化收紧 | rf-642
+
 - **工程质量/工具**：**测试计数轻量回写开关**——`collect-test-coverage.py` 新增 `--update-docs`：按本次快照回写 `test-coverage.md` 计数行（反引号标记行 + 已映射标签加粗行，比对域与 `check-doc-drift` 计数核对**同构**、复用其行匹配原语，写后必过 `--with-test-count`）与 `folders.md`「测试用例」行；只改数字保粗体/千分位/后缀、幂等、收集非 0/5 跳过回写；快照单源 `_build_snapshot()`（与输出分节同出一份，同名键覆盖次序对齐子进程 stdout 解析）。实施收尾刷计数不再需要整跑 bench（流程纪律维持 bench 仅发布刷新/换机）；文档触点 developer-guide ×4、CLAUDE 发布刷新句、folders 目录树同步；回归 7 项 | rf-641
 
 - **兼容/守护**：**Windows 钩子日志回放乱码修复**——pre-commit 十守护经 `run_bg` 重定向落盘，中文 Windows 上 Python 按 locale ANSI（cp936）编码，UTF-8 终端回放成乱码（前台直打正常、回放段落乱码的分界与 `WriteConsoleW` vs 文件落盘吻合）；修复 = 钩子 `export PYTHONUTF8=1` + `scripts/_checklib.py` 导入时把非 UTF-8 的真实 stdout/stderr 收敛到 UTF-8（已 UTF-8 / `StringIO` 桩零改写），守护详情在 Windows 可读；回归 4 项 | rf-640
