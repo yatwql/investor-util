@@ -7,10 +7,14 @@
   - `extract_table_region()`：正常表格、marker 缺失、区域非表格、夹非表格行、缺分隔行
   - `replace_table_region()`：替换表体、标记缺失抛 ValueError
   - `exemptions`：章节/轮次合法计数表述豁免命中、非法引用不误豁免、编译缓存与函数一致
+  - `_force_utf8_stream`：非 UTF-8 文本流收敛 UTF-8（Windows 重定向日志乱码回归）、
+    已 UTF-8 流零改写、非 TextIOWrapper 桩跳过、`_force_utf8_stdio` 作用于当前 stdio
 """
 
 from __future__ import annotations
 
+import io
+import sys
 from pathlib import Path
 
 import pytest
@@ -33,6 +37,41 @@ def checklib():
 def traces_common():
     """章节/轮次豁免实现已迁至 `_traces_code/exemptions.py`（check-code-traces 拆包）。"""
     return load_script("_traces_code/exemptions.py")
+
+
+# ═══ stdio 编码收敛 ═══
+
+
+class TestForceUtf8Stream:
+    """非 UTF-8 文本流收敛 UTF-8：重定向日志回放乱码的回归防线。"""
+
+    def test_non_utf8_text_wrapper_converted(self, checklib):
+        stream = io.TextIOWrapper(io.BytesIO(), encoding="cp936")
+        checklib._force_utf8_stream(stream)
+        assert stream.encoding == "utf-8"
+
+    def test_utf8_stream_left_untouched(self, checklib, monkeypatch):
+        stream = io.TextIOWrapper(io.BytesIO(), encoding="utf-8")
+        calls: list[dict] = []
+        monkeypatch.setattr(stream, "reconfigure", lambda **kw: calls.append(kw))
+        checklib._force_utf8_stream(stream)
+        assert calls == []
+
+    def test_non_wrapper_stream_skipped(self, checklib):
+        buf = io.StringIO()
+        buf.write("x")
+        # StringIO 无 reconfigure 能力——若被改写即 AttributeError，能返回即未误伤
+        checklib._force_utf8_stream(buf)
+        assert buf.getvalue() == "x"
+
+    def test_stdio_hook_converts_current_streams(self, checklib, monkeypatch):
+        out = io.TextIOWrapper(io.BytesIO(), encoding="cp936")
+        err = io.TextIOWrapper(io.BytesIO(), encoding="cp936")
+        monkeypatch.setattr(sys, "stdout", out)
+        monkeypatch.setattr(sys, "stderr", err)
+        checklib._force_utf8_stdio()
+        assert out.encoding == "utf-8"
+        assert err.encoding == "utf-8"
 
 
 # ═══ rel ═══

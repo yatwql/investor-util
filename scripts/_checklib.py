@@ -6,8 +6,10 @@
     HIGH/ORIGIN/VERSION=1、仅 LOW=3，其允许码集见 `check-script-contract.py` 白名单）
   - 通过时打印 `[OK] …`；失败时逐条 `[ERR] file:desc`（或 `--ci` 下仅 `file:desc`）+ `[!] 发现 N 处…`
 
-本模块提供**无副作用的原语**（例外：结论缓存 `conclusion_cache_*`——仅在调用方
-显式调用时读写，写入原子、失败静默，见文末章节）；脚本以
+本模块提供**无副作用的原语**（例外有二：结论缓存 `conclusion_cache_*`——仅在调用方
+显式调用时读写，写入原子、失败静默，见文末章节；**stdio 编码收敛**——import 即把
+非 UTF-8 的 stdout/stderr 收敛到 UTF-8，防 Windows 重定向落盘后回放乱码，见
+`_force_utf8_stream`）；脚本以
 ``sys.path.insert(0, str(Path(__file__).resolve().parent))`` 后 ``from _checklib import …`` 引用
 （`pyproject.toml` 对 `scripts/*.py` 声明了 E402 豁免，理由即此）。
 """
@@ -16,6 +18,7 @@ from __future__ import annotations
 
 import argparse
 import hashlib
+import io
 import json
 import os
 import re
@@ -25,6 +28,27 @@ from pathlib import Path
 
 #: 仓库根目录（`scripts/` 的上一级）
 REPO_ROOT: Path = Path(__file__).resolve().parent.parent
+
+
+def _force_utf8_stream(stream: object) -> None:
+    """把非 UTF-8 的真实文本流收敛到 UTF-8（已是 UTF-8 / 非 TextIOWrapper 则无操作）。
+
+    Windows 上 stdout 重定向到文件时 Python 按 locale ANSI（cp936/GBK）编码落盘，
+    UTF-8 终端回放该字节流即乱码（如「未」的 GBK 双字节被逐字节误读成 `δ`）——pre-commit 的
+    `run_bg` 守护日志回放依赖此保证；控制台直打走 `WriteConsoleW` 本就无损，
+    StringIO 等测试输出桩无 reconfigure 能力，均不得改写。
+    """
+    if isinstance(stream, io.TextIOWrapper) and (stream.encoding or "").lower().replace("-", "") != "utf8":
+        stream.reconfigure(encoding="utf-8")
+
+
+def _force_utf8_stdio() -> None:
+    """对当前 stdout/stderr 应用 :func:`_force_utf8_stream`（本模块 import 即调用）。"""
+    _force_utf8_stream(sys.stdout)
+    _force_utf8_stream(sys.stderr)
+
+
+_force_utf8_stdio()
 
 
 def rel(path: Path) -> str:

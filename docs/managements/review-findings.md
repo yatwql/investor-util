@@ -1,6 +1,6 @@
 # 投资复盘助手 - 自我审查问题记录
 > 文档版本：0.12.7-dev
-> **编号源**：`rf-next = 640`（新增问题取此编号，完成后更新为 +1；已用最大 rf-639，递增保证唯一，归档不回收。若与历史归档冲突，运行 `scripts/check-task-numbering.py` 校验）
+> **编号源**：`rf-next = 641`（新增问题取此编号，完成后更新为 +1；已用最大 rf-640，递增保证唯一，归档不回收。若与历史归档冲突，运行 `scripts/check-task-numbering.py` 校验）
 
 ---
 
@@ -46,6 +46,8 @@
 | **rf-78** | `fetcher/batch.py` | 520 | 维持现状（BatchDispatcher 本身内聚，复核确认不拆；2026-10-02 实测 520，回落至登记值附近（rf-522 重试退避原语收编后下降）） | BatchDispatcher 本身内聚，可维持现状（不拆） |
 
 ## 已解决问题
+
+- rf-640 已修复（2026-10-09，Windows 钩子回放乱码自查，当批修复）：pre-commit 十守护经 `run_bg` 把 stdout 重定向到日志文件，中文 Windows 上 Python 按 locale ANSI（cp936/GBK）落盘，`cat` 回放到 UTF-8 终端即成乱码（GBK `CE B4`=「未」被读作 `δ`；前台直打走控制台 `WriteConsoleW` 正常——与「前台正常、回放段落乱码」的分界完全吻合），纯显示问题、退出码与判定不受影响，但守护详情在 Windows 上不可读。修复三点：① 钩子 `set -e` 后 `export PYTHONUTF8=1`（UTF-8 模式统一按 UTF-8 写日志，Linux/CI 本就是 UTF-8、行为不变）；② `scripts/_checklib.py` 导入时 `_force_utf8_stdio()` 把**非 UTF-8 的真实 stdout/stderr**收敛到 UTF-8（`_force_utf8_stream`：已 UTF-8 不动、`StringIO` 等测试输出桩跳过），模块 docstring「无副作用原语」例外清单同步为两项；③ 回归 4 项：cp936 文本流收敛、已 UTF-8 零改写、非 TextIOWrapper 跳过、`_force_utf8_stdio` 对当前 stdio 生效
 
 - rf-639 已修复（2026-10-09，文档计数核对诊断发现，当批修复）：`check-doc-drift --with-test-count` 的计数核对只识别反引号标记行，`test-coverage.md` 功能域表的中文加粗标签行因不匹配以「未收录名」**静默跳过**，实测该表 4 行过期（报告生成 / LLM 智能分析 / 配置管理 / 核心基础设施）无人核对。修复五点：① 标签↔标记映射与 collect 功能域聚合**单一来源**（`_test_runner.modes.UNIT_DOMAIN_LABELS`，collect 侧同对象引用防双处定义漂移）；② 功能域章内（`## 功能域对应测试源`）出现**未登记标签**或映射集**缺行**一律报 finding，章外加粗行不属核对域（既有用例不受影响）；③ 表内「端到端业务场景」聚合行经显式别名映射 scenario 父标记；④ 功能域行标签与单源对齐（「CLI 命令行模式」→「CLI 命令行」），完整性反查按**标记覆盖度**判定、对标签措辞免疫；⑤ 同批刷新该表 11 行过期计数与 `folders` 测试用例总数。回归 7 项：映射匹配/不匹配、章内外边界、未登记报出、缺行反查（按映射集动态遍历不写死条数）、collect 同对象断言
 

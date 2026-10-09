@@ -9,6 +9,8 @@
 
 ## [0.12.7-dev] - 开发中（未发布）
 
+- **兼容/守护**：**Windows 钩子日志回放乱码修复**——pre-commit 十守护经 `run_bg` 重定向落盘，中文 Windows 上 Python 按 locale ANSI（cp936）编码，UTF-8 终端回放成乱码（前台直打正常、回放段落乱码的分界与 `WriteConsoleW` vs 文件落盘吻合）；修复 = 钩子 `export PYTHONUTF8=1` + `scripts/_checklib.py` 导入时把非 UTF-8 的真实 stdout/stderr 收敛到 UTF-8（已 UTF-8 / `StringIO` 桩零改写），守护详情在 Windows 可读；回归 4 项 | rf-640
+
 - **工程质量/守护**：**单文件行数红线体系三域定档（主程序/脚本/测试）**——`check-file-length` 检查域扩到 `scripts/` 递归全集（警戒 400 / 红线 1000，含包内子模块），主程序硬上限 800 → 1000（警告 500 维持），测试 800/1200 维持；阈值与警戒区收敛为 `_LIMIT_BY_KIND` / `_WARN_BY_KIND` / `_HINT_BY_KIND` 三域单源。域内最大单文件 `factor_zoo_eval.py`（1595 行）按「评测核心 / 阶段编排 / 判定书」拆为 `scripts/_factor_zoo/` 包（catalog/probe/metrics/stages/report 五模块 342/228/562/410/135 行，入口仅留 CLI 与原面 re-export，既有 40 项测试零改动），CLI 冒烟（`--help` + catalog 阶段落盘）通过；边界/三域收集/脚本警戒区新增 4 项用例。决策与理由记入 technical.md 约束 C28「大文件红线体系（主程序/脚本/测试）」，developer-guide 阈值表/门禁注记/脚本表、CLAUDE 守护描述与 review-findings P3 口径同步 | plan-113
 
 - **工程质量/缺陷**：**计数核对守卫功能域表静默跳过修复**——`--with-test-count` 只识别反引号标记行，`test-coverage.md` 功能域表的中文加粗标签行不匹配即被「未收录名」静默跳过，实测该表 4 行过期（报告生成 / LLM 智能分析 / 配置管理 / 核心基础设施）长期无人核对；修复：标签↔标记映射与 `collect-test-coverage` 功能域聚合**单一来源**（collect 侧同对象引用防双处漂移）、功能域章内**未登记标签**与映射集**缺行**一律报出（章外加粗行不属核对域）、「端到端业务场景」聚合行显式别名映射父标记、功能域行标签与单源对齐；同批刷新该表 11 行过期计数与测试用例总数；回归 7 项（缺行反查按映射集动态遍历、不写死条数） | rf-639
