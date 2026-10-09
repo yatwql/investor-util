@@ -27,7 +27,5 @@ class TestPenetrationSheetEdge:
         with caplog.at_level(logging.WARNING):
             ps.write_penetration_sheet(ws, [], [], penetration_data={})
 
-        text = "\n".join(
-            str(cell.value) for row in ws.iter_rows() for cell in row if cell.value is not None
-        )
+        text = "\n".join(str(cell.value) for row in ws.iter_rows() for cell in row if cell.value is not None)
         assert "暂无穿透数据" in text

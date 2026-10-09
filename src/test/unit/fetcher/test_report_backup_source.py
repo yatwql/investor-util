@@ -332,7 +332,7 @@ class TestOrchestrationTakeover:
 
     def test_fulltext_ladder_uses_source(self, monkeypatch):
         """全文兜底阶同样透传来源（巨潮候选不落主源命名空间）。"""
-        monkeypatch.setattr(fr, "_fetch_sections", lambda doc_id: None)
+        monkeypatch.setattr(fr, "_fetch_sections", lambda doc_id, source=None: None)
         seen: list = []
 
         def _fake_fetch(doc_id, section, source=None, meta=None):
@@ -408,3 +408,26 @@ class TestChainSlotCoverage:
         )
         assert DataSinkReportAdapter().extract_data({"doc_id": "1001", "source_hint": cninfo.SOURCE_ID}) is None
         assert called == []
+
+
+class TestAdapterRefusalReason:
+    """异源拒服务须写失败原因（回归：曾静默返回 None，链路只剩「返回空（返回空）」——
+    命名空间隔离被伪装成源返回空，长期无法定性的直接原因）。"""
+
+    def test_cninfo_refusal_writes_reason(self):
+        """巨潮适配器遇异源 hint → None 且 last_reason 记录拒服务原因。"""
+        from src.python.fetcher.report_adapters import CninfoReportAdapter
+        from src.python.providers._utils import clear_last_reason, take_last_reason
+
+        clear_last_reason()
+        assert CninfoReportAdapter().extract_data({"source_hint": "datasink", "doc_id": "9"}) is None
+        assert "异源候选拒服务" in take_last_reason("")
+
+    def test_datasink_refusal_writes_reason(self):
+        """主源适配器遇异源 hint → None 且 last_reason 记录拒服务原因。"""
+        from src.python.fetcher.report_adapters import DataSinkReportAdapter
+        from src.python.providers._utils import clear_last_reason, take_last_reason
+
+        clear_last_reason()
+        assert DataSinkReportAdapter().extract_data({"source_hint": "cninfo", "doc_id": "9"}) is None
+        assert "异源候选拒服务" in take_last_reason("")
