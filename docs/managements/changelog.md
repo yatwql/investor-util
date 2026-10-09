@@ -9,7 +9,7 @@
 
 ## [0.12.8-dev] - 开发中（未发布）
 
-- **样式/Web**：**Web 配置页 375px 横向滚动修复（rf-644，解除 rf-257 ④ 阻塞）**——`style.css` 三层钳制：路径文案 `overflow-wrap:anywhere` + `.generate-form > *` 行线宽按列封顶（flex 行线宽取 fit-content 不受列宽封顶是机制性根因）+ select/file input `min-width:0; max-width:100%`；真机 CDP 复验 375px 断言 35/0/2（修前 4.1/4.3 不过）、五页签×十二视口扫描 60/60、新旧 A/B scroll 404→375；新增 `test_web_responsive.py` 5 用例回归；另补标签页 favicon（`favicon.svg` + `link` 声明，消除 `/favicon.ico` 404）。
+- **样式/Web**：**Web 配置页 375px 横向滚动修复（rf-644，解除 rf-257 ④ 阻塞）**——`style.css` 三层钳制：路径文案 `overflow-wrap:anywhere` + `.generate-form > *` 行线宽按列封顶（flex 行线宽取 fit-content 不受列宽封顶是机制性根因）+ select/file input `min-width:0; max-width:100%`；真机 CDP 复验 375px 断言 35/0/2（修前 4.1/4.3 不过）、五页签×十二视口扫描 60/60、新旧 A/B scroll 404→375；新增 `test_web_responsive.py` 5 用例回归；另补标签页 favicon（Web 侧 `favicon.svg` + `link` 声明消除 `/favicon.ico` 404；报告与 What-if 模板内联 data URI 同款图标、单文件零外链，whatif 关态 golden 基线经复核更新）。
 - **修复/报告侧**：**调试页窄视口溢出与打印 display 还原修复（rf-645，rf-113 附带发现）**——`test-chart.html` grid 列下限改 `minmax(min(420px,100%),1fr)`；`chart-print.js` beforeprint 记录 canvas 原内联 display、afterprint 按记录还原（未记录回退 block、周期末清空），替代置空串导致的 computed display 漂移；`test_feature_interactive.py` 补 4 回归用例。
 - **文档/需求**：**事件窗量化对照需求登记补齐（rf-646）**——`requirements.md` §6.16 + `R-EW-01..06` 六条需求行（先读实现后如实登记），`testplan.md` §2.1 补 6 行载体映射，`check-requirement-trace` 纳入 R-EW 域（38/38 域全量双向一致，后续新增不再漏报）。
 - **文档/结构**：**设计语言契约 DESIGN.md 迁入管理文档目录**——自仓库根移至 `docs/managements/DESIGN.md`（设计约束类文档归属管理文档区）；路径性引用同步（`check-style-guardrails.py` 真值路径、4 处契约测试路径、CLAUDE.md 设计契约入口与管理文档清单、developer-guide 设计契约链接、folders.md 目录树与统计口径；样式/模板中的注释性提及按文件名寻址，无需改动）。
