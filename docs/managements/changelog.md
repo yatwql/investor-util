@@ -18,6 +18,7 @@
 - **修复/数据**：**东财 push2 请求节流与穿透写入空数据降级（rf-650）**——push2 每次请求前随机间隔 0.05~0.2s 防同速批量触发反爬断连；`write_penetration_sheet` 空数据分支改 `.get("top10")` 消除 KeyError 整表写入失败（降级占位空 dict 路径），edge 用例回归「暂无穿透数据」优雅降级。
 - **修复/数据**：**财报链路 source_hint 命名空间碰撞（rf-648，根因经真实探测确认）**——主源索引条目自带自由文本 `source="巨潮资讯网 (cninfo)"` 直传 `source_hint` 致两适配器双双静默拒服务（主源整条 7 天无命中，靠巨潮备源+缓存兜底；13 次 HTTP 探测两源全 200，排除网络/反爬/报告期）；修复：`_candidate_source` 来源归一（仅精确 cninfo 判备源，使用点归一兼容旧缓存）+ `_index_source_of` 精确匹配、sections/全文两阶段透传 source（备源候选不再打主源 sections，消除单次生成 10 次 404 与历史挂起）、异源拒服务写 `last_reason` + DEBUG（不再伪装成源返回空）；同批：chain 失败日志补 doc_id 定位标识（`_tag_key = code or doc_id`），定性修正（标的全为 A 股个股，原「基金噪音」判断错误）。回归用例 8 项（归一 6 + 拒服务原因 2）。
 - **修复/LLM**：**429 首试即熔断（零退避重试）+ kimi 端点节流调大**——429 属配额/风控终态，`_attempt_api_call` 归入 `quota` 不再进退避表，首试即 `force` 600s 熔断，撞限首波代价 10~35s→<1s（503/超时保留重试；失败原因归 `quota_exceeded`，全挂延迟重试不空转）；配套 kimi 双端点 `pacing.min_interval` 1s→5s（`llm_providers.json`，改前备份）降低 RPM 撞限频率。回归：429 单次请求/首试熔断/失败原因 3 处改写 + 底层 kind 断言。
+- **测试/门禁**：**crosscheck 真实仓库用例零写副作用（rf-651）**——`test_real_repo_sync_idempotent` 落点改为 tmp 副本承载真实 `folders.md` 内容：消除与并行一致性冒烟用例的 read/write 竞争（原先漂移时会把真实文件「顺手改好」，致双方偶发假红并掩盖漂移），真实实测与幂等断言语义不变。
 
 
 （本次发布内容见下方归档索引）

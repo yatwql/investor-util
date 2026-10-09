@@ -692,22 +692,26 @@ class TestProjectStatsSync:
         applied = drift_parts._tree.sync_project_stats(tmp_path / "nope.md", actual={}, test_count=1)
         assert applied == []
 
-    def test_real_repo_sync_idempotent(self, drift, drift_parts):
-        """真实仓库：同步是幂等的（当前一致 → 无应用项、文件零改动）。
+    def test_real_repo_sync_idempotent(self, drift, drift_parts, tmp_path):
+        """真实仓库内容：同步是幂等的（当前一致 → 无应用项、文件零改动）。
 
+        落点用 tmp 副本承载真实 folders.md 内容：真实 `_stats_actual()` 照常实测，
+        但**不回写真实仓库**——避免与并行 worker 的真实仓库读检查（一致性冒烟）
+        相互踩踏（并行 read/write 会让双方偶发假红），也避免失败时把真实文件
+        「顺手改好」而掩盖漂移。
         test_count 显式注入（从 folders.md 「测试用例」行读当前登记值），**不触发
         嵌套全量 pytest 收集**——测试运行在 xdist worker 内，嵌套收集会与并行套件
         争用资源而采到不完整集合（实测 7964 vs 完整 8173），使幂等断言假失败。
-        真实 `_stats_actual()` 仍照常实测，故同步逻辑的真实仓库幂等性照旧被覆盖。
         """
         from _doc_drift._tree import _FOLDERS_MD, sync_project_stats as _sync
 
         original = Path(_FOLDERS_MD).read_text(encoding="utf-8")
         documented = _documented_test_count(original)
         assert documented is not None, "folders.md 「测试用例」行缺少数量"
-        applied = _sync(test_count=documented)
-        after = Path(_FOLDERS_MD).read_text(encoding="utf-8")
-        assert applied == [] and after == original
+        scratch = tmp_path / "folders.md"
+        scratch.write_text(original, encoding="utf-8")
+        applied = _sync(scratch, test_count=documented)
+        assert applied == [] and scratch.read_text(encoding="utf-8") == original
 
 
 # ═══ 守护清单同源 ═══
