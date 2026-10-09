@@ -271,3 +271,11 @@
 **动作**：接入 `add_common_args` 与公共输出原语，退出码分级语义不变；同步 test_trace_check_scripts 对应断言
 
 **完成态（2026-10-09，`82d81f99`）**：手写 argparse 换 `_checklib.add_common_args`、本地 `rel` 改共享 `rel()`（别名 `rel_path`），0/1/2/3 分级退出码语义保留，`--help` 统一面由新增用例锁死（`add_common_args` 须为 `_checklib` 同一对象）；`check-script-contract` 四条规则**全部归零**；`_checklib` 契约 docstring 中该脚本分级描述与实现不符一并改正。同批完成该脚本的扫描域修复（扫描目录深度算错致守卫空转、规则定义载体与领域值豁免、展示层分层倒置实质修复），详见 review-findings 已解决段 rf-636。
+
+#### ✅ `plan-113` scripts 大文件治理评估（红线域扩或拆分） — 已完成（2026-10-09，`61b0214f`）
+
+**现状与问题**（2026-10-08 scripts 核查）：9 个脚本 ≥400 行，factor_zoo_eval 1595 / release 841 / check-test-redundancy 666 / check-doc-traces 592 / calibrate-dedup-threshold 520；`check-file-length` 800 红线域当前只含主程序与测试，scripts 不在域内（1595 行远超主程序红线但无守护）
+
+**动作**：评估三案：① check-file-length 域扩到 scripts（豁免清单重估）② 按 registry 拆分先例下沉子模块（如 factor_zoo_eval 拆评测核心/报告生成/CLI）③ 维持现状并登记豁免理由；产出决策记入 technical.md
+
+**完成态（2026-10-09，`61b0214f`）**：三案取①+②组合——`check-file-length` 检查域扩到 `scripts/` 递归全集（警戒 400 / 红线 1000，含包内子模块），主程序硬上限 800 → 1000（警告 500 维持），测试 800/1200 维持，阈值收敛 `_LIMIT_BY_KIND`/`_WARN_BY_KIND`/`_HINT_BY_KIND` 三域单源，`EXEMPTIONS` 保持空集；域内最大单文件 `factor_zoo_eval.py`（1595 行）按案②拆为 `scripts/_factor_zoo/` 包（catalog/probe/metrics/stages/report 五模块 342/228/562/410/135 行，入口仅留 CLI 与原面 re-export，既有 40 项测试零改动），边界/三域收集/脚本警戒区新增 4 项用例。决策与理由记入 technical.md 约束 C28「大文件红线体系（主程序/脚本/测试）」（含 2026-10-09 阈值定档记录），developer-guide 阈值表/门禁注记/脚本表、CLAUDE 守护描述与 review-findings P3 登记表（2026-10-09 实测刷新）同步。

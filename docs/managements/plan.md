@@ -8,7 +8,7 @@
 
 本文档记录项目的实现计划。已完成的历史版本计划已归档，此处仅跟踪当前迭代中的工作。
 
-**当前迭代**：在办 20 项按「价值 / 收益 / 风险」分三档（2026-10-07 重排，档位定义见「当前迭代待办」）——P1 5 项（**plan-71** 转正判据先行 + 风险/核心价值改进 **plan-99/85/91/95**）、P2 10 项（**plan-49/55/83** 等待条件型 + 改进批 **plan-88/89/90/92/93/100/101**）、P3 5 项（**plan-70** 死线观察，已有落地设计 `decision-reflection-shadow-design.md`；择机 **plan-87/94/102** 与 scripts 核查批 **plan-113**）；scripts 核查批 **plan-110/111/112/114** 四项**已完成并归档**（2026-10-08 立项当批实施，plan-113 评估项待办）；**plan-85 ~ plan-102** 为 2026-10-07 自审改进盘点迁入批（18 项）；**plan-103 ~ plan-109** Web 展示借鉴批 7 项**已全部完成并归档**（awesome-design-md 研究：2026-10-07 首批 6 项 + 2026-10-08 HTML 报告专项补研追加 plan-109，立项映射见 [`awesome-design-md-borrow-candidates-research.md`](../plan/awesome-design-md-borrow-candidates-research.md)）；历史批次（**plan-59 ~ plan-84**，含 Vibe-Trading / gs-quant / 工程效能 / TradingAgents-CN 借鉴批）已全部收口，完成态与未采纳记录随档见 [`archived_plan.0.11.x.md`](../archive/v0.11.x/archived_plan.0.11.x.md) 与 [`archived_plan.0.12.x.md`](../archive/v0.12.x/archived_plan.0.12.x.md)，借鉴批研究文档随档在 `docs/archive/v0.12.x/`（plan-66 ~ plan-68 候选现状见「P3」）。
+**当前迭代**：在办 19 项按「价值 / 收益 / 风险」分三档（2026-10-07 重排，档位定义见「当前迭代待办」）——P1 5 项（**plan-71** 转正判据先行 + 风险/核心价值改进 **plan-99/85/91/95**）、P2 10 项（**plan-49/55/83** 等待条件型 + 改进批 **plan-88/89/90/92/93/100/101**）、P3 4 项（**plan-70** 死线观察，已有落地设计 `decision-reflection-shadow-design.md`；择机 **plan-87/94/102**）；scripts 核查批 **plan-110/111/112/113/114** 五项**已完成并归档**（2026-10-08 立项当批实施）；**plan-85 ~ plan-102** 为 2026-10-07 自审改进盘点迁入批（18 项）；**plan-103 ~ plan-109** Web 展示借鉴批 7 项**已全部完成并归档**（awesome-design-md 研究：2026-10-07 首批 6 项 + 2026-10-08 HTML 报告专项补研追加 plan-109，立项映射见 [`awesome-design-md-borrow-candidates-research.md`](../plan/awesome-design-md-borrow-candidates-research.md)）；历史批次（**plan-59 ~ plan-84**，含 Vibe-Trading / gs-quant / 工程效能 / TradingAgents-CN 借鉴批）已全部收口，完成态与未采纳记录随档见 [`archived_plan.0.11.x.md`](../archive/v0.11.x/archived_plan.0.11.x.md) 与 [`archived_plan.0.12.x.md`](../archive/v0.12.x/archived_plan.0.12.x.md)，借鉴批研究文档随档在 `docs/archive/v0.12.x/`（plan-66 ~ plan-68 候选现状见「P3」）。
 
 > **命名纪律（强制）**：重构/新增的变量名、函数名、注释与文档表述必须与新章节语义相关（如 `position_relationship`/`portfolio_history_drawdown`/`style_factor`/`action`），**绝对禁止用任务编号命名**（F 系列、plan-N、rf-N 等）。任务编号仅在本表作链接锚点，不进入实现层。
 
@@ -170,12 +170,6 @@
 **现状与问题**（2026-10-07 自审迁入）：归档 `better-investment-advice` §4.2 放弃「反问引导/对话式」的理由是「单向报告无法承载交互」，并明注「**若未来增加交互式报告或对话式 TUI 可重新考虑**」——现 Web 交互渠道已落地，该条件已成立；读者看完报告想追问（「为什么说集中度偏高？」）目前只能重跑 LLM 模块
 
 **动作**：按新 plan 立项评估（不直接实现）：Web 报告页「就本期报告追问」输入框，会话内多轮，上下文 = 报告关键数据 + 首问摘要，复用既有 provider 链/预算/降级/事实校验；成本与缓存策略先行设计，TUI 侧后置。**明确不做**：仓位硬建议、全市场筛选仍守归档边界
-
-#### 🔲 `plan-113` scripts 大文件治理评估（红线域扩或拆分）
-
-**现状与问题**（2026-10-08 scripts 核查）：9 个脚本 ≥400 行，factor_zoo_eval 1595 / release 841 / check-test-redundancy 666 / check-doc-traces 592 / calibrate-dedup-threshold 520；`check-file-length` 800 红线域当前只含主程序与测试，scripts 不在域内（1595 行远超主程序红线但无守护）
-
-**动作**：评估三案：① check-file-length 域扩到 scripts（豁免清单重估）② 按 registry 拆分先例下沉子模块（如 factor_zoo_eval 拆评测核心/报告生成/CLI）③ 维持现状并登记豁免理由；产出决策记入 technical.md
 
 ## 归档
 
