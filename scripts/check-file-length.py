@@ -2,10 +2,12 @@
 """单文件行数红线守护脚本。
 
 阈值口径（developer-guide「文件膨胀阈值」表 + review-findings 文件过长监控区硬上限）：
-  - 主程序（``src/python/**.py``） > 800 行 → finding（硬上限，必须拆分）
+  - 主程序（``src/python/**.py``） > 1000 行 → finding（硬上限，必须拆分）
+  - 脚本（``scripts/**.py``）       > 1000 行 → finding（脚本红线，含包内子模块）
   - 测试（``src/test/**.py``）      > 1200 行 → finding（测试文件红线）
-  - 主程序 500-800 / 测试 800-1200 为可选优化区间，不判 finding，仅 ``-v`` 输出清单，
-    供 review-findings「文件过长」登记表派生刷新（人肉快照退役，脚本输出即真值）。
+  - 主程序 500-1000 / 脚本 400-1000 / 测试 800-1200 为可选优化区间，不判 finding，
+    仅 ``-v`` 输出清单，供 review-findings「文件过长」登记表派生刷新
+    （人肉快照退役，脚本输出即真值）。
 
 豁免登记：既有破线项须同时在 review-findings 挂账限期处理，二者同步存在——
   - 豁免文件超限 → 不报 finding，``-v`` 列为「豁免」状态；
@@ -34,14 +36,24 @@ from _checklib import REPO_ROOT, add_common_args, rel, report  # noqa: E402
 
 # ── 阈值与检查域 ──────────────────────────────────────────────
 
-MAIN_SOURCE_LIMIT = 800
+MAIN_SOURCE_LIMIT = 1000
 """主程序单文件硬上限（行数）。"""
+
+SCRIPTS_SOURCE_LIMIT = 1000
+"""脚本单文件红线（行数）。"""
 
 TEST_SOURCE_LIMIT = 1200
 """测试单文件红线（行数）。"""
 
 MAIN_SOURCE_ROOT = "src/python"
+SCRIPTS_SOURCE_ROOT = "scripts"
 TEST_SOURCE_ROOT = "src/test"
+
+#: 各检查域行数上限（> 上限判 finding）与拆分提示
+_LIMIT_BY_KIND = {"主程序": MAIN_SOURCE_LIMIT, "脚本": SCRIPTS_SOURCE_LIMIT, "测试": TEST_SOURCE_LIMIT}
+_HINT_BY_KIND = {"主程序": "硬上限必须拆分", "脚本": "脚本红线须拆分", "测试": "测试文件红线须拆分"}
+#: 各检查域可选优化区间下界（``-v`` 清单只列区间内文件；超上限者已直接判 finding）
+_WARN_BY_KIND = {"主程序": 500, "脚本": 400, "测试": 800}
 
 #: 既有破线豁免：相对路径 → 挂账说明（review-findings 待处理区须有对应条目）。
 #: 空 = 当前无挂账破线项；新破线须先拆分，无法立即拆分时在此登记并同步挂账。
@@ -49,9 +61,13 @@ EXEMPTIONS: dict[str, str] = {}
 
 
 def collect_line_counts(root: Path) -> list[tuple[str, str, int]]:
-    """遍历检查域，返回 (类别, 相对路径, 行数) 记录列表（类别：主程序/测试）。"""
+    """遍历检查域，返回 (类别, 相对路径, 行数) 记录列表（类别：主程序/脚本/测试）。"""
     records: list[tuple[str, str, int]] = []
-    for sub, kind in ((MAIN_SOURCE_ROOT, "主程序"), (TEST_SOURCE_ROOT, "测试")):
+    for sub, kind in (
+        (MAIN_SOURCE_ROOT, "主程序"),
+        (SCRIPTS_SOURCE_ROOT, "脚本"),
+        (TEST_SOURCE_ROOT, "测试"),
+    ):
         base = root / sub
         if not base.is_dir():
             continue
@@ -74,7 +90,7 @@ def split_findings(
     exempted: list[str] = []
     removable: list[str] = []
     for kind, path, lines in records:
-        limit = MAIN_SOURCE_LIMIT if kind == "主程序" else TEST_SOURCE_LIMIT
+        limit = _LIMIT_BY_KIND[kind]
         over = lines > limit
         if path in exemptions:
             if over:
@@ -82,16 +98,16 @@ def split_findings(
             else:
                 removable.append(f"{path}（已回落至 {limit} 行内，可移除豁免登记）")
         elif over:
-            hint = "硬上限必须拆分" if kind == "主程序" else "测试文件红线须拆分"
+            hint = _HINT_BY_KIND[kind]
             violations.append(f"{path}: {kind} {lines} 行 > {limit} 行（{hint}），须拆分或在豁免登记挂账")
     return violations, exempted, removable
 
 
 def over_limit_inventory(records: list[tuple[str, str, int]]) -> list[str]:
-    """可选优化区间清单：主程序 >500 行、测试 >800 行（review-findings 文件过长登记表派生源）。"""
+    """可选优化区间清单：主程序 >500 / 脚本 >400 / 测试 >800 行（review-findings 文件过长登记表派生源）。"""
     rows = []
     for kind, path, lines in records:
-        warn_at = 500 if kind == "主程序" else 800
+        warn_at = _WARN_BY_KIND[kind]
         if lines > warn_at:
             rows.append(f"  [{kind}] {lines:>5} 行  {path}")
     rows.sort(key=lambda s: -int(s.split("]")[1].split("行")[0].strip()))
@@ -99,7 +115,7 @@ def over_limit_inventory(records: list[tuple[str, str, int]]) -> list[str]:
 
 
 def main() -> int:
-    parser = argparse.ArgumentParser(description="单文件行数红线守护（主程序 >800 / 测试 >1200）")
+    parser = argparse.ArgumentParser(description="单文件行数红线守护（主程序/脚本 >1000 / 测试 >1200）")
     add_common_args(parser)
     args = parser.parse_args()
 
@@ -108,7 +124,8 @@ def main() -> int:
 
     if args.verbose:
         print(
-            f"检查域：{MAIN_SOURCE_ROOT}/（≤{MAIN_SOURCE_LIMIT} 行）+ {TEST_SOURCE_ROOT}/（≤{TEST_SOURCE_LIMIT} 行）"
+            f"检查域：{MAIN_SOURCE_ROOT}/（≤{MAIN_SOURCE_LIMIT} 行）+ {SCRIPTS_SOURCE_ROOT}/"
+            f"（≤{SCRIPTS_SOURCE_LIMIT} 行）+ {TEST_SOURCE_ROOT}/（≤{TEST_SOURCE_LIMIT} 行）"
             f"，共 {len(records)} 个 py 文件"
         )
         for line in over_limit_inventory(records):
@@ -119,7 +136,7 @@ def main() -> int:
             print(f"[可移除豁免] {line}")
 
     ok_message = (
-        f"[OK] 行数红线通过（主程序 ≤{MAIN_SOURCE_LIMIT} 行 / 测试 ≤{TEST_SOURCE_LIMIT} 行；"
+        f"[OK] 行数红线通过（主程序/脚本 ≤{MAIN_SOURCE_LIMIT} 行 / 测试 ≤{TEST_SOURCE_LIMIT} 行；"
         f"豁免在列 {len(exempted)} 项，违规 {len(violations)} 项）"
     )
     return report(

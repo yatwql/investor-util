@@ -109,7 +109,7 @@ ln -sf "$PWD/.pi/models.json" ~/.pi/agent/models.json
 .venv/bin/python scripts/check-requirement-trace.py --ci   # 需求 ID ↔ 验证载体追溯（已补全域全覆盖 + 载体文件存在）
 .venv/bin/python scripts/check-version-consistency.py --ci   # 版本号全局一致性（APP_VERSION ↔ README/pyproject/管理文档 10 份）
 .venv/bin/python scripts/check-doc-links.py --ci              # 文档死链/死锚点/重复标题/层级/编号序列/§引用机检
-.venv/bin/python scripts/check-file-length.py --ci         # 单文件行数红线（主程序 >800 行 / 测试 >1200 行）
+.venv/bin/python scripts/check-file-length.py --ci         # 单文件行数红线（主程序/脚本 >1000 行 / 测试 >1200 行）
 ```
 
 > **`--sync` 统计快照口径（CI 分叉坑）**：`check-doc-drift --sync`（及 pre-commit 自动回写）按**工作区**实测写入 `folders.md` 行数，而 CI 的 `check-doc-drift` 按 **committed** 树实测——若受检目录存在**长期不提交的修改**（本地游离改动），本地已同步的数字会在 CI 上判「不一致」，连带 guards / test / portability 三个 job 同时红。提交前确认受检文件全部纳入本次提交；有长期游离修改时先提交它们、再 `--sync`。
@@ -840,12 +840,14 @@ mod = load_script("_test_runner/modes.py", module_name="modes_under_test")   # �
 
 | 指标 | 警告线 | 红线 | 措施 |
 |:-----|:------:|:----:|:-----|
+| 主程序单文件行数（`src/python/`） | > 500 行 | > 1000 行 | 按职责域下沉拆分（域下沉 + 门面 re-export，消费方导入面不变） |
+| 脚本单文件行数（`scripts/` 递归含包内子模块） | > 400 行 | > 1000 行 | 按职责拆包（评测核心 / 阶段编排 / CLI 等），入口仅留 CLI 与原面 re-export |
+| 测试单文件行数（`src/test/`） | > 800 行 | > 1200 行 | 考虑按被测函数 / 场景类型拆分 |
 | 单文件测试数 | > 80 项 | > 120 项 | 拆分到子文件 `test_xxx_part1.py` / `test_xxx_part2.py` |
-| 单文件行数 | > 800 行 | > 1200 行 | 考虑按被测函数 / 场景类型拆分 |
 | 单类方法数 | > 15 项 | > 25 项 | 拆为多个 Test 类或拆分文件 |
 | 单方法 mock 数 | > 5 个 patch | > 8 个 patch | 重构被测函数以降低耦合 |
 
-> **门禁**：红线列由 `scripts/check-file-length.py --ci` 强制——**主程序 >800 行**（硬上限，review-findings 文件过长登记区）与**测试 >1200 行**即 finding 退出 2；豁免路径须与 review-findings 挂账同步（拆分后自动提示移除豁免）。`-v` 另输出可选优化区间清单（主程序 >500 / 测试 >800），review-findings「文件过长」登记表以该清单为派生源。
+> **门禁**：红线列由 `scripts/check-file-length.py --ci` 强制——**主程序 >1000 行**（硬上限，review-findings 文件过长登记区）、**脚本 >1000 行**与**测试 >1200 行**即 finding 退出 2；豁免路径须与 review-findings 挂账同步（拆分后自动提示移除豁免）。`-v` 另输出可选优化区间清单（主程序 >500 / 脚本 >400 / 测试 >800），review-findings「文件过长」登记表以该清单为派生源。
 
 ### 常见问题
 
@@ -886,7 +888,7 @@ A: 运行 `.venv/bin/python scripts/check-test-markers.py`，脚本会静态扫�
 | `check-semantic-index.py` | 测试 | 功能语义命名表正反向一致性校验（功能开关注册表表外键 / 僵尸条目 / 合并章 key 缺失） |
 | `check-doc-drift.py` | 测试 | 文档与实现一致性校验（章节表/章节数量、开关表/分组计数/默认值断言、配置与 LLM 默认值表、TUI 面板编号、目录树、项目统计表；`--sync` 自动回写统计快照） |
 | `check-doc-links.py` | 测试 | 文档链接与结构一致性校验（死链/死锚点/重复标题/层级/编号序列/§引用） |
-| `check-file-length.py` | 测试 | 单文件行数红线守护（主程序 >800 行 / 测试 >1200 行；豁免登记与 review-findings 挂账同步，`-v` 输出可选优化区间清单供登记表派生） |
+| `check-file-length.py` | 测试 | 单文件行数红线守护（主程序/脚本 >1000 行 / 测试 >1200 行；豁免登记与 review-findings 挂账同步，`-v` 输出可选优化区间清单供登记表派生） |
 | `check-test-redundancy.py` | 测试 | 测试用例冗余与无效检查（死用例 / 无断言 / 完全重复 / 自证用例 / 硬编码演进总数） |
 | `check-requirement-trace.py` | 测试 | 需求 ID ↔ 验证载体追溯（单段 ID 全域覆盖 / 载体文件存在 / ID 双向一致） |
 | `install-claude-hook.py` | 测试 | 安装/卸载 Claude Code PostToolUse hook（任务编号一致性自动校验） |

@@ -491,7 +491,7 @@ while True:
 
 ### 1.7 CLI 渠道详细设计
 
-CLI 渠道是**命令行参数**形态，面向脚本化与自动化场景：定时任务（cron/计划任务）、批量生成、what-if 调仓、数据源健康检查。`cli/cli.py` 为 argparse 主入口，单次执行后退出，退出码供外部脚本判定成败。**模块职责拆分**（守住单文件 800 行红线）：`cli/_parser.py` 承载解析器构建与 type 回调，`cli/_handlers.py` 承载子命令处理器、持仓读入辅助与 `_EXIT_*` 退出码契约，`cli/cli.py` 为门面——保留 `main()`/`run_cli()` 主流程与命令行功能开关应用，并 re-export 上述符号（`__all__` 显式声明），保证 `src.python.cli` 包导入与测试 patch 点（`cli.cli._handle_*`）稳定。与 TUI 差异在**无交互**——持仓通过 config 定位而非文件选择器，进度默认写日志（`--verbose` 才输出到 stderr）。
+CLI 渠道是**命令行参数**形态，面向脚本化与自动化场景：定时任务（cron/计划任务）、批量生成、what-if 调仓、数据源健康检查。`cli/cli.py` 为 argparse 主入口，单次执行后退出，退出码供外部脚本判定成败。**模块职责拆分**（守住单文件 1000 行红线）：`cli/_parser.py` 承载解析器构建与 type 回调，`cli/_handlers.py` 承载子命令处理器、持仓读入辅助与 `_EXIT_*` 退出码契约，`cli/cli.py` 为门面——保留 `main()`/`run_cli()` 主流程与命令行功能开关应用，并 re-export 上述符号（`__all__` 显式声明），保证 `src.python.cli` 包导入与测试 patch 点（`cli.cli._handle_*`）稳定。与 TUI 差异在**无交互**——持仓通过 config 定位而非文件选择器，进度默认写日志（`--verbose` 才输出到 stderr）。
 
 #### 1.7.1 退出码约定
 
@@ -3600,9 +3600,9 @@ web/ (Web 服务层，薄入口)
 本节定义系统架构层面的**设计约束**。所有新增或修改的代码必须遵守，违反即视为架构违规。
 约束按职责域分组，每个约束包含：设计目的（为何存在）、违反后果（不遵守的影响）、适用范围（哪些模块/场景受约束）。
 
-> **约束外参照（语义命名纪律）**：除上表 C1~C27 编号约束外，**语义命名纪律**以 [「功能语义命名表」](#67-功能语义命名表) 为唯一现状基准——代码/配置标识符（函数/变量/模块/config 键）必须与表中语义 slug 一致，禁止用任务代号（`plan-N`/`rf-N`/系列代号）命名；新增功能先定语义名再设计。该纪律属全局代码卫生，与编号约束并列遵守，由双脚本强制：`scripts/check-code-traces.py --ci`（负面禁止 IDENT/CODE）+ `scripts/check-semantic-index.py --ci`（正面双向校验本表与代码一致）。
+> **约束外参照（语义命名纪律）**：除上表 C1~C28 编号约束外，**语义命名纪律**以 [「功能语义命名表」](#67-功能语义命名表) 为唯一现状基准——代码/配置标识符（函数/变量/模块/config 键）必须与表中语义 slug 一致，禁止用任务代号（`plan-N`/`rf-N`/系列代号）命名；新增功能先定语义名再设计。该纪律属全局代码卫生，与编号约束并列遵守，由双脚本强制：`scripts/check-code-traces.py --ci`（负面禁止 IDENT/CODE）+ `scripts/check-semantic-index.py --ci`（正面双向校验本表与代码一致）。
 
-> **约束外参照（文档与实现一致性纪律）**：除上表 C1~C27 编号约束外，**文档中的事实断言**（章节表与数量、功能开关表与分组计数、默认值表、TUI 面板编号、目录树、项目统计表）必须与代码/配置文件/文件系统一致，由 `scripts/check-doc-drift.py --ci` 强制（十项逐条对账，`changelog.md`/`review-findings.md` 与版本快照类文档按设计豁免）；历史痕迹类约束另由 `scripts/check-doc-traces.py --ci` 强制。
+> **约束外参照（文档与实现一致性纪律）**：除上表 C1~C28 编号约束外，**文档中的事实断言**（章节表与数量、功能开关表与分组计数、默认值表、TUI 面板编号、目录树、项目统计表）必须与代码/配置文件/文件系统一致，由 `scripts/check-doc-drift.py --ci` 强制（十项逐条对账，`changelog.md`/`review-findings.md` 与版本快照类文档按设计豁免）；历史痕迹类约束另由 `scripts/check-doc-traces.py --ci` 强制。
 
 > **约束外参照（脚本 CLI 契约）**：`scripts/` 下的检查脚本统一 `-v/--verbose` + `--ci`（仅输出 `文件:描述`）与退出码语义（0=通过 / 2=发现 finding，`check-code-traces.py` 保留 HIGH=1、LOW=3 分级）；共享设施集中在 `scripts/_checklib.py`（CLI/输出/路径/文档区间解析）；历史痕迹检查内部实现拆在 `scripts/_traces_code/` 包内（共享排除模式在 `exemptions.py`，`_traces_common.py` 已并入其中删除）；检查脚本内部实现普遍拆 `前置横线包`pattern（`_doc_drift/` / `_traces_code/` / `_test_runner/` / `_halluc_sampler/`，入口仅留 CLI 与原面 re-export）；连通性探测统一入口 `scripts/probe.py`（target registry，实现在 `scripts/probes/`，新探针登记即用）；发布编排分步 CLI `scripts/release.py`（check/prepare/refresh/evolution/gate/publish/devbump，每步独立可审阅、失败即停，内部实现同为入口薄 CLI + 单模块）。
 
@@ -3658,6 +3658,9 @@ web/ (Web 服务层，薄入口)
 | **C16** | **路径绝对化** — 配置层输出的路径型键（`holdings_dir`、`output_dir`、`llm_key_file`、`llm_providers_file`、`llm_settings_file`）必须为绝对路径，在 `get_config()` 返回前经 `_absolutize_paths()` 统一转换；下游消费者不得依赖 CWD | `tui/tui.py`/`cli/cli.py` 去掉了 `os.chdir`，相对路径无法被正确解析 | 路径查找失败、配置文件/持仓文件/报告输出找不到 | `config/_core.py`（转换点），所有消费路径型配置的模块 |
 | **C26** | **重试与退避唯一原语** — 凡「失败后重试」必须经 `core/retry.py`（`RetryPolicy` 策略 / `is_transient_exception` 瞬时判据 / `retry_transient` 执行器），禁止各模块自建重试循环与退避算式；各来源差异只用策略参数表达 | 退避数值与「可重试」口径各写一处必然漂移：最坏时延无法估算、策略调整需改 N 处、测试钉住的次数与等待量随之失真 | 全部「失败后重试」路径：数据获取层（Provider Chain 同源重试、provider 连接级重试、akshare 超时重试、HTTP 429 退避）+ LLM 调用链（`llm/api_base.py` 的 429/503/超时/网络重试，退避用显式序列策略表达；其**失败分类**（内容级/配额级判定）与终态副作用仍属 LLM 层职责，见 §5.4） |
 | **C27** | **间隔节流唯一原语** — 凡「两次请求至少间隔多久」必须经 `core/throttle.py`（`RateLimiter` + `interval_delay`），禁止自建「间隔 + 睡眠」与抖动算式 | 同一约束在数据层/调度层/LLM 层各写一份 → 抖动幅度与等待语义不一致；通用原语若住在某一上层模块，会被其他层反向依赖（层次倒置） | 数据源 qps 限速、`batch_rate_limit`、LLM 端点级节流（`pacing`） |
+| **C28** | **大文件红线体系（主程序/脚本/测试）** — 单文件行数按域执行固定红线：主程序（`src/python/`）> 1000 行、脚本（`scripts/` 递归含包内子模块）> 1000 行、测试（`src/test/`）> 1200 行即 finding；警戒区（`-v` 清单：主程序 500 / 脚本 400 / 测试 800）为可选优化区间；超限必须拆分，或在 `check-file-length` 的 `EXEMPTIONS` 登记并与 review-findings 挂账同步 | 行数无红线时文件无限膨胀（`scripts/` 未入守护域时 `factor_zoo_eval.py` 达 1595 行而无发现渠道）；阈值只写在文档不进守护脚本会改一处漏一处；无警戒区则只能在破线后才察觉，拆分时机失去观察缓冲 | 所有 py 源文件：`src/python/`、`scripts/`（含包内子模块）、`src/test/`；阈值与清单由 `scripts/check-file-length.py --ci` 单源强制（`_LIMIT_BY_KIND` / `_WARN_BY_KIND`），口径同步 developer-guide「文件膨胀阈值」表与 review-findings 文件过长登记表 |
+
+> **C28 阈值定档记录（2026-10-09）**：三域阈值一次定档——主程序 800 → 1000（实测 343 文件中位 226 / P90 535 / 最大 783，阈值须给内聚大文件留出拆分触发缓冲；警告线 500 维持观察密度）、`scripts/` 纳入守护（实测 P90 520，警戒 400 / 红线 1000，与主程序同值统一口径）、测试 800/1200 维持。同批把域内最大单文件 `factor_zoo_eval.py`（1595 行）按「评测核心 / 阶段编排 / 判定书」拆为 `scripts/_factor_zoo/` 包（入口仅留 CLI 与原面 re-export，既有测试零改动）；`EXEMPTIONS` 保持空集（拆分后无挂账破线）。
 
 ### 8.6 测试约束
 
