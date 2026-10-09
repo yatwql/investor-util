@@ -212,6 +212,14 @@ body {
   flex-wrap: wrap;
 }
 
+/* 窄屏列布局下，flex 行线宽取子项假定宽（fit-content），不受容器列宽封顶：
+   单个长文案/固有宽控件会把整行撑出视口。子项 min-width:0 解除内容下限、
+   max-width:100% 按容器列宽封顶，行线宽即不再超视口（窄屏横向滚动根因） */
+.generate-form > * {
+  min-width: 0;
+  max-width: 100%;
+}
+
 .field-row {
   display: flex;
   flex-direction: column;
@@ -281,6 +289,13 @@ body {
   accent-color: var(--primary);
 }
 
+/* 文案含持仓绝对路径（无空格/标点断词机会）：anywhere 让任意字符处可断，
+   同时压低 min-content（overflow-wrap:break-word 不参与 min-content 计算，无效） */
+.radio-label span {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
 #formal-options {
   padding: 12px 14px;
   border: 1px dashed var(--border);
@@ -308,6 +323,9 @@ select {
   border-radius: 6px;
   background: var(--surface);
   color: var(--text);
+  /* 选项文案固有宽可超窄屏列宽：min-width:0 解除内容下限、max-width:100% 封顶 */
+  min-width: 0;
+  max-width: 100%;
 }
 
 select:focus,
@@ -1019,6 +1037,9 @@ input[type='text']:focus {
   border-radius: 6px;
   background: var(--surface);
   color: var(--text);
+  /* 原生 file 输入内在宽约 347px，大于窄屏可用列宽：收缩钳制 */
+  min-width: 0;
+  max-width: 100%;
 }
 
 .file-input-plain:focus-visible {

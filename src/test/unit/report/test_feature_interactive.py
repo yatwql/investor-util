@@ -32,6 +32,9 @@ pytestmark = [pytest.mark.unit, pytest.mark.unit_report]
 _DEBUG_PAGE_PATH = os.path.normpath(
     os.path.join(os.path.dirname(__file__), "..", "..", "..", "static", "test-chart.html"),
 )
+_CHART_PRINT_PATH = os.path.normpath(
+    os.path.join(os.path.dirname(__file__), "..", "..", "..", "static", "chart-print.js"),
+)
 
 
 def _history_ok() -> dict:
@@ -239,3 +242,45 @@ class TestDebugPageAssets:
             content = f.read()
         assert "scripts.shift();" in content, "离线场景应通过 shift() 仅移除第一个引擎文件"
         assert "if (scenario === 'offline') { scripts.shift(); }" in content, "离线场景应在注入前移除 chart.min.js"
+
+    def test_grid_column_min_shrinks_with_container(self) -> None:
+        """调试页 grid 列下限随容器收缩（回归防护：窄视口自身溢出）。
+
+        调试页 .grid 的列下限若为裸 minmax(420px, 1fr)，在窄视口下加 body
+        边距会撑破页面自身横向溢出；列下限须为 min(420px, 100%)，窄视口
+        下随容器收缩。
+        """
+        with open(_DEBUG_PAGE_PATH, encoding="utf-8") as f:
+            content = f.read()
+        assert "minmax(min(420px, 100%), 1fr)" in content, "列下限须随容器宽收缩（min(420px,100%)）"
+        assert "minmax(420px, 1fr)" not in content, "裸 420px 列下限在窄视口必溢出（回归）"
+
+
+class TestChartPrintDisplayRestore:
+    """打印前后 canvas 内联 display 记录-还原闭环（回归防护）。"""
+
+    @staticmethod
+    def _src() -> str:
+        with open(_CHART_PRINT_PATH, encoding="utf-8") as f:
+            return f.read()
+
+    def test_beforeprint_remembers_inline_display(self) -> None:
+        """beforeprint 快照时记录各 canvas 原内联 display，重复打印不覆盖首个值。"""
+        src = self._src()
+        assert "rememberDisplay" in src, "应有记录原内联 display 的函数"
+        assert "canvas.style.display" in src.split("rememberDisplay", 1)[1], "记录源须为 canvas.style.display"
+        assert "if (savedDisplays[i].canvas === canvas) return;" in src, "同一 canvas 只记首个值，避免二次快照覆盖原值"
+
+    def test_afterprint_restores_recorded_display_not_empty(self) -> None:
+        """afterprint 按记录还原 display，禁止置空串（置空使 computed display 漂移）。"""
+        src = self._src()
+        assert "canvas.style.display = savedDisplayOf(canvas);" in src, "恢复须按记录还原原值"
+        assert "canvas.style.display = '';" not in src, (
+            "置空串会使 computed display 漂移（Chart.js 初始化写 block，置空后变 inline）"
+        )
+
+    def test_unrecorded_falls_back_to_block_and_state_clears(self) -> None:
+        """未记录的 canvas 回退 block；一次打印周期结束后清空记录。"""
+        src = self._src()
+        assert "return 'block';" in src, "未记录回退 block（与 Chart.js 初始化内联值一致）"
+        assert re.search(r"savedDisplays\s*=\s*\[\];", src), "打印周期结束应清空记录，避免跨周期残留"

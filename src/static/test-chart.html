@@ -27,7 +27,8 @@
   #banner.ok { background: #e8f5e9; border-color: #2E7D32; color: #1b5e20; }
   #banner.warn { background: #fff8e1; border-color: #E68A00; color: #7a5c00; }
   #banner.err { background: #ffebee; border-color: #CC0000; color: #8b0000; }
-  .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(420px, 1fr)); gap: 14px; }
+  /* min(420px, 100%)：窄视口（如 375px）列宽可收缩到容器宽，图卡最小宽不撑破页面 */
+  .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(420px, 100%), 1fr)); gap: 14px; }
   .chart-box { background: #fff; border: 1px solid #ddd; border-radius: 6px; padding: 10px; position: relative; }
   .chart-title { font-size: 13px; font-weight: bold; margin-bottom: 8px; display: flex; justify-content: space-between; align-items: center; }
   .chart-holder { height: 300px; position: relative; }

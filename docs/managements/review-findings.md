@@ -25,9 +25,7 @@
 |---|------|----------|
 
 | **rf-114** | TD3/TD-L1：双渲染路径共存——模板保留 Canvas `drawSimpleChart()`（265 行内联 JS）+ Chart.js 渲染器，Flag OFF 时旧路径仍活 | plan-1 稳定 2 版本后（v0.10.0，阶段 2→3 切换，判定标准见 upgrade.md §4.15）删除 `drawSimpleChart()` + Canvas 回退分支 + Feature Flag 条件分支，Chart.js 成唯一渲染器。**2026-08-05 决策：先完成 rf-113 人工验证（确认 Chart.js 真机渲染可靠）后再执行删除** |
-| **rf-644** | Web 配置页 375px 横向滚动（rf-257 ④ 不过的根因，2026-10-09 headless 实测）：「正式更新」radio 文案内绝对持仓路径无断词机会（`min-content=369px`，`overflow-wrap:break-word` 无效）把生成页签整列表单撑到 404px——`select#report-type` 超视口 29px（清单 4.1/4.3 不过）；whatif 页签原生 `input[type=file]` 内在宽 347px>293px 同溢出（与路径无关，任何机器都复现）；溢出随安装路径长度变化（路径短的机器可能暂不复现，结构性风险仍在）；另 favicon.ico 缺省 404（是否补待定） | 路径文案加 `overflow-wrap:anywhere`（实测 min-content 369→16~32px）+ select/file input 收缩约束（select 是被上层撑宽、须断在文案处）；调仓模拟页签同类文案一并处理；修后按 `docs/plan/web-browser-verification.md` §5 复验 4.1/4.3 —— 阻塞 rf-257 ④ 复验 |
-| **rf-645** | 报告侧两处轻微项（rf-113 自动化实测附带发现，2026-10-09）：① `src/static/test-chart.html` 调试页 375px 自身溢出 61px（`.grid` 的 `minmax(420px,1fr)` + body 16px 边距 = 436px；**报告产物 375px 实测无溢出**，清单 5.1 的执行载体应明确为报告 HTML，按调试页走查会误判）；② `chart-print.js` afterprint 把 canvas 内联 `display` 置 `''` 而非还原原值（Chart.js 初始化写 `block`，恢复后 computed 变 `inline`；几何 0px 偏差、tooltip 正常，当前无可见影响） | ① grid 改 `minmax(min(420px,100%),1fr)`（或清单 5.1 载体明确为报告 HTML）；② beforeprint 记录原值、afterprint 还原（或统一恢复 `'block'`）；随 rf-113 复验清单回归 |
-| **rf-646** | 事件窗量化对照无需求条目——`requirements.md` §6 无 `event_window_impact` 对应章节与需求行（plan-79 落地时未登记；需求追溯守护按现有 ID 集合双向校验，故不报错） | 对照 §6.13 R-HCR 体例补 §6.16 章节 + R-EW-01..0n 需求行（开关可见性/契约与降级/双端单源/LLM 附录），或决策并入 §7.6 新闻分析条目；补登记后跑 `check-requirement-trace` 确认双向一致 |
+
 
 ### P3 — 持续监控：文件过长登记表（>500 行观察，脚本域 >400 即入观察 / **>1000 行为硬上限必须拆分**（主程序与脚本）；按距红线余量升序）
 
@@ -49,7 +47,9 @@
 
 ## 已解决问题
 
-（已解决条目随发布强制迁入归档——本区当前无待迁档记录，历史见下方「归档档案」。）
+- rf-644 已修复（2026-10-09，Web 375px 横向滚动根因）：`style.css` 三层钳制——`.radio-label span` 路径文案 `overflow-wrap:anywhere`（min-content 369→断词级；break-word 不参与 min-content 计算故无效）+ `.generate-form > *` 行线宽按列封顶（机制性根因：flex 行线宽取 fit-content 不受列宽封顶）+ select/file input `min-width:0; max-width:100%`；生成与调仓页签同类路径文案同规则覆盖。真机复验（headless CDP）：375px 断言 35/0/2（修前 4.1 scrollWidth=421、4.3 select 超视口不过）、五页签×十二视口扫描 60/60、新旧 CSS A/B scroll 404→375 / select 363→293，桌面 1280 无回归；回归用例 `test_web_responsive.py` 5 项。favicon 404 留待定；320px status 按钮溢出经 A/B 证实 pre-existing 不在本条范围。rf-257 ④ 复验解锁（余项仍待人工）。
+- rf-645 已修复（2026-10-09，rf-113 自动化实测附带发现两处）：① 调试页 `test-chart.html` grid 列下限改 `minmax(min(420px,100%),1fr)`，375px 不再自身溢出（报告产物本就无溢出，清单 5.1 载体仍为报告 HTML）；② `chart-print.js` beforeprint 记录各 canvas 原内联 display、afterprint 按记录还原（未记录回退 `block`、周期末清空记录），替代置空串导致 computed display 由 block 漂移为 inline。资产单源确认（`html_writer_assets.py` 相对路径引用，无内联副本）；回归用例 `test_feature_interactive.py` 4 项。
+- rf-646 已修复（2026-10-09，需求登记补齐）：`requirements.md` §6.16 事件窗量化对照 + `R-EW-01..06` 六条需求行（纯计算口径/契约与降级/编排只读/开关可见性/双端单源/LLM 附录，先读实现后如实登记）；`testplan.md` §2.1 补 6 行载体映射（段首统计同步实测 38 域/310 条）；`check-requirement-trace` `_COVERED_DOMAINS`/`_ALL_DOMAINS` 纳入 R-EW——守护 38/38 域全量双向一致，后续新增需求行不再漏报。
 
 
 ### 归档档案
