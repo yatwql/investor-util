@@ -66,6 +66,16 @@ class TestStaticServing:
             assert resp.status_code == 200, f"前端资产 404：{asset}"
             assert resp.get_data(), f"前端资产为空：{asset}"
 
+    def test_favicon_declared_and_served(self, app_client):
+        """标签页图标经 link 声明且可访问（防浏览器回退请求 /favicon.ico 得 404）。"""
+        client = app_client
+        index_html = client.get("/").get_data(as_text=True)
+        assert 'rel="icon"' in index_html, "index.html 应声明标签页图标"
+        assert "/static/favicon.svg" in index_html, "图标应指向 /static/favicon.svg"
+        resp = client.get("/static/favicon.svg")
+        assert resp.status_code == 200, "favicon.svg 应可访问"
+        assert resp.get_data(as_text=True).lstrip().startswith("<svg"), "favicon 应为 SVG 文档"
+
     def test_main_js_reachable_and_contains_init(self, app_client):
         """main.js 可访问且含 DOMContentLoaded 初始化注册（防空壳文件）。"""
         resp = app_client.get("/static/main.js")
