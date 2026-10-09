@@ -37,65 +37,6 @@ def app_client(tmp_path, monkeypatch):
     return app.test_client()
 
 
-# ═══════════════════════════════════════════════════════════════
-# T1 白名单完备：7 组全集 + 无多余键
-# ═══════════════════════════════════════════════════════════════
-
-_EXPECTED_WHITELIST = {
-    # 1 自由文本路径（菜单 C/F/O）
-    "holdings_dir",
-    "holdings_filename",
-    "output_dir",
-    # 2 报告章节开关（菜单 P 1~5）
-    "enable_fund_deep_analysis",
-    "enable_news",
-    "enable_history",
-    "enable_portfolio_evolution",
-    "enable_action",
-    # 3 报告章节与增强开关（菜单 S 报告块；注册表 GROUP_REPORT）
-    "data_quality",
-    "industry_beta",
-    "candidate_compare",
-    "cost_lots",
-    "valuation_percentile",
-    "market_temperature",
-    "financial_report_digest",
-    "financial_indicator",
-    # 4 持仓匿名化枚举（菜单 A）
-    "anonymization.mode",
-    # 5 对比指数池（菜单 I）
-    "comparison_indices",
-    # 6 LLM 分析章节开关（菜单 S 1~5）
-    "enabled_llm.global_macro",
-    "enabled_llm.expert_review",
-    "enabled_llm.health_check",
-    "enabled_llm.penetration_deep",
-    "enabled_llm.news_correlation",
-    # 7 实验性功能开关（菜单 S 实验块；清单取自 features 注册表实验组）
-    "llm_debate_procon",
-    "decision_reflection",
-    "prosperity_framework",
-    # 7b 常规开关中的 LLM 增强（确定性信号模块：实时注入 + 跨期沉淀）
-    "deterministic_signal",
-    "llm_debate_conditional",
-    "module_quality_gate",
-    "decision_header_parse",
-    "datasource_credential_ready",
-    # 8 常规开关（菜单 S 常规块；同为注册表成员，此前无任何界面入口）
-    "metrics_sharpe",
-    "metrics_calmar",
-    "metrics_hhi",
-    "metrics_winrate",
-    "metrics_turnover",
-    "metrics_risk_contribution",
-    "metrics_beta",
-    "enable_interactive_charts",
-    "doctor_check",
-    "datasource_adapter",
-    "feeder_penetration",
-}
-
-
 class TestApplyScalarWrite:
     """T4：标量/枚举编辑走对应写入原语，写后读回正确。"""
 

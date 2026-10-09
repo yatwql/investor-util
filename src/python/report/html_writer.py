@@ -441,9 +441,9 @@ def write_html_report(
     purchase_status_data: dict | None = None,  # data 层：申购限购状态契约（None=无数据，申购状态列隐藏）
     decision_review_data: dict | None = None,  # 历史决策复盘 decision_review_data（行动章内嵌块，None=开关关闭）
     holding_change_data: dict
-    | None = None,  # data 层：持仓变动复盘契约（实验开关 `holding_change_review`，None=键缺席→整章隐藏）
+    | None = None,  # data 层：持仓变动复盘契约（报告章节与增强开关 `holding_change_review`，None=键缺席→整章隐藏）
     event_impact_data: dict
-    | None = None,  # data 层：事件窗量化对照契约（实验开关 `event_window_impact`，None=键缺席→整章隐藏）
+    | None = None,  # data 层：事件窗量化对照契约（报告章节与增强开关 `event_window_impact`，None=键缺席→整章隐藏）
     schedule_replay_data: dict
     | None = None,  # data 层：调仓纪律回放契约（实验开关 `rebalance_schedule_replay`，None=键缺席→整章隐藏）
 ) -> str:

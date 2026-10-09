@@ -82,7 +82,7 @@ def _compute_section_visibility(
         "news": enable_news,  # ← 配置字段（不是 include_news/data 层）
         "history": enable_history,
         "evolution": enable_portfolio_evolution,  # ← board 层：组合演进
-        # 持仓变动复盘：实验章无 board 层开关（恒 True），可见性由 data 层
+        # 持仓变动复盘：无 board 层开关（恒 True），可见性由 data 层
         # data_flag（holding_change_data，seam 注入）控制——与 Excel 端同口径
         "holding_change": True,
         # 调仓纪律回放：同持仓变动复盘（实验章无 board 层开关，data 层控制）
@@ -106,7 +106,7 @@ def _compute_section_visibility(
         # evolution_data 同上：始终由编排层计算注入（非 None）→ 章节可见，
         # available=False 时模板写占位文本（快照不足，§1.4.5）
         "evolution_data": evolution_data is not None,
-        # 持仓变动复盘：实验开关 holding_change_review 经 seam 注入（缺席=None）→
+        # 持仓变动复盘：报告章节与增强开关 holding_change_review 经 seam 注入（缺席=None）→
         # 整章隐藏；注入但 available=False 时模板写占位（双端同口径）
         "holding_change_data": holding_change_data is not None,
         # 调仓纪律回放：实验开关 rebalance_schedule_replay 经 seam 注入（缺席=None）→

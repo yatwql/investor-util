@@ -210,7 +210,7 @@ _MODULE_REGISTRY: tuple[DataModuleDef, ...] = (
         settings_suffix="self_review",
         cache_groups=("preload",),
     ),
-    # ── 持仓变动复盘归因（实验能力，章本体由 feature holding_change_review 控制；
+    # ── 持仓变动复盘归因（章本体由 feature holding_change_review 控制（报告章节与增强组，默认关）；
     #    章内 LLM 归因块，串行后置执行）──
     # 登记目的同生成后自检：显示名/缓存前缀/TTL/用量统计/失败原因载体复用既有机制。
     # **刻意不进 generators_orchestrator._MODULE_FNS**：输入是报告 seam 注入的契约

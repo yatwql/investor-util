@@ -173,7 +173,7 @@ _REPORT_SECTION_DEFAULT: list[dict] = [
         "nav_group": "history",
         "data_flag": "evolution_data",
     },
-    # ── holding_change 类型（实验开关 holding_change_review 控制，经实验挂载点注入） ──
+    # ── holding_change 类型（报告章节与增强开关 holding_change_review 控制，经实验挂载点注入） ──
     # 持仓变动复盘：快照差分事件级操作侧复盘（事件清单/频率/结构演变/意图对账 +
     # LLM 归因块）。data_flag 控制双端可见性：开关关闭（默认）时
     # pipeline_data 键缺席 → 标志 False → 整章隐藏，两条输出路径保持既有输出；
@@ -188,7 +188,7 @@ _REPORT_SECTION_DEFAULT: list[dict] = [
     },
     # 事件窗量化对照：并入「财经新闻热点与持仓关联分析」章内区块（partial 在新闻章内以
     # block-title 渲染，可见性由契约 event_impact_view 决定），不占独立注册表条目、不消耗
-    # 连续编号；实验开关 event_window_impact 经实验挂载点注入 pipeline_data["event_impact_data"]。
+    # 连续编号；报告章节与增强开关 event_window_impact 经实验挂载点注入 pipeline_data["event_impact_data"]。
     # ── schedule_replay 类型（实验开关 rebalance_schedule_replay 控制，经实验挂载点注入）：调仓纪律回放——月度定期/阈值偏离纪律多期回放 vs 买入持有；data_flag 控制双端可见性（关态键缺席隐藏 / 开启但数据不足双端占位） ──
     {
         "key": "schedule_replay",

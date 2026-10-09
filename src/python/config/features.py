@@ -69,7 +69,7 @@ class FeatureSwitchDef:
     Attributes:
         label: 显示名（TUI 面板行名 / Web 配置面板标签，服务端同源下发）
         desc: 一句话说明（CLI 报错提示、控制台横幅、文档）
-        group: 分组（``GROUP_EXPERIMENTAL`` / ``GROUP_STANDARD``）
+        group: 分组（``GROUP_EXPERIMENTAL`` / ``GROUP_STANDARD`` / ``GROUP_REPORT``）
         default: 出厂默认值（``features.json`` 未覆写时的取值）
         affects_report: 开启后报告产物内容是否可能不同——决定它是否进入产物自述
     """
@@ -134,27 +134,31 @@ feature_switch_registry: dict[str, FeatureSwitchDef] = {
         False,
         True,
     ),
-    # ── 实验性功能：持仓变动复盘（快照差分事件级，需结构级结论人工认可后择机转正） ──
+    # ── 报告章节与增强：持仓变动复盘（章节类转正项：移出实验组、default 保持 False）──
+    # 声明位保持在原处——报告块面板编号按注册表顺序派生，转正项落在目标块块首，
+    # 既有报告项编号不位移（见 how-to-use-tui-menu.md「转正项按注册表顺序落在目标块」）
     "holding_change_review": FeatureSwitchDef(
         "持仓变动复盘",
         "快照差分出新增/加仓/减仓/清仓事件清单与频率/结构演变/意图对账（区间净额推断，结构级）+ LLM 归因块",
-        GROUP_EXPERIMENTAL,
+        GROUP_REPORT,
         False,
         True,
     ),
-    # ── 实验性功能：What-if 交易成本与基准对比（需费率/指数数据，先决门槛过审后择机转正） ──
+    # ── 报告章节与增强：What-if 交易成本与基准对比（页签/区块类转正项：移出实验组、default 保持 False）──
+    # 声明位保持在原处——报告块面板编号按注册表顺序派生，转正项落在目标块块首
     "whatif_trade_cost": FeatureSwitchDef(
         "What-if 交易成本对比",
         "调仓回放计入申赎成本（FIFO 持有期阶梯）+ 成本前后收益差与业绩基准三线参照",
-        GROUP_EXPERIMENTAL,
+        GROUP_REPORT,
         False,
         True,
     ),
-    # ── 实验性功能：事件窗量化对照（新闻事件 × 持仓行情窗口比对，先决门槛过审后择机转正） ──
+    # ── 报告章节与增强：事件窗量化对照（区块类转正项：移出实验组、default 保持 False）──
+    # 声明位保持在原处——报告块面板编号按注册表顺序派生，转正项落在目标块块首
     "event_window_impact": FeatureSwitchDef(
         "事件窗量化对照",
         "新闻事件映射交易日后 ±5 交易日窗口：品种收益/超额收益与文本极性同表对照，分歧例进 LLM 分析章",
-        GROUP_EXPERIMENTAL,
+        GROUP_REPORT,
         False,
         True,
     ),

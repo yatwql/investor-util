@@ -10,6 +10,7 @@
 > 追加归档：2026-10-06 plan-79 事件窗量化对照（event_window_impact）先决门槛三段通过并四迭代完成（见文末章节）
 > 追加归档：2026-10-07 plan-80 调仓纪律回放（rebalance_schedule_replay）先决门槛三段通过并四迭代完成（见文末章节）
 > 追加归档：2026-10-07 plan-84 发布流程分步编排脚本（release.py 七子命令 + 49 项单测）完成（见文末章节）
+> 追加归档：2026-10-09 plan-83 章节类实验转正批次（三项章节级开关迁报告章节与增强组）完成（见文末章节）
 > 设计文档索引：plan-72 的设计文档 [`fund-purchase-limit-design.md`](fund-purchase-limit/fund-purchase-limit-design.md) **已随 plan-74 完成一并归档**（本目录 `fund-purchase-limit/`）；plan-73 的 LLM 上下文设计同在 `fund-purchase-limit/fund-purchase-limit-llm-context-design.md`（设计 + 已实施）；plan-76 的快照事件级设计在本目录 `holding-change-review/holding-change-review-design.md`（已实施，§15 实施与验收记录）；plan-77 的 What-if 成本与基准设计在本目录 `whatif-cost-benchmark/whatif-cost-benchmark-design.md`（已实施，§14 门槛与验收记录）；plan-78 的因子目录评测设计在本目录 `factor-zoo-catalog/factor-zoo-catalog-design.md`（已评测·判定转正立项，§13 判定记录）；plan-79 的事件窗设计在本目录 `event-window-impact/event-window-impact-design.md`（已实施，§14 判定记录）；plan-80 的调仓纪律回放设计在本目录 `rebalance-schedule-replay/rebalance-schedule-replay-design.md`（已实施，§14 实施与门槛判定记录）
 
 ---
@@ -279,3 +280,11 @@
 **动作**：评估三案：① check-file-length 域扩到 scripts（豁免清单重估）② 按 registry 拆分先例下沉子模块（如 factor_zoo_eval 拆评测核心/报告生成/CLI）③ 维持现状并登记豁免理由；产出决策记入 technical.md
 
 **完成态（2026-10-09，`61b0214f`）**：三案取①+②组合——`check-file-length` 检查域扩到 `scripts/` 递归全集（警戒 400 / 红线 1000，含包内子模块），主程序硬上限 800 → 1000（警告 500 维持），测试 800/1200 维持，阈值收敛 `_LIMIT_BY_KIND`/`_WARN_BY_KIND`/`_HINT_BY_KIND` 三域单源，`EXEMPTIONS` 保持空集；域内最大单文件 `factor_zoo_eval.py`（1595 行）按案②拆为 `scripts/_factor_zoo/` 包（catalog/probe/metrics/stages/report 五模块 342/228/562/410/135 行，入口仅留 CLI 与原面 re-export，既有 40 项测试零改动），边界/三域收集/脚本警戒区新增 4 项用例。决策与理由记入 technical.md 约束 C28「大文件红线体系（主程序/脚本/测试）」（含 2026-10-09 阈值定档记录），developer-guide 阈值表/门禁注记/脚本表、CLAUDE 守护描述与 review-findings P3 登记表（2026-10-09 实测刷新）同步。
+
+#### ✅ `plan-83` 章节类实验转正批次（holding_change_review / whatif_trade_cost / event_window_impact） — 已完成（2026-10-09）
+
+**现状与问题**：三项章节级实验（plan-76/77/79 落地）先决门槛均已过审，但 `experiment_stats` 无真实报告启用记录、按「启用次数支撑观察」判据不足以转正；且旧转正定义对章节类形态过于激进（实验组转常规组即默认永远出章）
+
+**动作**：转正定义已扩展为「移出实验组、目标组按功能形态选——常驻读侧增强→常规组（默认开），章节/页签类→报告章节与增强组（默认关、按需开）」（注册表注释与三份手册同步）；待真实报告启用积累且用户确认产物质量后，三项分批执行注册表迁移
+
+**完成态（2026-10-09）**：启用记录已积累（三项各 4 次，最近 2026-10-09）且产物经报告浏览器实测（rf-113 ⑤/⑥ 项），三项**单批**迁入 `GROUP_REPORT`（章节类形态同构，分批会拉长面板编号抖动窗口）：注册表三处 `GROUP_EXPERIMENTAL → GROUP_REPORT`（声明位保持原处，报告块块首三项），`DEFAULTS`/`AFFECTS_REPORT` 原样（默认均关）；注册表现状 **34 项 = 实验 5 / 常规 16 / 报告 13**；TUI 面板编号随注册表顺序重推导（实验 8-12 / 常规 13-28 / 报告 29-41，转正三项占 29-31，既有报告项 32-41 不位移）；`--experiment` 取值域与报告自述、启用统计随实验组身份自动移除（`enabled_experimental_features` 派生面不再含三项）；同步 features.py 注释、requirements §11.5 计数与 R-WIF-13/R-HCR 措辞、developer-guide 转正判据首例注记、technical §1.8.11 白名单口径（51 键）、三份手册（TUI 编号/Web 分组行/CLI 取值域/开关表 [P] 说明）与 how-to-config/how-to-start/folders 残留枚举；测试同步（分组断言改报告组 + config 访问器同源不变式改写为「报告组有读取器者同源」+ legacy 读取器保有），定向 1069 项通过 + ruff 全绿。

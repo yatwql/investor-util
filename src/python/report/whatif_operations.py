@@ -7,7 +7,7 @@
 联网取生效日后行情，用 as-if 市值对比基准/目标组合曲线。回测失败/数据不足
 → 降级 available:False，不阻塞主报告。
 
-开关 ``whatif_trade_cost``（实验组，出厂关）开启时追加 whatif_data["cost"]
+开关 ``whatif_trade_cost``（报告章节与增强组，出厂关）开启时追加 whatif_data["cost"]
 （whatif_cost_panel 装配：成本本体 + 成本前/后差 + 业绩基准三线）；关闭 →
 键缺席 → whatif 双端输出与开关引入前逐字节一致（零变更红线）。
 

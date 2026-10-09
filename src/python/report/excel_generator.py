@@ -448,7 +448,7 @@ def generate_excel_report(
         except Exception:
             logger.debug("[excel] 组合演进页签写入失败（非关键）", exc_info=True)
 
-    # ── 持仓变动复盘页签（快照事件级，holding_change_data；实验开关默认关，
+    # ── 持仓变动复盘页签（快照事件级，holding_change_data；报告章节与增强开关默认关，
     #      键缺席时页签不创建，此处自然不触发） ──
     ws_hc = sheets.get("holding_change")
     if ws_hc is not None:
@@ -460,7 +460,7 @@ def generate_excel_report(
         except Exception:
             logger.debug("[excel] 持仓变动复盘页签写入失败（非关键）", exc_info=True)
 
-    # ── 事件窗量化对照区块（并入财经新闻页签尾部；实验开关 event_window_impact
+    # ── 事件窗量化对照区块（并入财经新闻页签尾部；报告章节与增强开关 event_window_impact
     #      默认关，键缺席时区块不渲染，此处自然不触发） ──
     ws_news = sheets.get("news_correlation")
     event_data = (pipeline_data or {}).get("event_impact_data")
