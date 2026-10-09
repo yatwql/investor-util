@@ -145,7 +145,7 @@
 
 **落地设计**：若判定转正，按 [`decision-reflection-shadow-design.md`](../plan/decision-reflection-shadow-design.md) 四迭代执行（决策条目结构化 → 到期结算器 → doctor 概览增强 → 报告内反思块），该设计以 Vibe-Trading `shadow_account`（extract→backtest→render）为参照；死线未过前不实施。plan-76 持仓变动复盘落地后与其构成「意图 vs 成交」对账（只读，不互写）。
 
-**观测快照（2026-10-07）**：条目 2026-10-03 前后立项（`607eaa65` 时已存在），其后仅 v0.12.6 一次发布——**2 个发布周期窗口未满，维持等待（不撤销、不转正、不实施设计）**；读数：experiment_stats `decision_reflection` 启用 14 次且 `last_enabled_date=2026-10-07`（增长中，判据①不成立）、`decision_ledger.jsonl` 2 决策 1 结算（已结算 1 条 <10，判据②暂成立但窗口内持续积累）、本机 features 覆写为开（实际使用中）。窗口期满（约至 v0.12.8 发布后）按上述两判据重新取数判定。
+**观测快照（2026-10-09）**：条目 2026-10-03 前后立项（`607eaa65` 时已存在），最新 tag 仍为 v0.12.6、当前 0.12.7-dev，v0.12.7/v0.12.8 均未发布（上轮后新增 0 次）——**经父级拍板沿用上轮 v0.12.8 起算口径，2 个发布周期窗口未满，维持等待（不撤销、不转正、不实施设计）**；读数：experiment_stats `decision_reflection` 启用 17 次且 `last_enabled_date=2026-10-09`（较上轮 14 增长，判据①不成立）、`decision_ledger.jsonl` 10 决策 1 结算（`fold_ledger()` 官方口径 `settled_count=1`/`pending_count=9`，已结算 1 条 <10，判据②成立但 2026-10-08 单批落账 8 条 pending 按 horizon 预计 10-15 前后集中结算）、本机 features 覆写为开（实际使用中）；注：plan.md 原文「立项后 2 个发布周期」严格按 `git tag --contains 607eaa65` 计数已 6 次发布（窗口已满，机械推导应撤销），与上轮「约至 v0.12.8 后满」前瞻标注冲突——已人工裁定取上轮口径（2026-10-09），窗口期满（v0.12.8 发布后）按两判据重新取数判定，届时若判据②仍成立且已结算仍无达标趋势则按原文撤销。
 
 #### 🔲 `plan-87` 相关性分析为静态单点
 

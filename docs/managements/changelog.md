@@ -9,6 +9,8 @@
 
 ## [0.12.7-dev] - 开发中（未发布）
 
+- **隐私/契约**：**调仓 What-if 双产物接入报告匿名化层**——按主报告同一分层接入 `anonymization.mode`：装配边（whatif_writer 双产品物化点）注入 `apply_report_anonymization` 字段层（changes 与 legs/feasibility 共用同一代号映射；full 不模糊 whatif 数值面、派生键剥离，计算结果不变）+ 渲染点 `| anon_code`（模板 4 处代码列键控折叠）+ 产物清扫（HTML 名称文本 `include_codes=False` + `mask_code_text` 边界安全兜底、先清扫后内嵌；Excel `mask_workbook_text` + 独立边界安全代码替换，数值单元格不动）；summary 研判 = 差异行不适配大类折叠 → 字段层原样、渲染/写入层拦截（HTML 明细区空态 / Excel 明细页占位），分类配置对比承载大类汇总；off 全链恒等（关态金标零字节）；回归 20 项（双产物 3 模式真名/真码 0 出现 + off 旁路恒等 + 金额含真码子串不误伤） | rf-635
+
 - **功能/规则**：**三项章节类实验转正入报告章节与增强组**——`holding_change_review` / `whatif_trade_cost` / `event_window_impact` 按「移出实验组、目标组按功能形态选（章节/页签类→报告章节与增强组，默认关）」单批迁入 `GROUP_REPORT`（章节类形态同构，分批反而拉长面板编号抖动窗口；声明位不动 → 转正三项落报告块块首 29-31、既有报告项 32-41 不位移）；启用记录已积累（三项各 4 次，最近 2026-10-09）且产物经报告浏览器实测；注册表现状 **34 项 = 实验 5 / 常规 16 / 报告 13**，TUI 面板编号重推导（实验 8-12 / 常规 13-28 / 报告 29-41），`--experiment` 取值域与报告自述、启用统计随实验组身份自动移除；同步 features.py 注释、requirements §11.5 计数与 R-WIF-13/R-HCR 措辞、developer-guide 转正判据首例注记、technical §1.8.11 白名单口径（51 键）、三份手册与 how-to-config/【P】说明/【how-to-start】面板组名/folders 行注、test_config_edit 死常量清理；测试同步（分组断言改报告组 + config 访问器同源不变式改写），定向 1069 项通过 | plan-83
 
 - **测试/工程质量**：**报告与 Web 浏览器验证方法成文入档 + 自动化实测**——新增 `docs/plan/report-browser-verification.md`（六项拆分：可自动化子项 headless Chromium 148 + Node 22 CDP 一键复跑，①②2.4③3.1⑤报告⑥ 实测全部通过/记录，④微信真机留人工步骤 + §5 复验清单）与 `docs/plan/web-browser-verification.md`（五类 37 断言 33 过/2 不过/2 人工 + smoke-web 11/11，全程 0 次真实 POST /api/runs）；rf-113 状态→仅余 ④ 微信真机（+ Safari/Ctrl+P 抽验），rf-257 状态→①②⑤过/③部分/④ 375px 不过（根因入 rf-644）；同批登记 rf-644（Web 375px 横向滚动：radio 路径文案不可断行 + select 溢出视口 + whatif 文件输入内在宽）、rf-645（调试页 375px 溢出 + afterprint 恢复不精确，均不影响报告产物）、rf-646（事件窗缺需求条目） | rf-113

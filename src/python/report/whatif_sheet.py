@@ -180,6 +180,21 @@ def write_whatif_changes_sheet(ws: Worksheet, whatif_data: dict[str, Any] | None
         auto_width(ws)
         return
 
+    # 汇总模式：单条持仓面不出行（拦截点与 HTML 明细区同口径，
+    # 差异行不适配大类折叠 → 聚合面由「分类配置对比」页签承载）
+    from src.python.config.anonymizer import get_anonymization_mode
+
+    if get_anonymization_mode() == "summary":
+        _write_placeholder(
+            ws,
+            "暂无单条持仓变动明细（汇总模式，大类汇总见「分类配置对比」页签）",
+            row=3,
+            max_cols=_ncols,
+        )
+        freeze_header(ws, row=2)
+        auto_width(ws)
+        return
+
     row = 2
     row = write_header_row(
         ws,
@@ -453,50 +468,53 @@ def write_whatif_cost_sheet(ws: Worksheet, whatif_data: dict[str, Any] | None) -
         row = write_data_row(ws, row, [label, tc.get(key, 0.0)], formats=[None, FMT_MONEY])
     row = write_data_row(ws, row, ["费率完整性", integrity])
 
-    # ── 逐腿明细 ──
-    row += 1
-    row = write_title_row(ws, row, "交易腿明细", ncols=_ncols)
-    row = write_header_row(
-        ws,
-        row,
-        [
-            "变动",
-            "名称",
-            "代码",
-            "方向",
-            "份额",
-            "金额(元)",
-            "费率",
-            "费用(元)",
-            "持有期(交易日)",
-            "费率来源",
-            "入账日",
-        ],
-    )
-    for leg in tc.get("legs", []):
-        rate = leg.get("rate")
-        fee = leg.get("fee")
-        flat = leg.get("flat_fee")
-        fee_text = f"{fee:.2f}" if fee is not None else (f"每笔 {flat:.2f}" if flat is not None else "—")
-        days = leg.get("holding_days")
-        row = write_data_row(
+    # ── 逐腿明细（汇总模式不出行：单条持仓面收在渲染/写入层拦截点）──
+    from src.python.config.anonymizer import get_anonymization_mode
+
+    if get_anonymization_mode() != "summary":
+        row += 1
+        row = write_title_row(ws, row, "交易腿明细", ncols=_ncols)
+        row = write_header_row(
             ws,
             row,
             [
-                leg.get("action", ""),
-                leg.get("name", ""),
-                leg.get("code", ""),
-                _SIDE_LABELS.get(leg.get("side"), leg.get("side", "")),
-                leg.get("shares"),
-                leg.get("amount"),
-                rate if rate is not None else "—",
-                fee_text,
-                days if days is not None else "—",
-                _SOURCE_LABELS.get(leg.get("rate_source"), leg.get("rate_source", "")),
-                leg.get("booked_date") or "—",
+                "变动",
+                "名称",
+                "代码",
+                "方向",
+                "份额",
+                "金额(元)",
+                "费率",
+                "费用(元)",
+                "持有期(交易日)",
+                "费率来源",
+                "入账日",
             ],
-            formats=[None, None, None, None, FMT_SHARES, FMT_MONEY, "0.0000%", None, "0.0", None, None],
         )
+        for leg in tc.get("legs", []):
+            rate = leg.get("rate")
+            fee = leg.get("fee")
+            flat = leg.get("flat_fee")
+            fee_text = f"{fee:.2f}" if fee is not None else (f"每笔 {flat:.2f}" if flat is not None else "—")
+            days = leg.get("holding_days")
+            row = write_data_row(
+                ws,
+                row,
+                [
+                    leg.get("action", ""),
+                    leg.get("name", ""),
+                    leg.get("code", ""),
+                    _SIDE_LABELS.get(leg.get("side"), leg.get("side", "")),
+                    leg.get("shares"),
+                    leg.get("amount"),
+                    rate if rate is not None else "—",
+                    fee_text,
+                    days if days is not None else "—",
+                    _SOURCE_LABELS.get(leg.get("rate_source"), leg.get("rate_source", "")),
+                    leg.get("booked_date") or "—",
+                ],
+                formats=[None, None, None, None, FMT_SHARES, FMT_MONEY, "0.0000%", None, "0.0", None, None],
+            )
 
     # ── 成本前/后对比（仅回测可用且费率全知时）──
     impact = cost.get("impact")
