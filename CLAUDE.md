@@ -64,8 +64,8 @@
 - **违规补救**：发现 `.claude/` 下出现本应放在 `docs/` 的文件时，**必须立即迁移**，不留存待办
 - **注意**：`EnterPlanMode` 等工具自动写入 `.claude/plans/` 的行为不可控，使用后**必须手动迁移**到 `docs/plan/`
 - **版本号一致**：发布版本时，先修改 `src/python/core/constants.py`（`APP_VERSION`），然后运行 `.venv/bin/python scripts/check-version-consistency.py`，按 [ERR] 提示逐个同步其余文件，直到全部 [OK] 再提交。受检文件：`pyproject.toml`、`README.md`、管理文档 10 份（`plan.md`/`technical.md`/`requirements.md`/`testplan.md`/`review-findings.md`/`llm-technical.md`/`folders.md`/`test-coverage.md`/`changelog.md`/`developer-guide.md`）。任何版本号变更均应全局覆盖，避免遗漏。
-- **发布数据文档刷新**：发布版本前，**必须**运行 `.venv/bin/python scripts/collect-test-coverage.py`，按实时收集结果核对/更新以下文档的数据快照（非版本号），保证统计与目录结构时效性：
-  - `docs/managements/test-coverage.md` — 模式/unit 子标记/跨类/功能域各项测试计数
+- **发布数据文档刷新**：发布版本前，**必须**运行 `.venv/bin/python scripts/collect-test-coverage.py --update-docs`（按本次快照自动回写 `test-coverage.md` 计数行与 `folders.md`「测试用例」行，其余项按实时收集结果人工核对），保证统计与目录结构时效性：
+  - `docs/managements/test-coverage.md` — 模式/unit 子标记/跨类/功能域各项测试计数（`--update-docs` 回写）
   - `docs/managements/folders.md` — 项目统计表（主程序/模板/脚本/测试代码行数、文件数、测试用例数）及目录树新增/重命名文件；**版本演进对照表（`## 版本演进对照`）每次发布必须更新**——「最新发布」列按新 tag 重跑快照统计（复现方法见表头：`git ls-tree -r --name-only <rev>` + `git cat-file --batch` 计行 + `git grep -c "def test_"` 数用例，`<rev>` = 新 tag），「当前开发版」列同步重跑刷新；列头版本号与 tag/日期文本由 `check-version-consistency.py --fix`（`evolution_head` / `release_tag` 断言）同步，只改版本号不刷演进表数据行属发布遗漏
   - `docs/manuals/datasource.md` + `datasource-reliability.md` — 数据源清单/路由归属/可靠性描述与实际代码配置一致
   数据快照更新与「版本号一致」的版本头同步可在同一次提交内完成。

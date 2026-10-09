@@ -1,6 +1,6 @@
 # 投资复盘助手 - 自我审查问题记录
 > 文档版本：0.12.7-dev
-> **编号源**：`rf-next = 641`（新增问题取此编号，完成后更新为 +1；已用最大 rf-640，递增保证唯一，归档不回收。若与历史归档冲突，运行 `scripts/check-task-numbering.py` 校验）
+> **编号源**：`rf-next = 642`（新增问题取此编号，完成后更新为 +1；已用最大 rf-641，递增保证唯一，归档不回收。若与历史归档冲突，运行 `scripts/check-task-numbering.py` 校验）
 
 ---
 
@@ -47,6 +47,7 @@
 
 ## 已解决问题
 
+- rf-641 已修复（2026-10-09，计数回写效率自查，当批修复）：测试计数刷新缺轻量回写入口——`check-doc-drift --with-test-count` 只读核对不落盘，实施收尾刷一次计数被迫整跑 `bench --update-docs`（14 模式、分钟级）；已定流程纪律 bench 只在发布刷新/换机跑，两者之间计数行长期无人回写。新增 `collect-test-coverage.py --update-docs`：按本次收集快照回写 `test-coverage.md` 计数行（反引号标记行 + 能映射到标记的加粗标签行，比对域与 `check_test_coverage_counts` **同构**、行匹配/标签映射复用 check-doc-drift 原语）与 `folders.md` 项目统计表「测试用例」行；只改计数数字（粗体/千分位/` 个` 后缀原样保留），一致零变更幂等；收集退出非 0/5 跳过回写并告警，错数不落盘；快照单源 `_build_snapshot()`（输出分节与快照同出一份，`edge/data/smoke/scenario_extreme` 同名键覆盖次序与子进程 `_parse_collect_stdout` 逐行后写同义，重叠四处谓词与裸标记判定已实测同值）。子标记清单提升为模块常量 `UNIT_SUBS`/`SCEN_SUBS`/`CROSS_SUBS`（输出与回写同一来源）。回归 7 项：保形改写（粗体/别名 `all`/聚合行/章外同标签行/folders 后缀）、非计数行跳过（未入快照键/无计数格/未映射标签）、写后过 `check_test_coverage_counts` 反漂移断言、幂等二轮零变更、CLI 摘要、收集失败跳过且不碰文件、空收集放行回写
 - rf-640 已修复（2026-10-09，Windows 钩子回放乱码自查，当批修复）：pre-commit 十守护经 `run_bg` 把 stdout 重定向到日志文件，中文 Windows 上 Python 按 locale ANSI（cp936/GBK）落盘，`cat` 回放到 UTF-8 终端即成乱码（GBK `CE B4`=「未」被读作 `δ`；前台直打走控制台 `WriteConsoleW` 正常——与「前台正常、回放段落乱码」的分界完全吻合），纯显示问题、退出码与判定不受影响，但守护详情在 Windows 上不可读。修复三点：① 钩子 `set -e` 后 `export PYTHONUTF8=1`（UTF-8 模式统一按 UTF-8 写日志，Linux/CI 本就是 UTF-8、行为不变）；② `scripts/_checklib.py` 导入时 `_force_utf8_stdio()` 把**非 UTF-8 的真实 stdout/stderr**收敛到 UTF-8（`_force_utf8_stream`：已 UTF-8 不动、`StringIO` 等测试输出桩跳过），模块 docstring「无副作用原语」例外清单同步为两项；③ 回归 4 项：cp936 文本流收敛、已 UTF-8 零改写、非 TextIOWrapper 跳过、`_force_utf8_stdio` 对当前 stdio 生效
 
 - rf-639 已修复（2026-10-09，文档计数核对诊断发现，当批修复）：`check-doc-drift --with-test-count` 的计数核对只识别反引号标记行，`test-coverage.md` 功能域表的中文加粗标签行因不匹配以「未收录名」**静默跳过**，实测该表 4 行过期（报告生成 / LLM 智能分析 / 配置管理 / 核心基础设施）无人核对。修复五点：① 标签↔标记映射与 collect 功能域聚合**单一来源**（`_test_runner.modes.UNIT_DOMAIN_LABELS`，collect 侧同对象引用防双处定义漂移）；② 功能域章内（`## 功能域对应测试源`）出现**未登记标签**或映射集**缺行**一律报 finding，章外加粗行不属核对域（既有用例不受影响）；③ 表内「端到端业务场景」聚合行经显式别名映射 scenario 父标记；④ 功能域行标签与单源对齐（「CLI 命令行模式」→「CLI 命令行」），完整性反查按**标记覆盖度**判定、对标签措辞免疫；⑤ 同批刷新该表 11 行过期计数与 `folders` 测试用例总数。回归 7 项：映射匹配/不匹配、章内外边界、未登记报出、缺行反查（按映射集动态遍历不写死条数）、collect 同对象断言

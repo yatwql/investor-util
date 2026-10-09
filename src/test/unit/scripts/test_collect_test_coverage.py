@@ -1,9 +1,10 @@
-"""collect-test-coverage.py 收集与分组计数测试（退出码传递 / 目标展开 / 模式计数口径）。
+"""collect-test-coverage.py 收集与分组计数测试（退出码传递 / 目标展开 / 模式计数口径 / --update-docs 回写）。
 
 覆盖 `_collect` 对 pytest 退出码的原样传递（含收集期失败 4 与空收集 5）、
 `CollectPlugin` 的 nodeid+标记记录、`_target_files` 的目录展开与 live 套件排除、
-模式谓词与 `_test_runner/modes.py::MODES` 的绑定，以及 `main()` 的退出码出口与
-模式/子标记计数输出。
+模式谓词与 `_test_runner/modes.py::MODES` 的绑定、`main()` 的退出码出口与
+模式/子标记计数输出，以及 `update_docs`/`--update-docs` 回写（保形改写 / 非计数
+行跳过 / 写后过核对函数 / 幂等 / 收集失败与空收集的出口守卫）。
 """
 
 from __future__ import annotations
@@ -33,9 +34,9 @@ class _StdoutStub(io.StringIO):
         return None
 
 
-def _run_main(mod, monkeypatch, records, targets) -> str:
+def _run_main(mod, monkeypatch, records, targets, extra_args=()) -> str:
     """以注入的收集结果跑一次 `main()`，返回其完整标准输出。"""
-    monkeypatch.setattr(sys, "argv", ["collect-test-coverage.py", *targets])
+    monkeypatch.setattr(sys, "argv", ["collect-test-coverage.py", *extra_args, *targets])
     monkeypatch.setattr(mod, "_collect", lambda _targets: 0)
     mod.collected.clear()
     mod.collected.extend(records)
@@ -235,3 +236,127 @@ class TestMainGroupingCounts:
         assert cross["edge"] == 1
         assert cross["data"] == 0
         assert cross["smoke"] == 0
+
+
+# ═══ --update-docs 回写 ═══
+
+
+class TestUpdateDocs:
+    """`update_docs`/`--update-docs`：保形回写、非计数行跳过、写后过核对、幂等、出口守卫。"""
+
+    @pytest.fixture()
+    def docs(self, tmp_path, monkeypatch, mod):
+        """陈旧计数的 test-coverage.md 与 folders.md（含各类应跳过行）。"""
+        domain_rows = "\n".join(f"| **{label}** | 说明 | 555 |" for label in mod.UNIT_DOMAIN_LABELS.values())
+        cov = tmp_path / "test-coverage.md"
+        cov.write_text(
+            "# 测试覆盖\n\n"
+            "## 模式\n\n"
+            "| 标记 | 计数 | 耗时 |\n"
+            "|---|---|---|\n"
+            "| `unit` | **9393** | ~31s |\n"
+            "| `all` | **9746** | ~32s |\n"
+            "| `unknown_key` | 111 | — |\n"
+            "| `unit` | ~31s | ~3min |\n"
+            "| **名称** | 表头加粗 | 222 |\n\n"
+            f"## 功能域对应测试源\n\n{domain_rows}\n"
+            "| **端到端业务场景** | 父标记行 | 555 |\n\n"
+            "## 其它\n\n"
+            "| **数据源 Provider** | 章外同标签 | 555 |\n",
+            encoding="utf-8",
+        )
+        folds = tmp_path / "folders.md"
+        folds.write_text(
+            "# 目录\n\n"
+            "| 项 | 一 | 二 | 计数 |\n"
+            "|---|---|---|---|\n"
+            "| 测试用例 | — | — | 9,750 个 |\n"
+            "| 主程序 | — | — | 12,345 行 |\n",
+            encoding="utf-8",
+        )
+        monkeypatch.setattr(mod, "_TEST_COVERAGE_MD", cov)
+        monkeypatch.setattr(mod, "_FOLDERS_MD", folds)
+        return cov, folds
+
+    @staticmethod
+    def _snap(mod, total=42, val=7) -> dict[str, int]:
+        """与 `_build_snapshot` 同形的快照（键集覆盖全部分节）。"""
+        snap: dict[str, int] = {"_总收集": total}
+        for name in mod._MODE_PREDICATES:
+            snap[name] = val
+        for s in (*mod.UNIT_SUBS, *mod.SCEN_SUBS, *mod.CROSS_SUBS):
+            snap[s] = val
+        for marker, label in mod.UNIT_DOMAIN_LABELS.items():
+            snap[label] = snap[marker]
+        return snap
+
+    def test_stale_rows_rewritten_preserving_format(self, mod, docs):
+        cov, folds = docs
+        snap = self._snap(mod)
+        changes = mod.update_docs(snap)
+        text = cov.read_text(encoding="utf-8")
+        assert "| `unit` | **7** | ~31s |" in text  # 粗体保留
+        assert "| `all` | **42** | ~32s |" in text  # 别名 all → _总收集
+        assert "| **端到端业务场景** | 父标记行 | 7 |" in text  # 聚合行走父标记 scenario
+        assert "| **数据源 Provider** | 章外同标签 | 7 |" in text  # 章外同标签行同构改写
+        ftext = folds.read_text(encoding="utf-8")
+        assert "| 测试用例 | — | — | 42 个 |" in ftext  # 计数列改写、` 个` 后缀保留
+        assert "| 主程序 | — | — | 12,345 行 |" in ftext  # 非测试用例行不动
+        assert any(c.endswith("unit 9393 → 7") for c in changes)
+        assert any(c.endswith("_总收集 9746 → 42") for c in changes)
+        assert any("测试用例 9,750 → 42" in c for c in changes)
+
+    def test_skipped_rows_untouched(self, mod, docs):
+        cov, _ = docs
+        mod.update_docs(self._snap(mod))
+        text = cov.read_text(encoding="utf-8")
+        assert "| `unknown_key` | 111 | — |" in text  # 键未入快照
+        assert "| `unit` | ~31s | ~3min |" in text  # 无计数单元格
+        assert "| **名称** | 表头加粗 | 222 |" in text  # 标签未映射
+
+    def test_post_write_passes_count_check(self, mod, docs):
+        from src.test._script_loader import load_script
+
+        cov, _ = docs
+        snap = self._snap(mod)
+        mod.update_docs(snap)
+        drift = load_script("check-doc-drift.py")
+        assert drift.check_test_coverage_counts(cov.read_text(encoding="utf-8"), snap) == []
+
+    def test_second_run_reports_no_changes(self, mod, docs):
+        snap = self._snap(mod)
+        assert mod.update_docs(snap)  # 首轮确有回写
+        assert mod.update_docs(snap) == []  # 幂等：二轮零变更
+
+    def test_main_update_docs_prints_summary(self, mod, monkeypatch, docs):
+        cov, _ = docs
+        out = _run_main(mod, monkeypatch, _FIXTURE_RECORDS, [], extra_args=["--update-docs"])
+        assert "[更新] " in out
+        assert "[OK] 已回写 " in out
+        assert "**" in cov.read_text(encoding="utf-8")  # 真回写保留粗体
+        again = _run_main(mod, monkeypatch, _FIXTURE_RECORDS, [], extra_args=["--update-docs"])
+        assert "[OK] 计数与文档一致，无需回写" in again  # 二轮无回写
+
+    def test_update_docs_skipped_when_collection_fails(self, mod, monkeypatch, docs, capsys):
+        cov, _ = docs
+        before = cov.read_text(encoding="utf-8")
+        calls: list[dict] = []
+        monkeypatch.setattr(mod, "update_docs", lambda snap: calls.append(snap) or [])
+        monkeypatch.setattr(sys, "argv", ["collect-test-coverage.py", "--update-docs"])
+        monkeypatch.setattr(mod, "_collect", lambda _targets: 2)
+        mod.collected.clear()
+        with pytest.raises(SystemExit) as exc:
+            mod.main()
+        assert exc.value.code == 2
+        assert calls == []  # 错数不回写
+        assert cov.read_text(encoding="utf-8") == before
+        assert "跳过文档回写" in capsys.readouterr().err
+
+    def test_update_docs_allowed_on_empty_collection(self, mod, monkeypatch, docs):
+        calls: list[dict] = []
+        monkeypatch.setattr(mod, "update_docs", lambda snap: calls.append(snap) or [])
+        monkeypatch.setattr(sys, "argv", ["collect-test-coverage.py", "--update-docs"])
+        monkeypatch.setattr(mod, "_collect", lambda _targets: 5)  # NO_TESTS_COLLECTED 合法
+        mod.collected.clear()
+        mod.main()  # 不应 sys.exit
+        assert len(calls) == 1

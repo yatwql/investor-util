@@ -179,7 +179,7 @@ PYTHONWARNDEFAULTENCODING=1 .venv/bin/python -m pytest src/test/unit -q
 | 新报告章节 | `registry.py` 注册表 → `reports-instruction.md`（目录/章节表/分组表/可见性总表/页签上限）→ `requirements.md` 章清单 → `technical.md`（结果区计数/`report_section_order`）→ `how-to-use-tui-menu.md`（报告块编号段）→ `folders.md`（新 partial/模板）→ `report_template.html` include |
 | 新功能开关 | `features.py` 注册表 → `how-to-config.md`（开关表+计数+实验/常规分列+Web 面板行）→ `how-to-use-tui-menu.md`（开关区行与编号）→ `technical.md`（语义命名表/开关计数）→ `testplan.md`（若涉门禁） |
 | 新文件/目录 | `folders.md` 目录树（`check-doc-drift --sync` 回写统计表）→ 若为 `scripts/*`：本文件「辅助脚本速查」一览与分类段 |
-| 新测试 | `conftest.py` marker 注册（若需）→ `.venv/bin/python scripts/collect-test-coverage.py` 刷新 `test-coverage.md` → 边缘用例入 `*_edge.py` |
+| 新测试 | `conftest.py` marker 注册（若需）→ `.venv/bin/python scripts/collect-test-coverage.py --update-docs` 回写 `test-coverage.md`/`folders.md` 计数行（不带标志仅输出供人工对照）→ 边缘用例入 `*_edge.py` |
 | 新 LLM 模块/seam | `registry.py` + 统一附录（`skeleton._build_prompt_appendix`）+ `technical.md`（语义命名表/seam 表/附录 H）→ 指纹条件并入用例 |
 | 每个计划收尾（通用） | `plan.md`（状态翻转+归档 note）→ 当期计划归档文档（归档段+设计文档索引，入 0.12 期归档）→ `review-findings.md`（rf 登记，rf-next 递增）→ `changelog.md`（含 rf token）→ `test-coverage.md`/`folders.md` 计数刷新 → 涉版本时 `check-version-consistency` |
 
@@ -896,7 +896,7 @@ A: 运行 `.venv/bin/python scripts/check-test-markers.py`，脚本会静态扫�
 | `install-claude-hook.py` | 测试 | 安装/卸载 Claude Code PostToolUse hook（任务编号一致性自动校验） |
 | `llm-hallucination-sampler.py` | 测试 | 10 组标准持仓 × LLM 幻觉率采样（薄 CLI，实现在 `_halluc_sampler/` 包） |
 | `calibrate-dedup-threshold.py` | 测试 | 新闻去重阈值校准分析 |
-| `collect-test-coverage.py` | 测试 | 测试覆盖计数收集（`--collect-only` 快照，供 test-coverage.md 更新） |
+| `collect-test-coverage.py` | 测试 | 测试覆盖计数收集（`--collect-only` 快照；`--update-docs` 回写 test-coverage/folders 计数行） |
 | `smoke-web.py` | 测试 | Web 模式 HTTP 冒烟脚本（test_client 进程内全链路断言，可独立运行） |
 | `check-version-consistency.py` | 质量 | 版本号全局一致性检查（P0/P2 守护脚本 + 发布流程必跑） |
 | `check-style-guardrails.py` | 质量 | 设计护栏机检（DESIGN.md 护栏样式面；E 级：强调色越权/明暗同步/双面 token 对表判 finding，W 级：裸色值/圆角档位观察统计——**观察期**未入钩子与 CI） |
@@ -1222,12 +1222,14 @@ sh .githooks/install-hooks.sh --off   # 停用
 只做 `.venv/bin/python -m pytest --collect-only`（收集测试项，**不执行测试**，耗时约 2s），模式计数谓词由 `_test_runner/modes.py::MODES` 的 marker 表达式现场编译，输出各模式 / unit 子标记 / scenario 分组 / 跨类标记 / 功能域 / 文件分布的项数，供 `docs/managements/test-coverage.md` 快照更新使用。
 
 ```bash
-.venv/bin/python scripts/collect-test-coverage.py
+.venv/bin/python scripts/collect-test-coverage.py                 # 仅输出（人工对照改文档）
+.venv/bin/python scripts/collect-test-coverage.py --update-docs   # 按本次快照回写计数行
 ```
 
 **说明**：
 - 只收集不执行——测试体不会运行，不影响测试结果，也不会触发真实数据源 / LLM 调用
 - 项数随版本迭代变化，属撰写时快照，精确计数以本脚本实时输出为准
+- **`--update-docs` 回写**：按本次快照改写 `test-coverage.md` 计数行（反引号标记行 + 能映射到标记的加粗标签行，比对域与 `check-doc-drift` 的计数核对同构、复用其行匹配原语，写后必然通过 `--with-test-count` 核对）与 `folders.md` 项目统计表「测试用例」行；只改数字、粗体/千分位/后缀原样保留，内容一致则零变更（幂等）；收集退出码非 0/5（如收集期校验中断）时**跳过回写**并告警，错数不落盘。与 `test-runner --mode bench --update-docs`（写耗时对照表）互不重叠
 - 计数口径直接取自 `MODES` 的 marker 表达式（复用 pytest 自身的 `-m` 求值器，`verify` / `dev-verify` 等组合模式与阶段 marker 回落同源），表达式只在 `modes.py` 定义一处、模式增删自动跟随；`all`（已由「总收集: N」表达）与 `live`（默认收集宇宙排除，计数恒 0）为显式豁免并在脚本内注记理由
 
 ### 质量类
@@ -1837,11 +1839,11 @@ registry 的测试在 `src/test/unit/core/test_registry.py`，验证 TTL 默认�
 发布版本前，必须运行：
 
 ```bash
-.venv/bin/python scripts/collect-test-coverage.py
+.venv/bin/python scripts/collect-test-coverage.py --update-docs
 ```
 
-按实时收集结果核对/更新以下文档的数据快照（非版本号），保证统计与目录结构时效性：
-- `test-coverage.md` — 模式/unit 子标记/跨类/功能域各项测试计数
+按实时收集结果回写/核对以下文档的数据快照（非版本号），保证统计与目录结构时效性：
+- `test-coverage.md` — 模式/unit 子标记/跨类/功能域各项测试计数（`--update-docs` 自动回写）
 - `folders.md` — 项目统计表及目录树新增/重命名文件；**版本演进对照表（`## 版本演进对照`）每次发布必须更新**：「最新发布」列按新 tag 重跑快照统计（复现方法见 folders.md 表头：`git ls-tree` + `git cat-file --batch` 计行 + `git grep -c "def test_"` 数用例），「当前开发版」列同步重跑；列头版本号与 tag/日期由 `check-version-consistency.py --fix`（`evolution_head`/`release_tag` 断言）同步，只改版本号不刷演进表数据行属发布遗漏
 - `datasource.md` + `datasource-reliability.md` — 数据源清单/路由归属/可靠性描述与实际代码配置一致
 

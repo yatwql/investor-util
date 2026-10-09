@@ -9,6 +9,8 @@
 
 ## [0.12.7-dev] - 开发中（未发布）
 
+- **工程质量/工具**：**测试计数轻量回写开关**——`collect-test-coverage.py` 新增 `--update-docs`：按本次快照回写 `test-coverage.md` 计数行（反引号标记行 + 已映射标签加粗行，比对域与 `check-doc-drift` 计数核对**同构**、复用其行匹配原语，写后必过 `--with-test-count`）与 `folders.md`「测试用例」行；只改数字保粗体/千分位/后缀、幂等、收集非 0/5 跳过回写；快照单源 `_build_snapshot()`（与输出分节同出一份，同名键覆盖次序对齐子进程 stdout 解析）。实施收尾刷计数不再需要整跑 bench（流程纪律维持 bench 仅发布刷新/换机）；文档触点 developer-guide ×4、CLAUDE 发布刷新句、folders 目录树同步；回归 7 项 | rf-641
+
 - **兼容/守护**：**Windows 钩子日志回放乱码修复**——pre-commit 十守护经 `run_bg` 重定向落盘，中文 Windows 上 Python 按 locale ANSI（cp936）编码，UTF-8 终端回放成乱码（前台直打正常、回放段落乱码的分界与 `WriteConsoleW` vs 文件落盘吻合）；修复 = 钩子 `export PYTHONUTF8=1` + `scripts/_checklib.py` 导入时把非 UTF-8 的真实 stdout/stderr 收敛到 UTF-8（已 UTF-8 / `StringIO` 桩零改写），守护详情在 Windows 可读；回归 4 项 | rf-640
 
 - **工程质量/守护**：**单文件行数红线体系三域定档（主程序/脚本/测试）**——`check-file-length` 检查域扩到 `scripts/` 递归全集（警戒 400 / 红线 1000，含包内子模块），主程序硬上限 800 → 1000（警告 500 维持），测试 800/1200 维持；阈值与警戒区收敛为 `_LIMIT_BY_KIND` / `_WARN_BY_KIND` / `_HINT_BY_KIND` 三域单源。域内最大单文件 `factor_zoo_eval.py`（1595 行）按「评测核心 / 阶段编排 / 判定书」拆为 `scripts/_factor_zoo/` 包（catalog/probe/metrics/stages/report 五模块 342/228/562/410/135 行，入口仅留 CLI 与原面 re-export，既有 40 项测试零改动），CLI 冒烟（`--help` + catalog 阶段落盘）通过；边界/三域收集/脚本警戒区新增 4 项用例。决策与理由记入 technical.md 约束 C28「大文件红线体系（主程序/脚本/测试）」，developer-guide 阈值表/门禁注记/脚本表、CLAUDE 守护描述与 review-findings P3 口径同步 | plan-113
