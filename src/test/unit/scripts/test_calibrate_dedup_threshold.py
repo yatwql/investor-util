@@ -210,3 +210,21 @@ class TestReportOutput:
         out = capsys.readouterr().out
         assert "其中含真专名证据: 1 条" in out
         assert "会新增合并 1 条" in out
+
+
+class TestProperNounVetoSource:
+    """真专名判定与生产同源：泛词否决表经单源原语生效（校准展示面同步）。"""
+
+    def test_shared_helpers_apply_generic_veto(self, tool):
+        # 黄金 ETF 两报：共享 token 只有 etf（被否决）→ 不算真专名证据
+        assert tool._shared_carries_proper_noun("全球黄金ETF资金净流入创纪录", "8月全球黄金ETF净流入创新高") is False
+        assert tool._shared_proper_nouns("全球黄金ETF资金净流入创纪录", "8月全球黄金ETF净流入创新高") == []
+        # CPI 同事件两报：非否决短缩写照常作证据（bg2 设计用例不受影响）
+        assert tool._shared_carries_proper_noun("CPI同比增长2.5%", "CPI涨2.5%超预期") is True
+
+    def test_rules_legend_lists_generic_veto(self, tool, capsys):
+        tool._print_current_rules()
+        out = capsys.readouterr().out
+        assert "非泛词" in out
+        for word in tool._GENERIC_TOKENS:
+            assert word in out
