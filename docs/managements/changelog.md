@@ -9,6 +9,12 @@
 
 ## [0.12.9-dev] - 开发中（未发布）
 
+- **计划**：**plan-70 窗口期满重判（2026-10-10 执行）**——读数：experiment_stats `decision_reflection` 启用 17 → 24（判据①不成立）、`fold_ledger()` 已结算 2 <10（判据②成立；已结算 outcome 均 flat、`directional_total=0`、`sample_sufficient=false`），但 2026-10-08 单批 8 条 pending（`horizon_bars=5`）预计 10-15 前后集中结算、如期 settled=10 恰好达标 → 有达标趋势；按 10-09 裁定三元条件（判据②成立 **且** 无达标趋势才撤销）**本轮不撤销、不转正**，终判顺延至该批结算后——用户确认 10-15 后执行终判（settled ≥10 → 据 doctor 账本概览评估转正，正式命中率另需 `directional_total ≥ 20`；仍 <10 且无新增结算 → 按原文撤销）。
+
+- **配置**：**LLM Provider 链精简（用户指定）**——`data/config/llm_providers.json` 移除 `kimi-main` / `kimi-code` 两条条目，链路只剩 `deepseek-main`（主，priority 20）+ `opencode-go`（备，priority 30）；`opencode-go` 的 `pacing.min_interval` 1s → 5s（订阅端点收紧节流）。改前备份 `llm_providers.json.bak-20261010`（git 忽略）。
+
+- **文档**：**管理与用户文档核对修复（rf-656 / rf-657）**——① `how-to-config-llm.md` / `faq.md` 的 429 口径按 rf-647 / rf-653 后实现改写（429 归 `quota` 终态、首试即 600s 长冷却熔断零退避重试，503 才按 `max_retries` 退避），并补登缺项：全局键 `llm_full_fail_retry_delay`（8 → 9 项）、`{module}` 后缀清单与 `enabled_llm` 三处 JSON 示例补 `self_review` / `holding_change`、`how-to-config.md` cache_ttl 表补 `llm_holding_change`（2h 内容寻址）；② `folders.md` 版本演进对照「当前开发版」列按 2026-10-10 工作区重跑（主程序 345 / 91,291、测试 508 / 147,773、用例 9,412、代码合计 945 / 260,418、仓库 1,174 / 336,261，增长比与口径附注同步：严格口径 9,359、收集 9,882 / 9,902、行数比 147,773 / 91,291）；③ review-findings 的 rf-654 归位「已解决问题」区。
+
 - **修复/分析**：**事实校验器四类语境缺口（rf-655）**——① **回放/回测语境未豁免**：调仓纪律回放的模拟指标（规则A/买入持有 的区间收益、最大回撤、夏普）与持仓实际收益率不同源，句中无 6 位代码时被全局最近邻兜底归因到无关品种并自动「修正」（实盘：回放句「区间收益 -5.35% 优于买入持有 -7.16%」的 -7.16% 被改为 096001 的 9.2%，把正确数据改错且与回放面板自相矛盾）；② **回撤紧邻窗口被远端收益词击穿**：「收益 -5.35%、最大回撤 10.28%」中 10.28 因前 15 字符窗口含「收益」被排除回撤语境；③ **历史（已清仓）代码未纳入有效集**：LLM 提示词含【环比变化】清仓行与统一附录【持仓变动复盘】块，引用已清仓代码（如 159222）属合法历史语境，却被误报「不在当前持仓中」；④ **近并列排名无差距注记**：市值差仅 0.05% 的两只品种排名随快照时点翻转，告警未提示该脆弱性。修复：① `_REPLAY_KEYWORDS` + `_is_replay_context` 整句跳过；② `_is_drawdown_context` 增紧邻优先（≤8 字符内回撤词优先于远端收益词）；③ `extract_historical_codes` 从 `pipeline_data` 动态提取历史代码并入 `extra_valid_codes`；④ `_near_tie_note` 在市值差 <1% 时附加差距注记（不改变严重级别）。回归 16 项。
 
 - **UI/报告**：**行动建议章正文默认折叠**——正文大块包进 `details.section-fold`（与财经新闻关联、组合演进等已折叠各章同构）：提示条携带行动摘要与「点击展开/收起」指引，默认收起，锚点/打印展开由 fold.js 对全部折叠块统一生效；「回到顶部」与降级占位（无持仓数据）留在折叠块外常显。需求 R-OUT-12 覆盖清单同步（含此前漏登的持仓变动复盘/调仓纪律回放），新增 `TestActionSectionFold` 5 项结构回归。

@@ -65,7 +65,8 @@ LLM 配置由三个独立文件管理：
     "health_check": true,
     "penetration_deep": true,
     "news_correlation": false,
-    "self_review": false
+    "self_review": false,
+    "holding_change": true
   },
   "temperature_global_macro": 0.3,
   "max_tokens_global_macro": 3072,
@@ -196,7 +197,7 @@ LLM 配置由三个独立文件管理：
 
 - **缺省即无约束**：不写 `pacing` 的 provider 行为与未引入本机制时**逐字节一致**（零开销直通）。因此同一份配置里，可以把订阅制端点收紧、把按量端点放开。
 - **与全局并发叠加**：`llm_max_concurrency` 仍限制总线程数（默认 3）；`pacing.max_concurrency` 是**额外**的每端点上限，两者同时生效。例如全局 3 线程 + 订阅制端点 `max_concurrency: 1` ⇒ 该端点始终串行，其余端点可达 3 路并行。
-- **失败分类与重试**：端点返回 **403**（配额/风控拒绝，如 `You've reached your 5-hour usage limit` / `concurrent request limit`）时**不重试**——这类限制按时间窗口滚动、重试无益且会加剧风控画像；报告将显示「LLM 端点配额/风控限制已触发」并降级到下一 provider。**429 / 503** 仍按 `max_retries` 重试。
+- **失败分类与重试**：端点返回 **403**（配额/风控拒绝，如 `You've reached your 5-hour usage limit` / `concurrent request limit`）时**不重试**——这类限制按时间窗口滚动、重试无益且会加剧风控画像；报告将显示「LLM 端点配额/风控限制已触发」并降级到下一 provider。**503** 仍按 `max_retries` 重试；**429** 归 `quota` 终态不重试——限速属配额/风控终态，首试即以 600s 长冷却熔断该端点并降级下一 provider（与 403 同路径，记 `FAIL_REASON_QUOTA_EXCEEDED`）。
 - **抖动与间隔的线程安全**：同一端点的间隔串行与在途计数均为线程安全（per-端点锁 + 信号量），不同端点互不阻塞。
 - **429 诊断回显**：端点返回 429 时日志**先回显两级实际配置再给建议**——`当前配置：全局 llm_max_concurrency=…；provider[条目] pacing.max_concurrency=…、pacing.min_interval=…`（端点约束未声明标「未配置（不限流）」、间隔未声明标「未配置」），再按**生效并发 = min(全局, 端点)** 分支：生效并发 >1 只建议**绑定项**（哪级等于生效并发才建议调哪级，非绑定项注明须低于对方现值才生效）；任一级已到 1（生效并发=1）就不再叫你调低任何并发旋钮——端点已配 1 时调低全局根本不减少该端点在途并发——改推请求间隔 `min_interval`；生效并发与间隔均已到底时会明确提示「429 更可能来自请求速率或配额（RPM/TPM）/风控而非并发」。凡建议调整处均带当前值，不必翻配置找基数。
 
@@ -272,7 +273,7 @@ LLM Provider 状态
 
 ## 模块启停
 
-通过 `enabled_llm` 嵌套字典控制每个模块的开关。除 `news_correlation`（新闻 LLM 关联分析）与 `self_review`（生成后自检，实验能力）默认关闭外，其余默认开启：
+通过 `enabled_llm` 嵌套字典控制每个模块的开关。除 `news_correlation`（新闻 LLM 关联分析）与 `self_review`（生成后自检，实验能力）默认关闭外，其余默认开启（`holding_change` 持仓变动复盘归因的启停同时受报告章节开关 `holding_change_review` 约束）：
 
 ```json
 "enabled_llm": {
@@ -281,7 +282,8 @@ LLM Provider 状态
   "health_check": true,
   "penetration_deep": true,
   "news_correlation": false,
-  "self_review": false
+  "self_review": false,
+  "holding_change": true
 }
 ```
 
@@ -344,11 +346,12 @@ LLM 分析结果默认缓存，避免重复调用 API 浪费费用：
 
 ## 配置项总览
 
-> 以下为 `llm_settings.json` 的全部配置项。`{module}` 占位符替换为具体的模块后缀（global_macro / expert_review / health_check / penetration_deep / news_correlation）。
+> 以下为 `llm_settings.json` 的全部配置项。`{module}` 占位符替换为具体的模块后缀（global_macro / expert_review / health_check / penetration_deep / news_correlation / self_review / holding_change）。
 
-配置分为**全局配置**和**模块级配置**两类。全局配置共有 8 项：
+配置分为**全局配置**和**模块级配置**两类。全局配置共有 9 项：
 
-- `max_retries`（int，默认 `2`）：遇到 429 或 503 时最多重试次数
+- `max_retries`（int，默认 `2`）：**503**/超时/网络异常最多重试次数（**429/403 归 quota 不重试**——429 首试即 600s 长冷却熔断）
+- `llm_full_fail_retry_delay`（int，默认 `30`）：整链全挂后的延迟重试等待秒数（`0`=不等待）——网络/超时/单次 API 错误等**瞬时类**失败在整链失败后等待该秒数重试 1 次；配额（429/403）与熔断终态不重试
 - `llm_max_concurrency`（int，默认 `3`）：LLM 模块并发生成的最大线程数。设为 1 时完全串行，设为 4 及以上可提升速度但可能触发 API 限速（429）。建议值 2-3
 - `llm_max_thinking_concurrency`（int，默认 `1`）：开启 Extended Thinking 的模块（health_check / expert_review 等 `thinking_enabled_{module}=true`）并发的最大请求数。多 thinking 模块同时涌向 DeepSeek 等强制推理端点时偶发返回空 content（HTTP 200 空响应），此信号量将 thinking 请求串行化（同时最多 N 个，默认 1），非 thinking 模块不受此限。设大可提升 thinking 并发速度，但可能提高偶发空响应概率，建议保持默认 1
 
@@ -448,7 +451,9 @@ LLM 分析结果默认缓存，避免重复调用 API 浪费费用：
     "expert_review": true,
     "health_check": true,
     "penetration_deep": true,
-    "news_correlation": false
+    "news_correlation": false,
+    "self_review": false,
+    "holding_change": true
   },
 
   // ═══════════════════════════════════════════
@@ -868,17 +873,18 @@ Kimi 开放平台提供 Anthropic API 兼容端点，`provider` 设为 `"claude"
 | 状态码 | 含义 | 程序行为 |
 |---|---|---|
 | **403** | 配额/风控拒绝（5 小时窗口、并发上限、月度额度） | **不重试**，直接降级下一 Provider；报告显示「LLM 端点配额/风控限制已触发」 |
-| **429 / 503** | 瞬时限流 / 服务端过载 | 按 `max_retries`（默认 2）退避重试 |
+| **429** | 瞬时限流（配额/风控终态） | **不重试**：首试即长冷却熔断该端点 600s，日志回显两级并发配置并自动降级下一 Provider |
+| **503** | 服务端过载 | 按 `max_retries`（默认 2）退避重试 |
 | **401** | Key 与 Base URL 不配套 | 认证失败，不重试；核对步骤 1/2 |
 
-> 403 **不重试**是刻意设计：配额窗口按时间滚动（非瞬时故障），重试无益且高频重试会加剧风控画像。
+> 403 **不重试**是刻意设计：配额窗口按时间滚动（非瞬时故障），重试无益且高频重试会加剧风控画像。429 同归 `quota` 终态（限速即配额/风控信号）：首试即 600s 长冷却熔断、零退避重试，避免无效请求与日志噪音。
 
 **换 Key 后仍会看到的两处「无害提示」**
 
 | 现象 | 原因 | 处理 |
 |---|---|---|
 | 报告「LLM 用量」页签费用显示 **`-`** | `kimi-for-coding` 不在内置计价表，且订阅制**不按 token 计费**，费用无意义 | 可不处理（`-` 即「未计价」）。若要显示参考值，在 `llm_settings.json` 的 `pricing` 段自填等效单价 |
-| 请求偶发较慢 | 订阅端点高峰时段（工作日 14:00–17:00）偶发 `429 The engine is currently overloaded`（服务端容量，与账号无关） | 程序按 `max_retries` 重试；避开高峰更稳 |
+| 请求偶发较慢 | 订阅端点高峰时段（工作日 14:00–17:00）偶发 `429 The engine is currently overloaded`（服务端容量，与账号无关） | 程序首试即熔断该端点 600s 并降级下一 Provider（不退避重试）；避开高峰更稳，或为该条目配置 `pacing.min_interval` 降低请求频率 |
 </details>
 
 <details>

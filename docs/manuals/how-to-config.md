@@ -341,6 +341,7 @@
 | `llm_health_check` | `llm_health_check_{fingerprint}.json` | 24h | 持仓明细（排除行情波动） | 持仓体检报告 |
 | `llm_penetration_deep` | `llm_penetration_deep_{fingerprint}.json` | 24h | 持仓明细（排除行情波动） | 穿透深度分析 |
 | `llm_self_review` | `llm_self_review_{fingerprint}.json` | 2h | 四个分析模块的产出文本摘要 + 持仓/穿透摘要（**内容寻址**：产出不变即命中） | 生成后自检（⚗ 默认关） |
+| `llm_holding_change` | `llm_holding_change_{fingerprint}.json` | 2h | 变动事实块 + 信号对账块 + 持仓摘要 + 申购限购约束块（**内容寻址**：进提示词必进指纹） | 持仓变动复盘归因（章本体 `holding_change_review` 默认关，开启后归因默认开） |
 | `llm_debate_pro` | `llm_debate_pro_{fingerprint}.json` | 24h | 复用 expert_review 持仓指纹（排除行情波动） | 辩论白脸（实验功能） |
 | `llm_debate_con` | `llm_debate_con_{fingerprint}.json` | 24h | 复用 expert_review 持仓指纹（排除行情波动） | 辩论黑脸（实验功能） |
 | `llm_debate_synthesis` | `llm_debate_synthesis_{fingerprint}.json` | 24h | 复用 expert_review 持仓指纹（排除行情波动） | 辩论综合（实验功能） |

@@ -1,6 +1,6 @@
 # 投资复盘助手 - 自我审查问题记录
 > 文档版本：0.12.9-dev
-> **编号源**：`rf-next = 656`（新增问题取此编号，完成后更新为 +1；已用最大 rf-655，递增保证唯一，归档不回收。若与历史归档冲突，运行 `scripts/check-task-numbering.py` 校验）
+> **编号源**：`rf-next = 658`（新增问题取此编号，完成后更新为 +1；已用最大 rf-657，递增保证唯一，归档不回收。若与历史归档冲突，运行 `scripts/check-task-numbering.py` 校验）
 
 ---
 
@@ -47,15 +47,19 @@
 
 ## 已解决问题
 
+- rf-657 已修复（2026-10-10，管理文档核对）：**`folders.md` 版本演进对照「当前开发版」列过时**——该列为滚动读数，仍停留在 2026-10-09 发布日快照（主程序 344 文件 / 90,627 行、测试 506 / 146,728、`def test_` 行数 9,346），与同文件「项目统计」（345 / 91,291、508 / 147,773、收集 9,882）及实测不一致，口径附注同过时（严格口径 9,293、pytest 收集 9,784 / 9,804、行数比 146,728 / 90,627）。修复：按表内复现方法以 2026-10-10 工作区重跑第三列全部读数（11 行 + 增长比 + 列头日期）与附注三读数；前两列固定快照不动。
+
+- rf-656 已修复（2026-10-10，管理文档核对）：**LLM 用户手册落后于 429 实现口径且有缺登记**——rf-647 / rf-653 已把 429 归 `quota` 终态（首试即 600s 长冷却熔断、零退避重试，503 才按 `max_retries` 退避），`llm-technical.md` / `requirements.md` / `technical.md` / `developer-guide.md` 已同步，但用户手册漏改：`how-to-config-llm.md` 4 处（失败分类与重试、`max_retries` 键说明、状态码表 429/503 合并行、高峰 429 无害提示行）与 `faq.md` 429 Q&A 仍写「429 按 max_retries 退避重试」；同文件另缺登三处：全局键清单缺 `llm_full_fail_retry_delay`（rf-653 已入已知键集，「全部配置项」声明下不可检索）、`{module}` 后缀清单缺 `self_review` / `holding_change`、`enabled_llm` 三处 JSON 示例缺同两键；`how-to-config.md` 的 cache_ttl 表缺 `llm_holding_change`（`data_registry` 已登记 2h）。修复：按实现与 llm-technical 口径改写 / 补齐上述各处。
+
 - rf-655 已修复（2026-10-10，用户报告持仓体检报告事实校验 3 条提示 + 2 处自动误修正）：**事实校验器四类语境缺口**——① **回放/回测语境未豁免**：调仓纪律回放面板的模拟指标（规则A/买入持有 的区间收益、最大回撤、夏普）与持仓实际收益率不同源，句中无 6 位代码时被全局最近邻兜底归因到无关品种并自动「修正」（实盘：回放句「区间收益 -5.35% 优于买入持有 -7.16%」的 -7.16% 被改为 096001 的 9.2%，把正确数据改错且与回放面板自相矛盾）；② **回撤紧邻窗口被远端收益词击穿**：`_is_drawdown_context` 的「前 15 字符有收益词则非回撤」排除逻辑在「收益 -5.35%、最大回撤 10.28%」中把 10.28 判为收益语境；③ **历史（已清仓）代码未纳入有效集**：LLM 提示词含【环比变化】清仓行与统一附录【持仓变动复盘】块，引用已清仓代码（如 159222）属合法历史语境，却被品种存在性校验误报「不在当前持仓中」；④ **近并列排名无差距注记**：市值差仅 0.05% 的两只品种排名随快照时点翻转，告警未提示该脆弱性。修复：① `_constants._REPLAY_KEYWORDS` + `_context._is_replay_context`（整句判定，回放/回测/买入持有/What-if/as-if），在 `check_numerical_consistency` 主循环整句跳过；② `_is_drawdown_context` 增紧邻优先（match 前 ≤8 字符内回撤词直接判回撤，优先于远端收益词排除）；③ `generators_orchestrator.extract_historical_codes` 从 `pipeline_data["diff"]`（removed/added）与 `holding_change_data.events` 动态提取历史代码并入 `extra_valid_codes`（四模块均生效，穿透代码仍仅限三模块）；④ `_ranking._near_tie_note` 在市值差 <1% 时于告警文案尾附加差距注记（不改变严重级别）。回归 16 项（`test_fact_checker_replay_context.py`）。
 
 - rf-652 已修复（2026-10-10，用户报告盘后「价格更新状态 8/13」长期缺数）：**场外净值缓存新鲜度门禁对国内场外误用 QDII 的 T-1 阈值**——`_OTC_NAV_ROUTES`（`price_fund_otc`）把国内场外与 QDII 一律按前一交易日判新鲜，而国内场外 T 日当晚即披露净值、盘后应已达 T；实测数据源（东财）已返回 T（10-09），缓存仍停在 T-1（10-08）被门禁放行，报告口径（`price_update_status` 国内场外仅认 T）与缓存口径不一致 → 5 只国内场外长期计为未更新。修复：`_price_cache_fresh` 增 `name` 形参并按 `is_qdii_extended` 细分（QDII 保留 T-1、国内场外要求 T），两处调用点传入持仓名（`fetcher/price.py` 强刷路径 `expected_name`、`report/market_value.py` CACHE_ONLY 路径 `h.name`）。回归 4 项（QDII T-1 新鲜 / 国内场外 T-1 过时 / 国内场外 T 新鲜 / 端到端强刷并验证持仓名转发）；`unit/fetcher` + `unit/report` 3076 项全绿。
 
 - rf-653 已处置（2026-10-10，过去 72h 实现技术债核查：BASE=`424f25b5^..HEAD`，78 提交）：三项修复——① **LLM 429 行为变更后文档未同步**：rf-647 把 429 由「可重试」改判 `quota` 终态（首试即 600s 长冷却熔断、零退避重试），但 `llm-technical.md`（§4.2 与 403 的配合 / §6.1「四层容错」/ §6.2 重试表 / §6.3 失败原因表）、`requirements.md`（R-LLM-10 + `max_retries` 说明）、`technical.md`（LLM 降级 + C26）、`developer-guide.md`（测试载体描述）仍写 429 重试——按实现改写，并把 429 长冷却与「全链延迟重试（`llm_full_fail_retry_delay`）」补入容错层次与失败原因表；② **`llm_full_fail_retry_delay` 未登记为已知键**：`skeleton._execute_llm_with_finalize` 直接读取该键，但 `_DEFAULT_LLM_SETTINGS` 与 `get_known_llm_settings_keys()` 均无——用户在 `llm_settings.json` 设置会被判「未知配置项…请删除」，与消费端读取矛盾；补入默认集/模板/已知键集，并加结构回归（默认集 ⊆ 已知键集 + 设置该键不产生未知键告警）；③ **`_factor_zoo` 包内根路径三处重复计算**：`catalog/metrics/stages` 各自 `Path(__file__).resolve().parents[2]`（rf-636 同类「拆包后层级算错静默失效」风险），收敛为包 `__init__.py` 的 `PROJECT_ROOT` 单一来源。
 
-### 归档档案
-
 - rf-654 已修复（2026-10-10，量化指标开关合并（plan-115）实施中自查）：**熔断器 `_ff_was_off` 标记只读不写**——`_check_feature_flag` 的「Feature Flag 打开时自动重置断路器状态」分支依赖 `_ff_was_off`，但全仓无任何写入点，该契约从未生效；关闭期到来前的残留失败计数会跨开关周期累计，开关刚打开即可能误触发断路。修复：关闭期为已有状态写入标记（解熔路径保持原语义），开回时清零残留；并补 6 项熔断 FF 联动用例（关闭不计失败 / 开启正常计数断路 / 关闭自动解熔 / 开回清残留 / 映射外指标不受约束 / 关闭时不执行计算——此前该联动零覆盖）。
+
+### 归档档案
 
 - [`archived_review-findings.0.12.x.md`](../archive/v0.12.x/archived_review-findings.0.12.x.md) — v0.12.1 ~ v0.12.8 批次（2026-10-03 ~ 2026-10-09）
 - [`archived_review-findings.0.11.x.md`](../archive/v0.11.x/archived_review-findings.0.11.x.md) — v0.11.0 ~ v0.11.11  （2026-09-18 ~ 2026-10-02）
