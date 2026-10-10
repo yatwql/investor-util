@@ -214,6 +214,8 @@ def fetch_index_history(code: str, days: int = 365) -> list[dict] | None:
     跳过 is_a_share_code 类型检查。
 
     同次会话同一代码命中 DataSourceRegistry.session_cache（会话级复用）。
+    返回结果短于请求窗口且存在链路文件缓存时自动清缓存全量重取一次
+    （窗口缩水自愈；实测腾讯/东财 A 股指数 K 线实际上限 ~2000 根 ≈ 8 年）。
 
     Args:
         code: 指数代码，如 "sh000300" / "gb_inx"
@@ -227,7 +229,11 @@ def fetch_index_history(code: str, days: int = 365) -> list[dict] | None:
     if not code:
         return None
 
-    from src.python.fetcher.chain import FailureDiagnostics, fetch_with_incremental_fallback
+    from src.python.fetcher.chain import (
+        FailureDiagnostics,
+        clear_incremental_cache,
+        fetch_with_incremental_fallback,
+    )
 
     # 先查会话缓存（会话级复用）：缓存条目记为 ``(days, bars)``，**仅在缓存窗口不小于
     # 本次需求时复用**——否则「某调用者先用短窗口取过 → 后续要长窗口的调用者拿到更短
@@ -249,6 +255,20 @@ def fetch_index_history(code: str, days: int = 365) -> list[dict] | None:
     diag = FailureDiagnostics()
     try:
         result = fetch_with_incremental_fallback(chain_name, code, days, diagnostics=diag)
+        # 窗口缩水自愈：增量合并路径从 last_cached_date 起补数，旧的短窗口文件缓存
+        # 会把序列钉死在旧长度（实测：请求 2000 天只返回历史缓存的 91 根）。
+        # 仅当链路文件缓存存在（钉死成因）且结果仍短于请求窗口时清缓存全量重取
+        # 一次；无文件缓存时短结果即源上限，不重试
+        file_cached = cache_get(f"history_{chain_name}_{code}", CACHE_WEEKLY) or []
+        if result and len(result) < days and file_cached:
+            logger.info(
+                "[index] %s 返回 %d 根 < 请求 %d 天，清链路缓存全量重取",
+                code,
+                len(result),
+                days,
+            )
+            clear_incremental_cache(chain_name, code)
+            result = fetch_with_incremental_fallback(chain_name, code, days, diagnostics=diag)
     except Exception as exc:
         logger.warning("[index] 指数历史日线获取异常: %s", code, exc_info=True)
         result = []

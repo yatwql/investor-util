@@ -212,3 +212,106 @@ class TestBondYieldFetcher:
 
         rf = get_risk_free_rate(cache_ok=False)
         assert rf is None
+
+
+class TestRiskFreeRateHistory:
+    """get_risk_free_rate_history：10Y 国债收益率全历史序列（ERP 因子数据底座）。"""
+
+    @staticmethod
+    def _make_history_df() -> pd.DataFrame:
+        """两行模拟：首行 10Y 为 NaN（早期年份常态），末行合法。"""
+        return pd.DataFrame(
+            [
+                ["2026-07-16", None],
+                ["2026-07-17", 1.7404],
+            ],
+            columns=["日期", "中国国债收益率10年"],
+        )
+
+    @patch("src.python.fetcher.bond_yield.cache_set")
+    @patch("src.python.fetcher.bond_yield.cache_get", return_value=None)
+    @patch("akshare.bond_zh_us_rate")
+    def test_history_normal(self, mock_ak, _cg, _cs):
+        """正常返回 → rate 转小数、NaN 行剔除。"""
+        mock_ak.return_value = self._make_history_df()
+
+        from src.python.fetcher.bond_yield import get_risk_free_rate_history
+
+        rows = get_risk_free_rate_history()
+        assert rows == [{"date": "2026-07-17", "rate": pytest.approx(0.017404)}]
+
+    @patch("src.python.fetcher.bond_yield.cache_set")
+    @patch("src.python.fetcher.bond_yield.cache_get", return_value=None)
+    @patch("akshare.bond_zh_us_rate")
+    def test_history_cache_hit(self, mock_ak, mock_cg, _cs):
+        """缓存命中 → 不触达 akshare。"""
+        cached = [{"date": "2026-01-01", "rate": 0.02}]
+        mock_cg.return_value = cached
+
+        from src.python.fetcher.bond_yield import get_risk_free_rate_history
+
+        assert get_risk_free_rate_history() == cached
+        mock_ak.assert_not_called()
+
+    @patch("src.python.fetcher.bond_yield.cache_set")
+    @patch("src.python.fetcher.bond_yield.cache_get")
+    @patch("akshare.bond_zh_us_rate")
+    def test_history_empty_no_breaker_pollution(self, mock_ak, mock_cg, _cs):
+        """空数据属代码级结果 → 返回兜底/None，不向共享熔断键记失败。"""
+        mock_ak.return_value = pd.DataFrame()
+        mock_cg.return_value = None
+
+        with patch("src.python.core.provider_registry.get_registry") as reg:
+            reg.return_value.is_circuit_broken.return_value = False
+            from src.python.fetcher.bond_yield import get_risk_free_rate_history
+
+            assert get_risk_free_rate_history() is None
+        reg.return_value.record_failure.assert_not_called()
+
+    @patch("src.python.fetcher.bond_yield.cache_set")
+    @patch("src.python.fetcher.bond_yield.cache_get")
+    @patch("akshare.bond_zh_us_rate")
+    def test_history_column_missing_no_breaker(self, mock_ak, mock_cg, _cs):
+        """列缺失（接口改版）属代码级 → 不计熔断失败。"""
+        mock_ak.return_value = pd.DataFrame({"日期": ["2026-07-17"], "其他列": [1.0]})
+        mock_cg.return_value = None
+
+        with patch("src.python.core.provider_registry.get_registry") as reg:
+            reg.return_value.is_circuit_broken.return_value = False
+            from src.python.fetcher.bond_yield import get_risk_free_rate_history
+
+            assert get_risk_free_rate_history() is None
+        reg.return_value.record_failure.assert_not_called()
+
+    @patch("src.python.fetcher.bond_yield.cache_set")
+    @patch("src.python.fetcher.bond_yield.cache_get", return_value=None)
+    @patch("akshare.bond_zh_us_rate")
+    def test_history_exception_records_transport(self, mock_ak, _cg, _cs):
+        """调用异常（传输级）→ 计入共享 akshare 熔断（与单值版同键同故障域）。"""
+        mock_ak.side_effect = TimeoutError("boom")
+
+        with patch("src.python.core.provider_registry.get_registry") as reg:
+            reg.return_value.is_circuit_broken.return_value = False
+            from src.python.fetcher.bond_yield import get_risk_free_rate_history
+
+            assert get_risk_free_rate_history() is None
+        assert reg.return_value.record_failure.call_args[0][0] == "akshare"
+
+    @patch("src.python.fetcher.bond_yield.cache_set")
+    @patch("src.python.fetcher.bond_yield.cache_get")
+    @patch("akshare.bond_zh_us_rate")
+    def test_history_stale_fallback(self, mock_ak, mock_cg, _cs):
+        """实时获取失败 → 7 天内旧缓存兜底（rf 日变动仅数 bp）。"""
+        from src.python.core.constants import CACHE_WEEKLY
+
+        stale = [{"date": "2026-07-10", "rate": 0.018}]
+
+        def _get(key: str, ttl: float):
+            return stale if ttl >= CACHE_WEEKLY else None
+
+        mock_cg.side_effect = _get
+        mock_ak.return_value = pd.DataFrame()
+
+        from src.python.fetcher.bond_yield import get_risk_free_rate_history
+
+        assert get_risk_free_rate_history() == stale

@@ -972,7 +972,8 @@ fetcher/
 ├── chain_incremental.py  历史序列增量合并（payload 版本闸门 + 按日合并/连续性校验）
 ├── batch.py            批量并行调度（BatchDispatcher；间隔限速实现见 core/throttle.py）
 ├── akshare.py          AKShare 数据获取（备用数据源）
-├── bond_yield.py       债券收益率数据
+├── bond_yield.py       债券收益率数据（Rf 单值 + 10Y 历史序列双键）
+├── index_valuation.py  指数估值历史（乐咕 PE/PB 月频，市场温度估值因子）
 ├── news.py             新闻数据获取
 └── history_diff.py     持仓快照差异计算（纯计算，无 I/O）
 ```
@@ -3763,7 +3764,8 @@ investor-util/
 | 行业资金流向 | akshare 今日排名（直达） | `fetcher/akshare.py`（封装 `akshare_extras.py`） |
 | 股票历史分红 | akshare 无参全量拉取后按代码过滤（直达） | `fetcher/akshare.py`（封装 `akshare_extras.py`） |
 | 基金经理数据 | 天天基金 HTML 解析（主）→ 档案页回退 | `fetcher/fund_manager.py` |
-| 无风险利率（Rf） | akshare `bond_zh_us_rate`（Sina 国债收益率）→ 手动配置兜底 | `fetcher/bond_yield.py` |
+| 无风险利率（Rf） | akshare `bond_zh_us_rate`（Sina 国债收益率，单值 + 历史序列双键）→ 手动配置兜底 | `fetcher/bond_yield.py` |
+| 指数估值历史（PE/PB 月频，温度估值因子） | akshare 乐咕 `stock_index_pe_lg`/`stock_index_pb_lg`（单源，30 天旧缓存兜底） | `fetcher/index_valuation.py` |
 | 个股/ETF 历史 K 线 | 腾讯财经 K 线 → 新浪财经 K 线（双链路 fallback） | `fetcher/chain_incremental.py`（`tencent.py` / `sina.py`） |
 | 场外基金历史净值 | 天天基金 `pingzhongdata` → 东方财富净值分页 | `fetcher/chain_incremental.py` |
 | 指数历史 K 线（A 股指数） | 腾讯财经 K 线 → 东方财富 push2his 指数 K 线 → 新浪财经 K 线 → 同花顺官方（需 key） | `fetcher/index.py` |
@@ -3829,7 +3831,8 @@ investor-util/
 |:-----|:----------|:---:|:--------:|:----|:-----|
 | `tracking` | `holdings_tracking.json` | 30 天 | — | — | 无分组 |
 | `calendar` | `trading_calendar.json` | 14 天 | — | — | 无分组 |
-| `bond_yield` | `bond_yield_rf`（精确键名） | 1 天 | — | — | refresh |
+| `bond_yield` | `bond_yield_rf` / `bond_yield_history`（精确键名） | 1 天 | — | — | refresh |
+| `idx_valuation` | `idx_valuation_`（前缀，当前仅 sh000300） | 7 天 | — | — | refresh |
 
 > `—` 表示精确键名（无指纹后缀），TTL 到期后刷新。
 
@@ -3937,7 +3940,7 @@ investor-util/
 
 > `valuation_data`（估值分位，C19 契约，3 键 + 内嵌 `by_code` 子键）：`{"available": bool, "status": str, "by_code": {code: {"pe": float\|None, "pb": float\|None, "price_percentile": float\|None, "tier": str\|None, "sample_count": int, "percentile_available": bool}}}`。当前 PE/PB 由 `fetcher/industry.py::fetch_valuation_fields`（网关入口；东财 push2 扩展字段 f9/f23 与行业分类同属一次请求，经 Provider Chain + 文件/会话缓存取用，报告层不得直连 provider）；`price_percentile` 为历史 K 线价格分位代理（0~100，`analysis/valuation_percentile.py`，MIN_SAMPLES=60），非真实历史估值分位（盈利增长未纳入，渲染层必须展示 `DISCLAIMER`"价格分位代理，非真实历史估值分位"）。由 `report/orchestrator.py::compute_valuation_data` 计算（开关 功能开关 `valuation_percentile` 默认关；关闭 → None → 「资产穿透TOP10」估值列隐藏；PE/PB 与 K 线皆不可得 → available=False 落 §1.4.5 占位）。消费方：穿透 TOP10 Excel `penetration_sheet` 估值分位列（ncols 10→11 + 表尾免责）与 HTML `report_template.html` 条件列（`valuation_enabled`）。**真实历史估值分位（TTM 口径，后续增强）**：`by_code` 另含 `real`（子契约：`available`/`pe_ttm`/`pb`/`pe_percentile`/`pb_percentile`/`tier`/`basis`/`sample_count`/`report_period`/`reason`）与 `real_available`，由 `analysis/valuation_percentile.py::compute_real_valuation` 用「多期 TTM 每股收益（年报直取、季报累计差分）× 该日已生效最新一期基本面 × 历史收盘价」构造历史 PE/PB 序列后取当前值分位（生效日取法定披露截止日以避免前视偏差；PE 优先、PB 兜底；样本下限 60）。多期基本面来自 `fetcher/financial_indicator.py::fetch_indicator_series`；渲染层**优先展示真实分位并标注 basis，无基本面覆盖时回落价格分位代理**（分别对应 `DISCLAIMER_REAL` / `DISCLAIMER_PROXY`，两者不得混口径展示）。**数据底座门禁**：真实分位以 `config.datasink_feature_ready`（`datasink.enabled` 开启 且 凭据就绪，纯本地判定）为前提——未就绪时 `_fetch_valuation_for_code` 不做任何取数与计算，`compute_valuation_data` 置 `basis_mode="proxy_only"`，估值列文案与免责语**逐字回退到引入前的原样**（Excel `penetration_sheet.valuation_footer_note` / HTML `valuation_real_basis` 同一判据）；就绪时为 `basis_mode="real_ttm"`。
 
-> `market_temperature_data`（市场温度，C19 契约，9 键）：`{"available": bool, "status": str, "index_code": str, "index_name": str, "price_percentile": float\|None, "ma_deviation": float\|None, "volatility": float\|None, "score": float\|None, "tier": str\|None, "disclaimer": str}`。价格分位（复用估值分位的价格分位机制）+ 均线偏离 + 年化波动率三因子合成温度分（0~100，`analysis/market_temperature.py`，权重 0.5/0.3/0.2，各分量 clamp；**波动率分量反向**——A 股高波动多现于恐慌下跌，波动越高分量越低，“越波动越冷”）；**温度计只给刻度、无仓位指令**（`TEMPERATURE_DISCLAIMER` 渲染层必须展示）。`ma_deviation`/`volatility` 为小数比例（0.032=3.2%），渲染层须 ×100 转百分数展示。由 `report/orchestrator.py::compute_market_temperature_data` 计算（指数 K 线 `fetch_index_history` 沪深300 走 Chain + session_cache；开关 功能开关 `market_temperature` 默认开；关闭 → None → 「投资分析汇总」温度行隐藏；K 线不足 → `insufficient` 占位）。消费方：汇总 Excel `summary._write_market_temperature`（「市场指数」后刻度行）与 HTML kv-table（`market_temperature` 展示映射）。
+> `market_temperature_data`（市场温度，市场温度数据契约字段语义，16 键）：`{"available": bool, "status": str, "index_code": str, "index_name": str, "price_percentile": float\|None, "valuation_percentile": float\|None, "valuation_components": dict\|None, "first_factor": str\|None, "ma_deviation": float\|None, "volatility": float\|None, "score": float\|None, "tier": str\|None, "sample_count": int, "components": dict\|None, "reason": str\|None, "disclaimer": str}`。**第一因子为估值分位**（PE/PB/ERP 各自历史分位等权，样本下限 60；`fetcher/index_valuation.py` 乐咕月频 PE/PB + `bond_yield` 10Y 国债收益率历史序列 → `build_erp_series` 按日期 asof 对齐成股债性价比）；估值序列不可得时回落**点位分位**（`first_factor="price_proxy"`，行为=升级前口径；降级链：实时 → 30 天旧缓存兑底 → 点位分位，防源时好时坏导致档位翻跳）。第一因子 + 均线偏离 + 年化波动率三因子合成温度分（0~100，`analysis/market_temperature.py`，权重 0.5/0.3/0.2，各分量 clamp；**波动率分量反向**——A 股高波动多现于恐慌下跌，波动越高分量越低，“越波动越冷”）；回看窗口 2000 交易日（实测腾讯/东财源上限 ≈8 年；链路文件缓存短于请求窗口时自动清缓存全量重取——窗口缩水自愈）。`price_percentile` 始终计算（双轨保留，展示/回落用）；**温度计只给刻度、无仓位指令**（`TEMPERATURE_DISCLAIMER` 渲染层必须展示）。`ma_deviation`/`volatility` 为小数比例（0.032=3.2%），渲染层须 ×100 转百分数展示。由 `report/orchestrator.py::compute_market_temperature_data` 计算（指数 K 线 `fetch_index_history` 沪深300 走 Chain + session_cache；开关 功能开关 `market_temperature` 默认开；关闭 → None → 「投资分析汇总」温度行隐藏；K 线不足 → `insufficient` 占位）。消费方：汇总 Excel `summary._write_market_temperature`（三因子行首项按 `first_factor` 动态展示「估值分位/价格分位」）与 HTML kv-table（`first_label`/`first_value` 展示映射）。
 
 > `financial_report_digest_data`（持仓个股财报摘要，C19 契约，5 键）：`{"available": bool, "reason": str, "rows": list[dict], "failures": list[dict], "entry_count": int}`。`rows` 每项含 `code`/`name`/`symbol`/`report_period`/`doc_type`（中文标签）/`title`/`announcement_date`/`summary`/`source`/`adjunct_url`；`failures` 每项含 `code`/`name`/`reason`。对持仓 + 穿透中的 A 股标的，取最新年报（无年报退半年报）的目标章节正文并按 `datasink.max_chars` 截断，由 `report/financial_report_digest.py::build_financial_report_digest` 装配（数据源 `providers/datasink.py`，取数编排 `fetcher/financial_report.py`）。开关 功能开关 `financial_report_digest` 默认关（关闭 → None → 章节隐藏）；缺凭据/无 A 股标的/全部无覆盖 → `available=False` 降级。合规：`source` 为披露平台归属，渲染层须保留。C7 注册：该契约并入合并章 `fundamental_snapshot` 的 `data_flag_any`（无独立 type）。消费方：Excel `report/fundamental_snapshot_sheet.py::_write_digest_block` 与 HTML `partials/fundamental_snapshot_section.html`（区块二）。
 >

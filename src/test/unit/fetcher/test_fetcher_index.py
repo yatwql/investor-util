@@ -494,6 +494,53 @@ class TestFetchIndexHistory(unittest.TestCase):
         self.assertEqual(len(result), 1)
         mock_fetch.assert_called_once_with("history_index_us", "gb_inx", 200, diagnostics=ANY)
 
+    @patch("src.python.core.provider_registry.get_registry")
+    @patch("src.python.fetcher.chain.fetch_with_incremental_fallback")
+    @patch("src.python.fetcher.index.cache_get")
+    def test_window_shrink_heals_when_file_cache_present(self, mock_cache, mock_fetch, mock_get_reg):
+        """链路文件缓存钉死旧窗口 → 清缓存全量重取一次（窗口缩水自愈回归）。"""
+        from src.python.core.provider_registry import NOT_FOUND
+
+        mock_reg = MagicMock()
+        mock_reg.session_cache_get.return_value = NOT_FOUND
+        mock_get_reg.return_value = mock_reg
+        mock_cache.return_value = [self._SAMPLE_KLINE_1]  # 文件缓存存在（旧短窗口）
+        full = [self._SAMPLE_KLINE_1, self._SAMPLE_KLINE_2]
+        mock_fetch.side_effect = [[self._SAMPLE_KLINE_1], full]
+
+        from src.python.fetcher.index import fetch_index_history
+
+        with patch("src.python.fetcher.chain.clear_incremental_cache") as mock_clear:
+            result = fetch_index_history("sh000300", days=365)
+
+        self.assertEqual(result, full)
+        self.assertEqual(mock_fetch.call_count, 2)
+        mock_clear.assert_called_once_with("history_index", "sh000300")
+        # 最终以重取结果写会话缓存（后续调用者拿到长窗口）
+        mock_reg.session_cache_set.assert_called_once_with("history_index", "sh000300", (365, full), source="api")
+
+    @patch("src.python.core.provider_registry.get_registry")
+    @patch("src.python.fetcher.chain.fetch_with_incremental_fallback")
+    @patch("src.python.fetcher.index.cache_get")
+    def test_no_heal_without_file_cache(self, mock_cache, mock_fetch, mock_get_reg):
+        """无链路文件缓存时短结果即源上限 → 不重取（避免白打一次请求）。"""
+        from src.python.core.provider_registry import NOT_FOUND
+
+        mock_reg = MagicMock()
+        mock_reg.session_cache_get.return_value = NOT_FOUND
+        mock_get_reg.return_value = mock_reg
+        mock_cache.return_value = None
+        mock_fetch.return_value = [self._SAMPLE_KLINE_1]
+
+        from src.python.fetcher.index import fetch_index_history
+
+        with patch("src.python.fetcher.chain.clear_incremental_cache") as mock_clear:
+            result = fetch_index_history("sh000300", days=365)
+
+        self.assertEqual(result, [self._SAMPLE_KLINE_1])
+        self.assertEqual(mock_fetch.call_count, 1)
+        mock_clear.assert_not_called()
+
 
 class TestFetchUsIndicesRetryPolicyDelegation(unittest.TestCase):
     """美股主链路重试走 core/retry 唯一原语（RetryPolicy + retry_transient）。

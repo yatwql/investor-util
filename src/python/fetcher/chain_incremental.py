@@ -295,6 +295,15 @@ def _call_history_provider(
     return []
 
 
+def clear_incremental_cache(chain_name: str, code: str) -> None:
+    """清空增量链路的文件缓存（供调用方检测到窗口缩水时强制全量重取）。
+
+    缓存键格式与 :func:`fetch_with_incremental_fallback` 保持一致，
+    避免调用方重复拼接键名。
+    """
+    cache_clear(f"history_{chain_name}_{code}")
+
+
 def _merge_by_date(cached: list[dict], new_data: list[dict]) -> list[dict]:
     """按日期合并去重，new_data 中同天数据覆盖 cached（修正感知）。
 

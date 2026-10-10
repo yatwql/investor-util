@@ -21,7 +21,9 @@ from src.python.config import get_config
 logger = logging.getLogger("invest")
 
 _CACHE_KEY_RF = "bond_yield_rf"
+_CACHE_KEY_HISTORY = "bond_yield_history"
 _CACHE_TTL_RF = 86400  # 1 天
+_CACHE_TTL_HISTORY = 86400  # 1 天（日频数据）
 
 
 def get_risk_free_rate(cache_ok: bool = True) -> float | None:
@@ -136,8 +138,114 @@ def _fetch_from_akshare() -> float | None:
         return None
 
 
+def get_risk_free_rate_history(cache_ok: bool = True) -> list[dict] | None:
+    """获取中国 10Y 国债收益率**历史序列**（日频，升序）。
+
+    与 :func:`get_risk_free_rate` 同源（``bond_zh_us_rate`` 本身返回全历史
+    DataFrame，单值版只取末行）；供股债性价比（ERP = 1/PE − Rf）
+    分位因子等需要历史对照的消费方使用。
+
+    Args:
+        cache_ok: 是否读缓存（True）或强制实时获取（False）。
+
+    Returns:
+        [{"date": "YYYY-MM-DD", "rate": float}, ...] 按日期升序，rate 为小数
+        （0.0174 = 1.74%）；不可得返回 None（缺席，不抛异常）。
+    """
+    if cache_ok:
+        cached = cache_get(_CACHE_KEY_HISTORY, _CACHE_TTL_HISTORY)
+        if isinstance(cached, list) and cached:
+            logger.debug("无风险利率历史: 缓存命中（%d 行）", len(cached))
+            return cached
+
+    from src.python.core.provider_registry import get_registry
+
+    reg = get_registry()
+    if reg.is_circuit_broken("akshare"):
+        stale = _stale_history_fallback()
+        logger.info("无风险利率历史: akshare 已被熔断，%s", "用过期缓存兜底" if stale else "缺席")
+        return stale
+
+    rows = _fetch_history_from_akshare()
+    if not rows:
+        # 注：空数据/列缺失属代码级结果，不计熔断失败（传输异常已在
+        # _fetch_history_from_akshare 内部按异常路径记录）
+        stale = _stale_history_fallback()
+        logger.warning(
+            "无风险利率历史: 全部数据源不可用，%s",
+            "用过期缓存兜底（rf 日变动仅数 bp，7 天陈旧可容忍）" if stale else "返回 None",
+        )
+        return stale
+
+    reg.record_success("akshare")
+    cache_set(_CACHE_KEY_HISTORY, rows)
+    logger.info("无风险利率历史: akshare 获取成功（%d 行，%s ~ %s）", len(rows), rows[0]["date"], rows[-1]["date"])
+    return rows
+
+
+def _stale_history_fallback() -> list[dict] | None:
+    """过期缓存兜底：rf 日变动仅数 bp，7 天陈旧对 ERP 分位几乎无影响。"""
+    from src.python.core.constants import CACHE_WEEKLY
+
+    stale = cache_get(_CACHE_KEY_HISTORY, CACHE_WEEKLY)
+    return stale if isinstance(stale, list) and stale else None
+
+
+def _fetch_history_from_akshare() -> list[dict]:
+    """通过 akshare bond_zh_us_rate() 获取中国 10Y 国债收益率全历史序列。
+
+    Returns:
+        [{"date": "YYYY-MM-DD", "rate": float}, ...] 升序；失败返回 []。
+    """
+    try:
+        import pandas as pd
+
+        import akshare as ak
+    except ImportError:
+        logger.warning("无风险利率历史: akshare 未安装，无法获取")
+        return []
+
+    try:
+        df = ak.bond_zh_us_rate()
+    except Exception as e:
+        # 调用异常（超时/断连/接口失效）：计入共享 akshare 熔断（与
+        # get_risk_free_rate 同键同故障域——同一端点）
+        from src.python.core.provider_registry import get_registry
+
+        get_registry().record_failure("akshare", "bond_yield_history:transport")
+        logger.warning("无风险利率历史: akshare bond_zh_us_rate 异常: %s", e)
+        return []
+
+    try:
+        if df is None or df.empty:
+            logger.warning("无风险利率历史: bond_zh_us_rate 返回空数据")
+            return []
+
+        china_10y_cols = [c for c in df.columns if "10" in str(c) and "中国" in str(c)]
+        if not china_10y_cols:
+            logger.warning("无风险利率历史: 无法定位中国10Y国债收益率列（可用列: %s）", list(df.columns))
+            return []
+        value_col = china_10y_cols[0]
+
+        rows: list[dict] = []
+        for _, r in df.iterrows():
+            raw_date, raw_value = r.iloc[0], r[value_col]
+            if pd.isna(raw_value):
+                continue  # 早期年份常为 NaN，跳过
+            rate = float(raw_value) / 100.0
+            if not (0 < rate < 1):
+                continue
+            rows.append({"date": str(raw_date).strip()[:10], "rate": rate})
+        return rows
+
+    except Exception as e:
+        logger.warning("无风险利率历史: akshare bond_zh_us_rate 异常: %s", e)
+        return []
+
+
 __all__ = [
     "get_risk_free_rate",
+    "get_risk_free_rate_history",
     "_CACHE_KEY_RF",
     "_CACHE_TTL_RF",
     "_fetch_from_akshare",

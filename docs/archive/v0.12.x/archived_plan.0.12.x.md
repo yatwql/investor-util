@@ -12,6 +12,7 @@
 > 追加归档：2026-10-07 plan-84 发布流程分步编排脚本（release.py 七子命令 + 49 项单测）完成（见文末章节）
 > 追加归档：2026-10-09 plan-83 章节类实验转正批次（三项章节级开关迁报告章节与增强组）完成（见文末章节）
 > 追加归档：2026-10-10 plan-115 量化指标 7 个逐项开关合并为单开关 `metrics_enabled` 完成（见文末章节）
+> 追加归档：2026-10-10 plan-116 市场温度第一因子升级为估值分位（估值历史源 + ERP + 窗口拉长）完成（见文末章节）
 > 设计文档索引：plan-72 的设计文档 [`fund-purchase-limit-design.md`](fund-purchase-limit/fund-purchase-limit-design.md) **已随 plan-74 完成一并归档**（本目录 `fund-purchase-limit/`）；plan-73 的 LLM 上下文设计同在 `fund-purchase-limit/fund-purchase-limit-llm-context-design.md`（设计 + 已实施）；plan-76 的快照事件级设计在本目录 `holding-change-review/holding-change-review-design.md`（已实施，§15 实施与验收记录）；plan-77 的 What-if 成本与基准设计在本目录 `whatif-cost-benchmark/whatif-cost-benchmark-design.md`（已实施，§14 门槛与验收记录）；plan-78 的因子目录评测设计在本目录 `factor-zoo-catalog/factor-zoo-catalog-design.md`（已评测·判定转正立项，§13 判定记录）；plan-79 的事件窗设计在本目录 `event-window-impact/event-window-impact-design.md`（已实施，§14 判定记录）；plan-80 的调仓纪律回放设计在本目录 `rebalance-schedule-replay/rebalance-schedule-replay-design.md`（已实施，§14 实施与门槛判定记录）
 
 ---
@@ -297,3 +298,9 @@
 **动作**：注册表 7 条并为 `metrics_enabled`（label「量化指标」，常规组默认开）；`_chart_dataset_factory` / `chart_data_builder` 改传单开关（关闭 → 雷达全轴 N/A，含降级 3 轴路径统一口径）；`circuit_breaker_wrapper` 两份 flag_map 收敛为单常量；旧键按无消费者告警；同步面板编号与计数及各手册表格；补齐欠缺测试；生效面维持现状（不扩到 LLM 指标表/正文，避免提示词指纹变更）
 
 **完成态（2026-10-10）**：注册表 **34 → 28 项（常规 16 → 10）**，TUI 面板 18-24 → 18 单项、后续项前移至 19-22，报告块 29-41 → 23-35（编号由注册表派生自动跟随，Web 面板白名单同源）；雷达过滤由逐轴 `metric_flags` 改为单开关 `metrics_enabled`，**降级 3 轴路径此前不过滤已统一**（关闭 → 全轴 N/A、轴标签与降级标注保留）；熔断器两份 flag_map 收敛为 `_METRICS_FEATURE_FLAG` + `_METRIC_INDICATOR_NAMES` 单点；**修复 `_ff_was_off` 只读不写**（rf-654，「FF 开回时重置断路器」契约从未生效，关闭期残留失败计数会跨开关周期累计）；旧 `features.json` 键按无消费者告警（回归用例锁定不静默）；同步 requirements §11.5、technical §6.7 语义表 + §白名单计数、how-to-config / how-to-use-tui-menu / how-to-use-web-mode / how-to-use-cli-mode / how-to-config-llm 面板编号与计数、folders 统计行与 changelog / review-findings（rf-654）登记；**测试**：新增熔断 FF 联动 6 项（此前零覆盖）+ 降级路径过滤 + 旧键告警回归，同步改写雷达/CLI/TUI/Web/注册表既有用例，`dev-verify` 6474 全绿 + ruff 全绿。
+
+#### ✅ `plan-116` 市场温度第一因子升级为估值分位（估值历史源 + 股债性价比 + 回看窗口拉长） — 已完成（2026-10-10）
+
+**动机**：温度计第一因子原为指数**点位**分位（衡量涨了多少，非贵不贵）且回看窗口仅 750 交易日；对照主流估值派（有知有行/且慢）的关键差距是「估值分位 + 跨周期窗口」。
+
+**完成态（2026-10-10）**：① 新建 `fetcher/index_valuation.py`（akshare 乐咕 `stock_index_pe_lg`/`stock_index_pb_lg`，沪深300 月频 PE/PB 2005 起 259 点；1 周缓存 + 30 天旧缓存兑底；**可选源不向共享 `akshare` 熔断键写失败/成功**——防乐咕故障连坐无风险利率，只读检查）；② `bond_yield` 扩展 `get_risk_free_rate_history`（10Y 全历史 6184 行，`bond_yield_history` 独立键；传输异常才计熔断，空结果/列缺失属代码级不计）；③ 回看窗口 750 → **2000 交易日**（实测腾讯/东财源上限 ≈8 年，2018-07 起；2500 两轮牛熊免费源不可得），并**修复链路文件缓存窗口锁死缺陷**（增量合并从缓存末日补数把短窗口永久钉死——修前实测请求 2000 天只返 91 根；现短于请求窗口且存在文件缓存时自动清缓存全量重取一次，`chain_incremental.clear_incremental_cache` 封装）；④ 第一因子 = PE/PB/ERP 各自历史分位**等权**（样本下限 60；`build_erp_series` 按日期 asof 对齐——修复尾部 zip 会把 2005 年 PE 与近期 rf 错位配对的缺陷，实测 ERP 分位 53.7→77.2），估值序列不可得 → 回落点位分位（`first_factor="price_proxy"`，行为=升级前口径）；契约新增 `valuation_percentile`/`valuation_components`/`first_factor` 三键（16 键），Excel/HTML 三因子行首项按口径动态展示，`TEMPERATURE_DISCLAIMER` 同步；降级链「实时 → 30 天旧缓存 → 点位分位」防源时好时坏导致档位翻跳（实测今日两口径分差 7.6 分、同档）。**测试**：新增 33 项（获取器主/降级/熔断隔离回归 + ERP asof 对齐 + 等权分位 + 编排接线双路径 + 窗口自愈回归），同步既有温度/汇总用例；文档同步 technical 契约注记/数据源表/缓存表/目录树、datasource 两册、folders；plan-next 保持 117。
