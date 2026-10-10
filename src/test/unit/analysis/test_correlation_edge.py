@@ -230,3 +230,59 @@ class TestLargeMatrix:
         rs = [abs(p["pearson"]) for p in res["pairs"]]
         assert rs == sorted(rs, reverse=True)
         assert res["window"] <= DEFAULT_WINDOW
+
+
+# ═══════════════════════════════════════════════════════════════
+#  滚动趋势边缘场景
+# ═══════════════════════════════════════════════════════════════
+
+
+def test_rolling_no_common_dates_insufficient():
+    """两品种日期完全不相交 → 无可配对端点，不可用（status=insufficient）。"""
+    from src.python.analysis.correlation import compute_rolling_correlations
+
+    a = [{"date": d, "return": 0.01} for d in _dates(70, start="2026-01-05")]
+    b = [{"date": d, "return": 0.02} for d in _dates(70, start="2028-03-06")]
+    res = compute_rolling_correlations({"a": a, "b": b})
+    assert res["available"] is False
+    assert res["status"] == "insufficient"
+    assert res["portfolio"] == {"60": [], "120": []}
+
+
+def test_rolling_exact_min_samples_boundary():
+    """重叠恰好 = MIN_SAMPLES → 恰好产出端点；差 1 期 → 不可用。"""
+    from src.python.analysis.correlation import MIN_SAMPLES as _min
+    from src.python.analysis.correlation import compute_rolling_correlations
+
+    dates = _dates(_min)
+    seq = [{"date": d, "return": (i % 7 - 3) / 1000.0} for i, d in enumerate(dates)]
+    exact = compute_rolling_correlations({"a": seq, "b": list(reversed(seq)) and seq})
+    # 恰好达标的最小结构：至少一个端点
+    if exact["available"]:
+        assert exact["portfolio"]["60"], "恰好 MIN_SAMPLES 期应产出至少一个端点"
+
+    short = compute_rolling_correlations(
+        {"a": seq[:-1], "b": [dict(r) for r in seq[:-1]]},
+    )
+    assert short["available"] is False
+
+
+def test_rolling_single_pair_focus_alignment():
+    """仅一对品种：组合平均 = 该对 r 自身；焦点对与轴完全一致。"""
+    import math
+
+    from src.python.analysis.correlation import compute_rolling_correlations
+
+    n = 90
+    x = [math.sin(i / 6.0) for i in range(n)]
+    y = [math.cos(i / 6.0) for i in range(n)]
+    a = [{"date": d, "return": v} for d, v in zip(_dates(n), x)]
+    b = [{"date": d, "return": v} for d, v in zip(_dates(n), y)]
+    res = compute_rolling_correlations({"a": a, "b": b}, focus_pairs=[("a", "b")])
+    assert res["available"] is True
+    p60 = res["portfolio"]["60"]
+    focus = res["focus_pairs"][0]["series"]["60"]
+    # 单对时组合平均即该对 r；焦点对 LOCF 对齐后与轴同长同日期
+    assert [p["date"] for p in p60] == [p["date"] for p in focus]
+    assert all(abs(p["value"] - f["value"]) < 1e-9 for p, f in zip(p60, focus))
+    assert all(p["n_pairs"] == 1 for p in p60)

@@ -256,3 +256,150 @@ class TestContract:
         res = compute_correlation_matrix({"a": _returns(x), "b": _returns(y)})
         assert res["sample_count"] >= MIN_SAMPLES
         assert res["window"] <= DEFAULT_WINDOW
+
+
+# ═══════════════════════════════════════════════════════════════
+#  滚动趋势（组合平均 + 重点品对）
+# ═══════════════════════════════════════════════════════════════
+
+
+def _rolling_returns(n: int = 140) -> dict[str, list[dict]]:
+    """合成三品种日收益底座：A 基准、B 同向强正、C 强反向（确定性波形，无随机源）。
+
+    B = 0.9A + 异频小波、C = -0.9A + 异频小波 → A×B 强正、A×C 强负、B×C 强负。
+    """
+    base = _sin(n, freq=7.0)
+    w_b = _sin(n, freq=3.1)
+    w_c = [math.cos(i / 5.3) for i in range(n)]
+    series_b = [0.9 * base[i] + 0.05 * w_b[i] for i in range(n)]
+    series_c = [-0.9 * base[i] + 0.05 * w_c[i] for i in range(n)]
+    return {
+        "AAA": _returns(base),
+        "BBB": _returns(series_b),
+        "CCC": _returns(series_c),
+    }
+
+
+class TestRollingCorrelations:
+    """compute_rolling_correlations：结构、同轴、截断口径与已知方向。"""
+
+    CONTRACT_KEYS = {
+        "available",
+        "status",
+        "windows",
+        "min_samples",
+        "portfolio",
+        "focus_pairs",
+        "coverage",
+        "notes",
+    }
+
+    def test_contract_and_shared_axis(self):
+        """契约键齐全；60/120 两窗共享同一端点轴；值域与 n_pairs 合法。"""
+        from src.python.analysis.correlation import compute_rolling_correlations
+
+        res = compute_rolling_correlations(
+            _rolling_returns(),
+            focus_pairs=[("AAA", "BBB")],
+        )
+        assert set(res.keys()) == self.CONTRACT_KEYS
+        assert res["available"] is True and res["status"] == "ok"
+        p60, p120 = res["portfolio"]["60"], res["portfolio"]["120"]
+        assert p60 and p120
+        # 同轴：两窗端点日期序列完全一致（渲染层共享 labels 的结构前提）
+        assert [p["date"] for p in p60] == [p["date"] for p in p120]
+        # 端点轴单调升序
+        dates = [p["date"] for p in p60]
+        assert dates == sorted(dates)
+        for p in p60:
+            assert -1.0 <= p["value"] <= 1.0
+            assert p["n_pairs"] >= 1
+        assert res["coverage"]["dates"] > 0
+        assert res["coverage"]["first_date"] <= res["coverage"]["last_date"]
+        assert res["notes"], "口径句必须外送（渲染层只引用不复述）"
+
+    def test_focus_pair_direction_matches_construction(self):
+        """构造方向可验证：A×B 末点强正、A×C 末点强负；日期 ⊆ 组合端点轴。"""
+        from src.python.analysis.correlation import compute_rolling_correlations
+
+        res = compute_rolling_correlations(
+            _rolling_returns(),
+            focus_pairs=[("AAA", "BBB"), ("AAA", "CCC")],
+        )
+        focus = {(f["code_a"], f["code_b"]): f for f in res["focus_pairs"]}
+        s_ab = focus[("AAA", "BBB")]["series"]["60"]
+        s_ac = focus[("AAA", "CCC")]["series"]["60"]
+        assert s_ab and s_ac
+        assert s_ab[-1]["value"] > 0.8, f"A×B 应强正，实际 {s_ab[-1]['value']}"
+        assert s_ac[-1]["value"] < -0.8, f"A×C 应强负，实际 {s_ac[-1]['value']}"
+        axis = {p["date"] for p in res["portfolio"]["60"]}
+        assert all(pt["date"] in axis for pt in s_ab)
+        assert all(pt["date"] in axis for pt in s_ac)
+
+    def test_portfolio_avg_consistent_with_static_matrix(self):
+        """滚动末点组合平均 ≈ 静态矩阵（同 60 窗）配对 r 的均值——两层口径同源。"""
+        from src.python.analysis.correlation import (
+            compute_correlation_matrix,
+            compute_rolling_correlations,
+        )
+
+        data = _rolling_returns()
+        static = compute_correlation_matrix(data)
+        assert static["available"]
+        expected = sum(p["pearson"] for p in static["pairs"]) / len(static["pairs"])
+        res = compute_rolling_correlations(data)
+        last_avg = res["portfolio"]["60"][-1]["value"]
+        assert abs(last_avg - expected) < 0.01, f"滚动末点 {last_avg} vs 静态均值 {expected}"
+
+    def test_short_history_truncates_window_with_note(self):
+        """历史 < 120 期 → 120 窗按可得区间截断（序列仍产出 + notes 标注 + full_from=None）。"""
+        from src.python.analysis.correlation import compute_rolling_correlations
+
+        res = compute_rolling_correlations(_rolling_returns(n=80), focus_pairs=None)
+        assert res["available"] is True
+        p120 = res["portfolio"]["120"]
+        assert p120, "历史不足时 120 窗应按可得区间截断计算，而非整段缺席"
+        assert res["coverage"]["full_window_from"]["120"] is None
+        assert any("120" in n and "按可得区间" in n for n in res["notes"]), res["notes"]
+
+    def test_long_history_records_full_window_start(self):
+        """历史 ≥ 120 期 → full_window_from 记录完整窗起始，截断段在 notes 说明。"""
+        from src.python.analysis.correlation import compute_rolling_correlations
+
+        res = compute_rolling_correlations(_rolling_returns(n=140))
+        full_120 = res["coverage"]["full_window_from"]["120"]
+        assert full_120 is not None
+        assert any("120 日窗完整重叠自" in n for n in res["notes"]), res["notes"]
+
+    def test_insufficient_single_code_keeps_structure(self):
+        """单品种 → 不可用，但结构键仍在（渲染层无需分支判空）。"""
+        from src.python.analysis.correlation import compute_rolling_correlations
+
+        res = compute_rolling_correlations({"AAA": _rolling_returns()["AAA"]})
+        assert res["available"] is False and res["status"] == "insufficient"
+        assert res["portfolio"] == {"60": [], "120": []}
+        assert res["focus_pairs"] == [] and res["notes"] == []
+
+    def test_unknown_focus_pair_skipped_with_note(self):
+        """焦点对代码不在数据中 → 跳过并给出重点品对说明句。"""
+        from src.python.analysis.correlation import compute_rolling_correlations
+
+        res = compute_rolling_correlations(_rolling_returns(), focus_pairs=[("AAA", "ZZZ")])
+        assert res["available"] is True
+        assert res["focus_pairs"] == []
+        assert any("重点品对" in n for n in res["notes"])
+
+    def test_constant_code_contributes_no_pair(self):
+        """常数收益品种与任何品种算不出 r → 其配对序列为空、组合平均只计其余对。"""
+        from src.python.analysis.correlation import compute_rolling_correlations
+
+        data = _rolling_returns()
+        flat = [{"date": r["date"], "return": 0.0} for r in data["AAA"]]
+        data["DDD"] = flat
+        res = compute_rolling_correlations(data, focus_pairs=[("AAA", "DDD")])
+        assert res["available"] is True
+        # A×D 全程常数 → 该对不产出任何端点 r；焦点对序列为空（渲染层写 --）
+        focus_ad = next(f for f in res["focus_pairs"] if f["code_a"] == "AAA" and f["code_b"] == "DDD")
+        assert focus_ad["series"]["60"] == []
+        # 组合平均仍由 A×B/B×C/A×C 等有效对构成
+        assert all(p["n_pairs"] >= 1 for p in res["portfolio"]["60"])

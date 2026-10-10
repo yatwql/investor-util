@@ -60,6 +60,8 @@ LLM 分析结果独立缓存，通过指纹自动失效，不占用数据源请�
 
 由 `fetcher/index.py` 通过 Provider Chain 获取（`fetch_with_incremental_fallback`）：
 
+> **增量链路通用语义**（`history_stock` / `history_fund_otc` / `history_index` 共用）：缓存命中时从缓存末日起增量续拉、按日期合并后返回末 `days` 条；**当缓存历史短于请求条数时自动改为从头全量拉取一次**（增量永远补不长短缓存，否则滚动窗口类消费会拿到恒定短历史），全量失败回退短缓存降级不阻断；连续性校验（新旧 K 线跳空 > 5 个交易日）同样触发全量刷新。
+
 - **A 股指数** → `history_index` 通道：腾讯财经 → 东方财富 `push2his`（免 key 的独立厂商备源）→ 新浪财经 → 同花顺官方日 K（需 key）。新浪 `getKLineData` 端点实测不可用，故东方财富为实际第二可用源；各 provider 内置传输级退避重试（历史链无链级重试）
 - **美股指数** → `history_index_us` 通道：新浪财经 → 腾讯财经。两者共用指数 K 线函数（`fetch_index_kline`），新浪侧实现位于 `providers/sina_kline.py`，但其 `getKLineData` 端点对全部代码返回 404/空，实际取数通常由腾讯完成；而腾讯 K 线接口对 `gb_*` 代码支持有限，因此该通道可能整链取空——空结果按正常降级记录（成因与现状见 `datasource-reliability.md` §4.2）
 - **风格与因子分析·风格因子回归**（`analysis/style_factor_regression.py`，写入 `style_factor_data` 契约）复用 `history_index` 通道，并行拉取 CSI 风格因子指数 K 线（价值=sh000919、成长=sh000925、质量=sh000930）与基准指数（沪深300 sh000300）做 OLS 回归。因子指数不注册到 `_A_INDICES`（避免污染实时指数循环 fetch_indices），无专属缓存前缀，随 `history_index_` 统一按 TTL 管理

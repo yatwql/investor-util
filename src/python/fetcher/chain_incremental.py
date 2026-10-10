@@ -155,6 +155,14 @@ def fetch_with_incremental_fallback(
     cache_key = f"history_{chain_name}_{code}"
     cached = cache_get(cache_key, CACHE_WEEKLY) or []
     last_cached_date = cached[-1]["date"] if cached else None
+    # 缓存历史短于请求窗口时，增量续拉永远补不长（新数据只从缓存尾部续上，
+    # 合并后仍 < days，且每次调用都重复同一路径）——滚动窗口类消费会拿到恒定
+    # 短历史。此时直接从头全量拉取一次补齐：start_from=None 后 provider 全量
+    # 返回会命中下方「new_data[0] ≤ cached[0]」替换分支刷新缓存；拉取失败则
+    # 落回既有 `elif cached` 分支返回短缓存（降级不阻断，尽力而为满足
+    # 「至少 days 条」契约）。短历史仪器（上市不足 days）重复全量的代价与单次增量等同。
+    if cached and len(cached) < days:
+        last_cached_date = None
 
     registry = get_registry()
     providers = _get_chain(chain_name)
