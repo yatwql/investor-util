@@ -9,6 +9,8 @@
 
 ## [0.12.10-dev] - 开发中（未发布）
 
+- **文档**：**技术文档与代码一致性修复（rf-659）**——`technical.md` 三处：① `valuation_data` 数据契约块同步真实历史估值分位落地后的真值（3→4 顶层键含 `basis_mode`，`by_code` 子项 6→8 键含 `real`/`real_available`）；② `crisis_annotation_data` 键数声明自矛盾修正（8→2 键，与代码 `build_crisis_annotation` 顶层键一致）；③ 3 处符号归属改指真实定义文件（`compute_factor_exposure_data`/`compute_market_temperature_data`/`compute_correlation_data` 实际在 `_report_factor_metrics.py`/`_report_aux_metrics.py`，orchestrator 仅 import 转发）；纯文档侧，零代码影响。
+
 - **文档**：**需求文档模块清单补齐（rf-658）**——`requirements.md` §6.3 报告模块清单表补入「持仓变动复盘」「调仓纪律回放」两行（序号 15/16，开关默认关，原 15~17 顺延为 17~19），消除需求文档内部（与 R-OUT-05「页签 1~19」）及与技术文档/代码注册表（19 项）的不一致；两模块详细需求（§6.13/§6.15）早已存在，仅总清单表滞后。
 
 - **重构/配置**：**联接基金穿透开关取消、穿透内置恒开（plan-117 完成）**——移除 `feeder_penetration` 功能开关（注册表 28→27 项、常规组 11→10；TUI [S] 面板常规块 12-21、报告块 22-34，面板编号文档同步）；`with_feeder_penetration` 删开关分支、穿透无条件执行（结果标注键 `feeder_penetration` 保留，报告「穿透自目标 ETF `XXXXXX`（未折算持有比例）」标注不变）。理由：联接基金本身不持有股票，不穿透即底层暴露恒空，属失真口径而非可选口径；开关默认即开且无真实关闭使用记录。`features.json` 残留该键按「无消费者开关」告警（先例 plan-115 `metrics_*` 口径）。同步：requirements R-PEN-01、technical（§联接基金穿透 + 语义命名表 + 开关声明计数）、how-to-config / how-to-use-tui-menu / how-to-use-web-mode（开关表删行、面板编号与影响报告清单）、how-to-config-llm（[S] 面板编号顺带校正为 8-11/12-21/22-34）。测试：删「开关关闭→不穿透」死用例；`test_switch_on_by_default` 改写为 `test_penetrates_unconditionally`（全仓开关置 False 仍穿透，防开关分支回潮）；`TestRegistryLiveness.REMOVED_STALE_FLAGS` 增列防复活

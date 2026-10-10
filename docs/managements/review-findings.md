@@ -1,6 +1,6 @@
 # 投资复盘助手 - 自我审查问题记录
 > 文档版本：0.12.10-dev
-> **编号源**：`rf-next = 659`（新增问题取此编号，完成后更新为 +1；已用最大 rf-658，递增保证唯一，归档不回收。若与历史归档冲突，运行 `scripts/check-task-numbering.py` 校验）
+> **编号源**：`rf-next = 660`（新增问题取此编号，完成后更新为 +1；已用最大 rf-659，递增保证唯一，归档不回收。若与历史归档冲突，运行 `scripts/check-task-numbering.py` 校验）
 
 ---
 
@@ -47,6 +47,7 @@
 
 ## 已解决问题
 
+- rf-659 已修复（2026-10-10，技术文档↔代码一致性核对）：**`technical.md` 三处与代码真值不一致**——① `valuation_data` 数据契约块过时：声明「3 键 + by_code 子项 6 键」，代码真值（`orchestrator.py::compute_valuation_data` 返回）为 4 顶层键（多 `basis_mode: "real_ttm"|"proxy_only"`）+ `by_code` 子项 8 键（多 `real`/`real_available`）——R-VAL-03 真实历史估值分位落地后契约块未同步；② `crisis_annotation_data` 自相矛盾：声明「8 键」而同块仅列 2 键，代码真值（`build_crisis_annotation`）= 2 顶层键；③ 3 处符号归属文件写错：`orchestrator.py::compute_factor_exposure_data`/`compute_market_temperature_data`/`compute_correlation_data` 实际定义在 `_report_factor_metrics.py`/`_report_aux_metrics.py`（orchestrator 仅 import 转发）。全部为文档侧修复。
 - rf-658 已修复（2026-10-10，需求↔技术文档一致性核对）：**`requirements.md` §6.3 报告模块清单表漏「持仓变动复盘」「调仓纪律回放」两行（表 17 行 vs 注册表/technical/README 均 19）**——两模块详细需求（§6.13 R-HCR、§6.15 R-SR）早已存在，仅总清单表未同步；补两行（序号 15/16，触发 B/L，开关 `holding_change_review`/`rebalance_schedule_replay` 默认关），原 15~17 顺延为 17~19，与 `_REPORT_SECTION_DEFAULT`（19 项）、R-OUT-05（页签 1~19）、reports-instruction「最多 19 个」对齐。
 
 ### 归档档案
