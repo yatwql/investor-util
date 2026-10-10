@@ -129,7 +129,7 @@
 > | 菜单 | 面板标题 | 管什么 | 存放 |
 > |:--|:--|:--|:--|
 > | `[P]` | 配置报告可选章节 | **基础报告章节组 5 项**：基金深度分析 / 市场新闻 / 组合历史走势+回撤 / 组合演进 / 行动建议 | `config.json` 顶层 `enable_*` |
-> | `[S]` | 配置 LLM 报告章节与功能开关 | **LLM 分析章节**（`enabled_llm`）+ **三类功能开关共 28 项**（⚗实验 5 / 常规 10 / 报告章节与增强 13） | `llm_settings.json` / `features.json` |
+> | `[S]` | 配置 LLM 报告章节与功能开关 | **LLM 分析章节**（`enabled_llm`）+ **三类功能开关共 28 项**（⚗实验 4 / 常规 11 / 报告章节与增强 13） | `llm_settings.json` / `features.json` |
 >
 > 简记：**`[P]` = 整章组的开关（`config.json`）；`[S]` = 能力开关与细粒度开关（`features.json` / `llm_settings.json`）**。
 > 报告增强子模块（数据质量仪表盘 / 市场温度 / 行业Beta子表 / 候选基金比较 / 成本流水 / 估值分位 / 持仓个股财报摘要 / 财务指标）属功能开关，**只在 `[S]` 的报告块**；两个面板下方互相给出跳转提示。
@@ -203,10 +203,10 @@
 > |:-------------------|:--------:|:----:|:------|
 > | `llm_debate_procon` | 8 | ⚗ 实验 | 辩论-正反辩论（集中度问答段已内建） |
 > | `decision_reflection` | 9 | ⚗ 实验 | 决策跨期反思闭环 |
-> | `prosperity_framework` | 10 | ⚗ 实验 | 景气度框架诊断 |
-> | `factor_catalog` | 11 | ⚗ 实验 | 因子目录（25 因子五族横截面信号 + 风格与因子分析区区块四） |
-> | `rebalance_schedule_replay` | 12 | ⚗ 实验 | 调仓纪律回放（纪律 vs 放任多期回放：双线图 + 指标对照 + 逐期成本表，type=schedule_replay） |
-> | `deterministic_signal` | 13 | 常规 | 确定性信号模块（原信号预消化 + 确定性信号沉淀合并） |
+> | `factor_catalog` | 10 | ⚗ 实验 | 因子目录（25 因子五族横截面信号 + 风格与因子分析区区块四） |
+> | `rebalance_schedule_replay` | 11 | ⚗ 实验 | 调仓纪律回放（纪律 vs 放任多期回放：双线图 + 指标对照 + 逐期成本表，type=schedule_replay） |
+> | `deterministic_signal` | 12 | 常规 | 确定性信号模块（原信号预消化 + 确定性信号沉淀合并） |
+> | `prosperity_framework` | 13 | 常规 | 景气度框架诊断（六维评分卡；实验转正） |
 > | `module_quality_gate` | 14 | 常规 | 模块级质量分级 |
 > | `decision_header_parse` | 15 | 常规 | 决策头结构化 |
 > | `llm_debate_conditional` | 16 | 常规 | 辩论-条件推理 |

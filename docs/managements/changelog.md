@@ -9,6 +9,8 @@
 
 ## [0.12.9-dev] - 开发中（未发布）
 
+- **功能**：**景气度框架诊断转正入常规组（plan-49 / plan-71 判定执行）**——转正判据（plan-71 定稿）逐项达成：① 六维数据覆盖 6/6（2026-10-10 报告全维非「需核实」）；② 真实复盘认可（24 次运行评分稳定 55/100「部分契合」，10-09 降级运行折算 26/80 语义正确；用户认可评分口径，`concentration_target_pct` 保持 50%——实测前十大集中度 88.55% 使该维压至 4/15，属有效风险提示不调高掩盖）；③ 覆盖 24 天真实使用、跨月快照、真实调仓（159222 止盈后清仓）与真实数据降级；前置降级矩阵 6 场景全绿（09-16）、批内十守护 / dev-verify / verify 全绿。执行：`features.py` 移实验组入常规组、`default False → True`（声明位与评分口径不变）；[S] 面板重排（实验 8-11 / 常规 12-22，prosperity 落 13）；requirements R-PF-01、technical §4.20、五份手册、testplan、README/CLI 示例（改用仍在实验组的 `factor_catalog`）同步；新增转正锁定用例；plan-49 / plan-71 完成并归档。
+
 - **计划**：**plan-70 窗口期满重判（2026-10-10 执行）**——读数：experiment_stats `decision_reflection` 启用 17 → 24（判据①不成立）、`fold_ledger()` 已结算 2 <10（判据②成立；已结算 outcome 均 flat、`directional_total=0`、`sample_sufficient=false`），但 2026-10-08 单批 8 条 pending（`horizon_bars=5`）预计 10-15 前后集中结算、如期 settled=10 恰好达标 → 有达标趋势；按 10-09 裁定三元条件（判据②成立 **且** 无达标趋势才撤销）**本轮不撤销、不转正**，终判顺延至该批结算后——用户确认 10-15 后执行终判（settled ≥10 → 据 doctor 账本概览评估转正，正式命中率另需 `directional_total ≥ 20`；仍 <10 且无新增结算 → 按原文撤销）。
 
 - **配置**：**LLM Provider 链精简（用户指定）**——`data/config/llm_providers.json` 移除 `kimi-main` / `kimi-code` 两条条目，链路只剩 `deepseek-main`（主，priority 20）+ `opencode-go`（备，priority 30）；`opencode-go` 的 `pacing.min_interval` 1s → 5s（订阅端点收紧节流）。改前备份 `llm_providers.json.bak-20261010`（git 忽略）。

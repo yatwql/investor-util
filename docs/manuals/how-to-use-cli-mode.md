@@ -33,7 +33,7 @@ CLI 与 TUI 共享同一套缓存、配置与报告管线，可交替使用。
 | `--output DIR` | 报告输出目录，覆盖 `config.json` 中的 `output_dir`（不存在时自动创建；支持绝对 / 相对路径） |
 | `--verbose` | 详细日志输出到 stderr（默认仅写入 `logs/app.log`） |
 | `--non-interactive` | 跳过首次运行交互式引导（定时任务 / 脚本使用） |
-| `--experiment NAME` | 启用**实验组**功能（只开不关的简写），**仅本次运行生效（不写入 features.json）**。可重复指定；`NAME` 取开关名（如 `prosperity_framework`）或显示名（如 `景气度框架诊断`），`all` = 全部启用 |
+| `--experiment NAME` | 启用**实验组**功能（只开不关的简写），**仅本次运行生效（不写入 features.json）**。可重复指定；`NAME` 取开关名（如 `factor_catalog`）或显示名（如 `因子目录`），`all` = 全部启用 |
 | `--feature NAME=VALUE` | 切换**任意**功能开关（实验组 / 常规组 / 报告章节与增强组均可），**双向**（可开可关）、**仅本次运行生效（不写入 features.json）**。可重复指定；`NAME` 取开关名（如 `doctor_check`），`VALUE` 取 `on`/`off`（也接受 `true`/`false`/`1`/`0`，大小写不敏感）。同名后写覆盖先写 |
 | `--version` | 显示版本号并退出 |
 
@@ -44,7 +44,7 @@ CLI 与 TUI 共享同一套缓存、配置与报告管线，可交替使用。
 > .venv/bin/python -m src.python.cli --experiment llm_debate_procon report --type full
 >
 > # 用显示名指定、可重复叠加
-> .venv/bin/python -m src.python.cli --experiment 决策跨期反思闭环 --experiment 景气度框架诊断 report --type full
+> .venv/bin/python -m src.python.cli --experiment 决策跨期反思闭环 --experiment 因子目录 report --type full
 >
 
 
@@ -64,7 +64,7 @@ CLI 与 TUI 共享同一套缓存、配置与报告管线，可交替使用。
 > .venv/bin/python -m src.python.cli --feature metrics_enabled=off --feature enable_interactive_charts=off report --type full
 > ```
 >
-> 两个参数可同时使用：`--feature` 在 `--experiment` 之后应用，故 `--experiment all --feature prosperity_framework=off` 表示「其余实验功能全开、只关掉景气度框架诊断」。
+> 两个参数可同时使用：`--feature` 在 `--experiment` 之后应用，故 `--experiment all --feature factor_catalog=off` 表示「其余实验功能全开、只关掉因子目录」。
 
 ---
 

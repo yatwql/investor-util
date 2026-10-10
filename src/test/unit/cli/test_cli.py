@@ -142,9 +142,9 @@ class TestArgparse:
     def test_experiment_repeatable(self):
         """--experiment 可重复指定，逐项独立解析。"""
         args = _build_parser().parse_args(
-            ["--experiment", "decision_reflection", "--experiment", "prosperity_framework", "report"]
+            ["--experiment", "decision_reflection", "--experiment", "factor_catalog", "report"]
         )
-        assert args.experiment == [("decision_reflection",), ("prosperity_framework",)]
+        assert args.experiment == [("decision_reflection",), ("factor_catalog",)]
 
     def test_experiment_all(self):
         """--experiment all 展开为全部实验功能。"""
@@ -904,7 +904,7 @@ class TestMainEarlyExitExperiments:
             patch_target,
         )
         assert seen["decision_reflection"] is True
-        assert seen["prosperity_framework"] is False  # 未指定的开关不受影响
+        assert seen["factor_catalog"] is False  # 未指定的实验开关不受影响
 
     def test_without_experiment_flag_keeps_defaults(self):
         """不传开关参数 → 实验组保持默认关闭（对照组，防误判为恒真）。"""

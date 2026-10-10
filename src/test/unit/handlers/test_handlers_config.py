@@ -162,12 +162,12 @@ class TestConfigLlmModulesExperimentalFlags:
         mock_refresh,
         mock_press,
     ):
-        """输入景气度框架诊断的派生编号 → 切换该实验开关，持久化到 features.json。"""
+        """输入景气度框架诊断的派生编号 → 切换该常规开关（默认开 → 关），持久化到 features.json。"""
         from src.python.tui.handlers_config import _cmd_config_llm_modules
 
         _cmd_config_llm_modules()
 
-        mock_save_overrides.assert_called_once_with({"prosperity_framework": True})
+        mock_save_overrides.assert_called_once_with({"prosperity_framework": False})
         mock_press.assert_called_once()
 
     @patch("src.python.tui.handlers_config.press_any_key")

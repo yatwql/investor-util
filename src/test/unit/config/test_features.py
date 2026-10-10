@@ -700,3 +700,14 @@ class TestBannerLogLevel:
         assert banner, "应产出 ⚗ 横幅日志"
         assert all(r.levelno == logging.INFO for r in banner)
         assert not any(r.levelno >= logging.ERROR for r in caplog.records), "横幅不得使用 ERROR 级别（会污染错误统计）"
+
+
+class TestProsperityFrameworkPromotion:
+    """景气度框架诊断实验转正锁定：注册表移入常规组且默认开（评分口径不变，仅分组与默认值）。"""
+
+    def test_promoted_to_standard_default_on(self):
+        sw = feature_switch_registry["prosperity_framework"]
+        assert sw.group == GROUP_STANDARD
+        assert sw.default is True
+        assert sw.affects_report is True
+        assert not is_experimental_switch("prosperity_framework")

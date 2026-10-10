@@ -127,12 +127,12 @@ feature_switch_registry: dict[str, FeatureSwitchDef] = {
         True,
         True,
     ),
-    # ── 实验性功能：投资方法框架（借展开源骨架，需真实组合样本验证评分口径） ──
+    # ── 常规功能：投资方法框架（实验转正项：真实组合样本验证评分口径达成，移入常规组、默认开）──
     "prosperity_framework": FeatureSwitchDef(
         "景气度框架诊断",
         "六维评分卡（景气方向/ROE 低位弹性/全球比较优势/流动性/集中度与周期拼接/业绩回撤印证）评估组合契合度，缺数据维度标记需核实",
-        GROUP_EXPERIMENTAL,
-        False,
+        GROUP_STANDARD,
+        True,
         True,
     ),
     # ── 报告章节与增强：持仓变动复盘（章节类转正项：移出实验组、default 保持 False）──
