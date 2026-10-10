@@ -1,6 +1,6 @@
 # 投资复盘助手 - 自我审查问题记录
 > 文档版本：0.12.10-dev
-> **编号源**：`rf-next = 658`（新增问题取此编号，完成后更新为 +1；已用最大 rf-657，递增保证唯一，归档不回收。若与历史归档冲突，运行 `scripts/check-task-numbering.py` 校验）
+> **编号源**：`rf-next = 659`（新增问题取此编号，完成后更新为 +1；已用最大 rf-658，递增保证唯一，归档不回收。若与历史归档冲突，运行 `scripts/check-task-numbering.py` 校验）
 
 ---
 
@@ -46,6 +46,8 @@
 | **rf-78** | `fetcher/batch.py` | 520 | 维持现状（BatchDispatcher 本身内聚，复核确认不拆；2026-10-02 实测 520，回落至登记值附近（rf-522 重试退避原语收编后下降）） | BatchDispatcher 本身内聚，可维持现状（不拆） |
 
 ## 已解决问题
+
+- rf-658 已修复（2026-10-10，需求↔技术文档一致性核对）：**`requirements.md` §6.3 报告模块清单表漏「持仓变动复盘」「调仓纪律回放」两行（表 17 行 vs 注册表/technical/README 均 19）**——两模块详细需求（§6.13 R-HCR、§6.15 R-SR）早已存在，仅总清单表未同步；补两行（序号 15/16，触发 B/L，开关 `holding_change_review`/`rebalance_schedule_replay` 默认关），原 15~17 顺延为 17~19，与 `_REPORT_SECTION_DEFAULT`（19 项）、R-OUT-05（页签 1~19）、reports-instruction「最多 19 个」对齐。
 
 ### 归档档案
 
