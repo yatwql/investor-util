@@ -9,6 +9,7 @@
 
 ## [0.12.10-dev] - 开发中（未发布）
 
+- **重构/配置**：**联接基金穿透开关取消、穿透内置恒开（plan-117 完成）**——移除 `feeder_penetration` 功能开关（注册表 28→27 项、常规组 11→10；TUI [S] 面板常规块 12-21、报告块 22-34，面板编号文档同步）；`with_feeder_penetration` 删开关分支、穿透无条件执行（结果标注键 `feeder_penetration` 保留，报告「穿透自目标 ETF `XXXXXX`（未折算持有比例）」标注不变）。理由：联接基金本身不持有股票，不穿透即底层暴露恒空，属失真口径而非可选口径；开关默认即开且无真实关闭使用记录。`features.json` 残留该键按「无消费者开关」告警（先例 plan-115 `metrics_*` 口径）。同步：requirements R-PEN-01、technical（§联接基金穿透 + 语义命名表 + 开关声明计数）、how-to-config / how-to-use-tui-menu / how-to-use-web-mode（开关表删行、面板编号与影响报告清单）、how-to-config-llm（[S] 面板编号顺带校正为 8-11/12-21/22-34）。测试：删「开关关闭→不穿透」死用例；`test_switch_on_by_default` 改写为 `test_penetrates_unconditionally`（全仓开关置 False 仍穿透，防开关分支回潮）；`TestRegistryLiveness.REMOVED_STALE_FLAGS` 增列防复活
 
 （本次发布内容见下方归档索引）
 

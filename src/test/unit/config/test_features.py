@@ -393,6 +393,8 @@ class TestRegistryLiveness:
         "metrics_turnover",
         "metrics_risk_contribution",
         "metrics_beta",
+        # 联接基金穿透 → 内置恒开、无开关（穿透是真实口径而非可选口径）
+        "feeder_penetration",
     )
 
     @staticmethod
@@ -432,7 +434,8 @@ class TestRegistryLiveness:
             f"以下开关已被移除，不得回到 _FEATURE_FLAGS_DEFAULT：{resurrected}；"
             "对应能力分别归属 llm_settings.json 的 enabled_llm / config.json 的 "
             "enable_fund_deep_analysis、news_sources、enable_history、anonymization.mode，"
-            "量化指标逐项开关已并入单开关 metrics_enabled"
+            "量化指标逐项开关已并入单开关 metrics_enabled，联接基金穿透已内置恒开"
+            "（fetcher/fund.py::with_feeder_penetration，无开关）"
         )
 
     @pytest.mark.unit

@@ -241,15 +241,6 @@ feature_switch_registry: dict[str, FeatureSwitchDef] = {
         True,
         False,
     ),
-    # ── 常规开关：取数口径（关闭即回退到「联接基金无底层资产」） ──
-    "feeder_penetration": FeatureSwitchDef(
-        "联接基金穿透",
-        "ETF 联接基金按其目标 ETF 的持仓穿透底层资产（目标 ETF 由页面锚点动态解析）；"
-        "置 false 则联接基金维持「持仓不可用」",
-        GROUP_STANDARD,
-        True,
-        True,
-    ),
     # ── 报告章节与增强（声明顺序即面板顺序）──
     "data_quality": FeatureSwitchDef(
         "数据质量仪表盘",

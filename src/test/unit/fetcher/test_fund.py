@@ -601,23 +601,20 @@ class TestWithFeederPenetration(unittest.TestCase):
         self.assertNotIn("feeder_penetration", result)
 
     @patch("src.python.fetcher.fund.fetch_fund_holdings_cached")
-    def test_switch_off_returns_original(self, mock_cached):
-        """switch 关闭时不穿透（回退到「联接基金无底层资产」）。"""
-        from src.python.fetcher.fund import with_feeder_penetration
+    def test_penetrates_unconditionally(self, mock_cached):
+        """穿透内置恒开：不受任何功能开关影响（防开关分支回潮回归）。
 
-        with patch("src.python.config.features.is_feature_enabled", return_value=False):
-            result = with_feeder_penetration("016055", dict(self._FEEDER))
-        self.assertNotIn("feeder_penetration", result)
-        mock_cached.assert_not_called()
-
-    @patch("src.python.fetcher.fund.fetch_fund_holdings_cached")
-    def test_switch_on_by_default(self, mock_cached):
-        """默认开启：不经配置即可穿透。"""
+        缺陷场景：本函数早期以 `feeder_penetration` 开关把关，置 false 即穿透
+        整体失效（联接基金底层暴露恒空）。开关已移除——即便把全仓开关置为
+        False，穿透照常发生。
+        """
         from src.python.fetcher.fund import with_feeder_penetration
 
         mock_cached.return_value = self._TARGET
-        result = with_feeder_penetration("016055", dict(self._FEEDER))
+        with patch("src.python.config.features.is_feature_enabled", return_value=False):
+            result = with_feeder_penetration("016055", dict(self._FEEDER))
         self.assertIn("feeder_penetration", result)
+        mock_cached.assert_called_once()
 
 
 class TestHithinkHoldingsNormalization(unittest.TestCase):

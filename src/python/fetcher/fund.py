@@ -204,6 +204,10 @@ def fetch_fund_holdings(code: str) -> dict[str, Any] | None:
 def with_feeder_penetration(code: str, result: dict[str, Any] | None) -> dict[str, Any] | None:
     """联接基金穿透：以目标 ETF 的持仓代理该基金的底层暴露（**幂等**）。
 
+    穿透**内置恒开**（无功能开关）：联接基金本身不持有股票，不穿透则其底层
+    暴露恒为空，是失真口径而非可选口径；早期的 `feeder_penetration` 开关已于
+    2026-10-10 移除（见 `docs/managements/changelog.md`）。
+
     目标 ETF 经 :func:`fetch_fund_holdings_cached` 取数——与任何基金走同一条
     链路与会话缓存。若用户同时持有该目标 ETF，同一会话内其持仓只请求一次。
 
@@ -217,18 +221,12 @@ def with_feeder_penetration(code: str, result: dict[str, Any] | None) -> dict[st
         result: 取数结果（可为 None）
 
     Returns:
-        穿透后的合并结果；非联接基金、开关关闭或目标 ETF 亦不可得时原样返回 result。
+        穿透后的合并结果；非联接基金或目标 ETF 亦不可得时原样返回 result。
     """
     if not result or result.get("feeder_penetration"):
         return result
     target_code = result.get("feeder_target_code")
     if not target_code:
-        return result
-
-    from src.python.config.features import is_feature_enabled
-
-    if not is_feature_enabled("feeder_penetration"):
-        logger.info("基金 %s 为联接基金，但 switch feeder_penetration 已关闭，不穿透目标 ETF %s", code, target_code)
         return result
 
     target = fetch_fund_holdings_cached(target_code)

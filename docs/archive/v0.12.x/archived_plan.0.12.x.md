@@ -16,6 +16,7 @@
 > 追加归档：2026-10-10 plan-49 / plan-71 景气度框架诊断转正判据达成并实验转正入常规组（见文末章节）
 > 追加归档：2026-10-10 plan-89 大类资产收益贡献分解（大类 → 品种两级同口径归因）完成（见文末章节）
 > 追加归档：2026-10-10 plan-100 CLI 定时任务完成/失败通知（notify 三通道）完成（见文末章节）
+> 追加归档：2026-10-10 plan-117 取消联接基金穿透功能开关（穿透内置恒开）完成（见文末章节）
 > 设计文档索引：plan-72 的设计文档 [`fund-purchase-limit-design.md`](fund-purchase-limit/fund-purchase-limit-design.md) **已随 plan-74 完成一并归档**（本目录 `fund-purchase-limit/`）；plan-73 的 LLM 上下文设计同在 `fund-purchase-limit/fund-purchase-limit-llm-context-design.md`（设计 + 已实施）；plan-76 的快照事件级设计在本目录 `holding-change-review/holding-change-review-design.md`（已实施，§15 实施与验收记录）；plan-77 的 What-if 成本与基准设计在本目录 `whatif-cost-benchmark/whatif-cost-benchmark-design.md`（已实施，§14 门槛与验收记录）；plan-78 的因子目录评测设计在本目录 `factor-zoo-catalog/factor-zoo-catalog-design.md`（已评测·判定转正立项，§13 判定记录）；plan-79 的事件窗设计在本目录 `event-window-impact/event-window-impact-design.md`（已实施，§14 判定记录）；plan-80 的调仓纪律回放设计在本目录 `rebalance-schedule-replay/rebalance-schedule-replay-design.md`（已实施，§14 实施与门槛判定记录）
 
 ---
@@ -327,3 +328,7 @@
 #### ✅ `plan-87` 相关性分析为静态单点 — 已完成（2026-10-10）
 
 **完成态（滚动 60/120 端点窗 + 重点品对滚动相关）**：`analysis/correlation.py::compute_rolling_correlations` 纯计算——端点轴 = 品种日期并集，组合平均 = 每端点全部可算两两 Pearson r 均值（重叠 ≥60 期才计入，n_pairs 外送），端点窗 = min(窗口, 该对可得重叠期数)（历史不足按可得区间截断而非整段缺席，`coverage.full_window_from` 记完整窗起始、`notes` 单源标注口径），重点品对（静态 |r| 降序前 3）在自有重叠日期算 r 后 LOCF 对齐同一条端点网格（60/120 与焦点序列共享 labels，渲染层免对齐）；`_pearson_r` 轻量助手（不算 p 值省端点开销）。数据底座：`FETCH_DAYS` 90→260（≥ max(ROLLING_WINDOWS) 由测试锁），并修复**增量链路短缓存永远补不长**的隐患（`chain_incremental`：缓存 < days 时 start_from 置 None 全量补齐，回退路径保持降级不阻断——无此修复滚动趋势会被 90 日短缓存恒定截断）。编排（`_report_aux_metrics.compute_correlation_data`）：静态可用才算滚动，滚动层 try/except 失败仅 rolling=None（分层降级 §1.4.5），序列在编排层经 `report/downsample::downsample_bars` 下采样（避免分析层反向依赖报告层，分层依赖约束）；不可用路径统一携带 rolling=None（契约键恒在）。呈现：HTML `position_structure_section` 滚动子块（canvas + `drawSimpleChart` 多序列、日期映射对齐防御不传 null、重点品对最新值/首→末趋势表、口径句列示）；Excel `_write_correlation_block` 滚动摘要（窗口行 + 品对行 + 完整窗起始/截断标记）与口径句进说明区。需求 R-COR-01、testplan 批 14、technical（C19 契约 11→12 键 + §4.8 区块描述 + 语义命名表 `compute_rolling_correlations`）、reports-instruction 三处同步。测试：分析 8 + 边缘 3 + 渲染/接线 9 + Excel 4 + chain 回归 2（短缓存全量/长缓存增量语义），静态-滚动同源一致性容差断言锁口径。
+
+#### ✅ `plan-117` 取消联接基金穿透功能开关（穿透内置恒开） — 已完成（2026-10-10）
+
+**完成态（开关移除、穿透无条件执行）**：移除 `feeder_penetration` 功能开关（注册表 28→27 项、常规组 11→10；TUI [S] 面板常规块 12-21、报告块 22-34）；`fetcher/fund.py::with_feeder_penetration` 删 `is_feature_enabled` 分支，穿透无条件执行，结果标注键 `feeder_penetration` 与报告「穿透自目标 ETF（未折算持有比例）」标注不变；`features.json` 残留该键按「无消费者开关」告警（先例 plan-115 `metrics_*` 口径）。**取舍留档**：目标 ETF 锚点解析异常时无一键止血、只能发版修复——解析失败本就原样降级不硬失败，风险可接受。测试：删「开关关闭→不穿透」死用例，`test_switch_on_by_default` 改写为 `test_penetrates_unconditionally`（全仓开关置 False 仍穿透，防开关分支回潮），`TestRegistryLiveness.REMOVED_STALE_FLAGS` 增列防复活。

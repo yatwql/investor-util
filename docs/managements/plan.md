@@ -8,7 +8,7 @@
 
 本文档记录项目的实现计划。已完成的历史版本计划已归档，此处仅跟踪当前迭代中的工作。
 
-**当前迭代**：在办 14 项按「价值 / 收益 / 风险」分三档（2026-10-07 重排，档位定义见「当前迭代待办」）——P1 4 项（风险/核心价值改进 **plan-99/85/91/95**）、P2 7 项（**plan-55** 等待条件型 + 改进批 **plan-88/90/92/93/101/117**）、P3 3 项（**plan-70** 死线观察，已有落地设计 `decision-reflection-shadow-design.md`；择机 **plan-94/102**）；scripts 核查批 **plan-110/111/112/113/114** 五项**已完成并归档**（2026-10-08 立项当批实施）；量化指标开关合并 **plan-115** **已完成并归档**（2026-10-10）；章节类实验转正批 **plan-83** **已完成并归档**（2026-10-09）；景气度框架诊断转正批 **plan-49 / plan-71** **已完成并归档**（2026-10-10）；大类资产收益贡献分解 **plan-89** **已完成并归档**（2026-10-10）；CLI 完成/失败通知 **plan-100** **已完成并归档**（2026-10-10）；相关性滚动趋势 **plan-87** **已完成并归档**（2026-10-10）；**plan-85 ~ plan-102** 为 2026-10-07 自审改进盘点迁入批（18 项）；**plan-103 ~ plan-109** Web 展示借鉴批 7 项**已全部完成并归档**（awesome-design-md 研究：2026-10-07 首批 6 项 + 2026-10-08 HTML 报告专项补研追加 plan-109，立项映射见 [`awesome-design-md-borrow-candidates-research.md`](../archive/v0.12.x/awesome-design-md-borrow-candidates-research.md)）；历史批次（**plan-59 ~ plan-84**，含 Vibe-Trading / gs-quant / 工程效能 / TradingAgents-CN 借鉴批）已全部收口，完成态与未采纳记录随档见 [`archived_plan.0.11.x.md`](../archive/v0.11.x/archived_plan.0.11.x.md) 与 [`archived_plan.0.12.x.md`](../archive/v0.12.x/archived_plan.0.12.x.md)，借鉴批研究文档随档在 `docs/archive/v0.12.x/`（plan-66 ~ plan-68 候选现状见「P3」）。
+**当前迭代**：在办 13 项按「价值 / 收益 / 风险」分三档（2026-10-07 重排，档位定义见「当前迭代待办」）——P1 4 项（风险/核心价值改进 **plan-99/85/91/95**）、P2 6 项（**plan-55** 等待条件型 + 改进批 **plan-88/90/92/93/101**）、P3 3 项（**plan-70** 死线观察，已有落地设计 `decision-reflection-shadow-design.md`；择机 **plan-94/102**）；scripts 核查批 **plan-110/111/112/113/114** 五项**已完成并归档**（2026-10-08 立项当批实施）；量化指标开关合并 **plan-115** **已完成并归档**（2026-10-10）；章节类实验转正批 **plan-83** **已完成并归档**（2026-10-09）；景气度框架诊断转正批 **plan-49 / plan-71** **已完成并归档**（2026-10-10）；大类资产收益贡献分解 **plan-89** **已完成并归档**（2026-10-10）；CLI 完成/失败通知 **plan-100** **已完成并归档**（2026-10-10）；相关性滚动趋势 **plan-87** **已完成并归档**（2026-10-10）；联接基金穿透开关取消 **plan-117** **已完成并归档**（2026-10-10）；**plan-85 ~ plan-102** 为 2026-10-07 自审改进盘点迁入批（18 项）；**plan-103 ~ plan-109** Web 展示借鉴批 7 项**已全部完成并归档**（awesome-design-md 研究：2026-10-07 首批 6 项 + 2026-10-08 HTML 报告专项补研追加 plan-109，立项映射见 [`awesome-design-md-borrow-candidates-research.md`](../archive/v0.12.x/awesome-design-md-borrow-candidates-research.md)）；历史批次（**plan-59 ~ plan-84**，含 Vibe-Trading / gs-quant / 工程效能 / TradingAgents-CN 借鉴批）已全部收口，完成态与未采纳记录随档见 [`archived_plan.0.11.x.md`](../archive/v0.11.x/archived_plan.0.11.x.md) 与 [`archived_plan.0.12.x.md`](../archive/v0.12.x/archived_plan.0.12.x.md)，借鉴批研究文档随档在 `docs/archive/v0.12.x/`（plan-66 ~ plan-68 候选现状见「P3」）。
 
 > **命名纪律（强制）**：重构/新增的变量名、函数名、注释与文档表述必须与新章节语义相关（如 `position_relationship`/`portfolio_history_drawdown`/`style_factor`/`action`），**绝对禁止用任务编号命名**（F 系列、plan-N、rf-N 等）。任务编号仅在本表作链接锚点，不进入实现层。
 
@@ -100,12 +100,6 @@
 **现状与问题**（2026-10-07 自审迁入）：`html_save` 按日期归档到子目录但不生成 index；TUI 无「最近报告」菜单项（grep 历史报告/报告列表 = 0）；Web 有运行历史但 HTML 归档目录本身不可浏览——找上期报告靠翻文件系统
 
 **动作**：生成/刷新 `output_dir/index.html`（按日期列出 Excel/HTML 产物与打开链接），TUI 加「打开输出目录 / 最近报告」入口（与 rf-636 联动）；索引页不泄漏路径以外的本地信息，匿名化口径与报告一致
-
-#### 🔲 `plan-117` 取消联接基金穿透功能开关（穿透内置恒开）
-
-**现状与问题**（2026-10-10 用户提议）：`feeder_penetration`（TUI [S] 面板 22 号，常规组，默认开）是「取数口径」回退杠杆——置 false 即回退到「联接基金无底层资产」。但默认即开、无真实关闭使用记录，「关闭」仅两类边缘场景（看直接持有口径 / 目标 ETF 锚点解析异常时止血），常开状态等于面板多一项、`with_feeder_penetration` 多一条分支
-
-**动作**：删注册表项（常规 28→27）与 `with_feeder_penetration` 的 `is_feature_enabled` 分支，穿透恒开（**结果标注键 `result["feeder_penetration"]` 保留**，语义命名表「同名键」行改口径）；同步面板编号（23~28 前移，doc-drift 面板编号校验项）与五份手册/README/`technical.md`（§联接基金穿透）、`requirements.md` R-PEN-01 去开关表述、`how-to-config.md` 功能开关表删行；删「开关关闭 → 不穿透」死用例（`test_fund.py` / `test_fund_edge.py`，否则 check-test-redundancy 拦截），用例计数同步 test-coverage/folders；changelog 记迁移说明（旧键 `feeder_penetration` 转未知配置键告警，先例 plan-115 的 `metrics_*` 口径）。**取舍留档**：目标 ETF 锚点解析异常时无一键止血、只能发版修复——解析失败本就原样降级不硬失败，风险可接受
 
 ### P3 — 预期实施，有空时安排
 
