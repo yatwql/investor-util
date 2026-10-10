@@ -6,9 +6,7 @@ from pathlib import Path
 from typing import Any
 import json
 
-#: 仓库根：scripts/_factor_zoo/<mod>.py → parents[2]（层级固定，勿改浅——改浅会静默扫错目录）
-_PROJECT_ROOT = Path(__file__).resolve().parents[2]
-
+from _factor_zoo import PROJECT_ROOT
 from _factor_zoo.catalog import (
     BETA_WINDOW,
     B_MIN_DENOM,
@@ -459,7 +457,7 @@ def metric_b(catalog: list[dict[str, Any]], computable: list[str], corr_results:
 
 def read_report_baseline(perf_path: Path | None = None) -> dict[str, Any]:
     """真实报告耗时基线：perf_history 近 5 次 full 报告 total_seconds 中位数。"""
-    path = perf_path or (_PROJECT_ROOT / "data" / "state" / "perf_history.jsonl")
+    path = perf_path or (PROJECT_ROOT / "data" / "state" / "perf_history.jsonl")
     totals: list[float] = []
     compute_totals: list[float] = []
     try:

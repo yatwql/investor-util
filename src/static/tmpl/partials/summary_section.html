@@ -143,7 +143,7 @@
                 <tr>
                     <td>三因子（{{ market_temperature.index_name }}）</td>
                     <td>
-                        价格分位 {{ market_temperature.components.price_percentile }}
+                        {{ market_temperature.components.first_label }} {{ market_temperature.components.first_value }}
                         · 20日均线偏离 {{ market_temperature.components.ma_deviation }}
                         · 年化波动率 {{ market_temperature.components.volatility }}
                     </td>

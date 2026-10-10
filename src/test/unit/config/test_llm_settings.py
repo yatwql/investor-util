@@ -6,6 +6,7 @@ TUI 与 Web 配置编辑共用的 llm_settings.json 写入原语（自 tui/handl
 from __future__ import annotations
 
 import json
+import logging
 
 import pytest
 
@@ -123,3 +124,23 @@ class TestTokenCapHeadroom:
         assert debate["procon"]["per_call_max_tokens"] == 18432
         assert debate["max_total_tokens_per_report"] == 72000
         assert 3 * debate["procon"]["per_call_max_tokens"] < debate["max_total_tokens_per_report"]
+
+
+class TestFullFailRetryDelayDeclared:
+    """全链延迟重试等待键须为已登记 llm_settings 键。
+
+    回归：该键曾被 ``skeleton._execute_llm_with_finalize`` 直接读取、却不在
+    ``_DEFAULT_LLM_SETTINGS`` 中——用户在 llm_settings.json 设置它会触发
+    「未知配置项…请核对后删除」告警，与消费端的实际读取相矛盾。
+    """
+
+    def test_defaults_all_known_and_key_not_reported_unknown(self, caplog):
+        from src.python.config import _KNOWN_LLM_SETTINGS_KEYS
+        from src.python.config._llm_settings import _check_unknown_llm_keys
+        from src.python.config._llm_settings_defaults import _DEFAULT_LLM_SETTINGS
+
+        # 默认集中每个键都须已知（否则用户照默认写进文件即被判「未知配置项」）
+        assert set(_DEFAULT_LLM_SETTINGS) <= _KNOWN_LLM_SETTINGS_KEYS
+        with caplog.at_level(logging.WARNING):
+            _check_unknown_llm_keys({"llm_full_fail_retry_delay": 5})
+        assert not [r for r in caplog.records if "未知配置项" in r.getMessage()]

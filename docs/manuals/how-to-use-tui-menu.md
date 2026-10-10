@@ -129,7 +129,7 @@
 > | 菜单 | 面板标题 | 管什么 | 存放 |
 > |:--|:--|:--|:--|
 > | `[P]` | 配置报告可选章节 | **基础报告章节组 5 项**：基金深度分析 / 市场新闻 / 组合历史走势+回撤 / 组合演进 / 行动建议 | `config.json` 顶层 `enable_*` |
-> | `[S]` | 配置 LLM 报告章节与功能开关 | **LLM 分析章节**（`enabled_llm`）+ **三类功能开关共 34 项**（⚗实验 5 / 常规 16 / 报告章节与增强 13） | `llm_settings.json` / `features.json` |
+> | `[S]` | 配置 LLM 报告章节与功能开关 | **LLM 分析章节**（`enabled_llm`）+ **三类功能开关共 28 项**（⚗实验 4 / 常规 11 / 报告章节与增强 13） | `llm_settings.json` / `features.json` |
 >
 > 简记：**`[P]` = 整章组的开关（`config.json`）；`[S]` = 能力开关与细粒度开关（`features.json` / `llm_settings.json`）**。
 > 报告增强子模块（数据质量仪表盘 / 市场温度 / 行业Beta子表 / 候选基金比较 / 成本流水 / 估值分位 / 持仓个股财报摘要 / 财务指标）属功能开关，**只在 `[S]` 的报告块**；两个面板下方互相给出跳转提示。
@@ -170,13 +170,13 @@
 | 15 | 决策头结构化 | 专家复盘提示词追加受控 JSON 决策头，抽取优先读结构化、失败回落确定性表格解析（决策词归一，防写反方向）（默认开启） |
 | 16 | 辩论-条件推理 | 注入预设市场情景(上涨/下跌/震荡)，使分析结果情景化（在既有调用内追加，不增加调用次数）（默认开启） |
 | 17 | 数据源凭据就绪 | 为数据源声明所需凭据（环境变量名 + 申请地址），缺失时主动跳过该源并给可读指引（不进熔断计数）；`check-sources` 产出 `⏭️` 跳过态、`doctor` 增设「数据源凭据」组。**当前全部数据源免费无需凭据**（默认开启） |
-| 18-24 | 量化指标-夏普比率 / 卡玛比率 / HHI 集中度 / 胜率 / 换手率 / 风险贡献 / Beta | 报告量化指标区逐项启停，关闭即该指标不出现在报告中 |
-| 25 | 报告图表交互总开关 | Chart.js 交互图（缩放/悬停）；**同时决定 HTML 是否单文件自包含**——关闭后回退 Canvas + 表格静态渲染、HTML 不内嵌 JS（需与 `reports/` 下 .js 资产同目录才显示图表） |
-| 26 | 系统自检 | TUI 主菜单 `[T]` 与 Web「系统自检」卡片的可见性。置 `false` 时这两个入口**整体消失**；**只约束这两个日常入口**，CLI 的 `doctor` 子命令始终可用（配置损坏正是它要诊断的场景）。默认开是因为它只读、不改报告产物、不写文件 |
-| 27 | 数据源适配契约 | 行情域三源以三段式适配器+声明式 alias 归一获取，与既有转换函数逐源等价。**默认开启**（内部接缝，开关两种取值下报告数值不变）；置 `false` 即回退既有转换函数 |
-| 28 | 联接基金穿透 | ETF 联接基金按其**目标 ETF** 的持仓与报告期穿透底层资产（联接基金本身不持有股票，其季报股票表按构造为空）；目标 ETF 由基金主页面锚点动态解析。置 `false` 即维持「联接基金无底层资产」 |
+| 18 | 量化指标显示 | 量化指标是否输出的总开关（原夏普/卡玛/HHI/胜率/换手/风险贡献/Beta 七项已合并，指标始终全量计算）：关闭即雷达图各轴显示 N/A、熔断器暂停指标失败计数（默认开启） |
+| 19 | 报告图表交互总开关 | Chart.js 交互图（缩放/悬停）；**同时决定 HTML 是否单文件自包含**——关闭后回退 Canvas + 表格静态渲染、HTML 不内嵌 JS（需与 `reports/` 下 .js 资产同目录才显示图表） |
+| 20 | 系统自检 | TUI 主菜单 `[T]` 与 Web「系统自检」卡片的可见性。置 `false` 时这两个入口**整体消失**；**只约束这两个日常入口**，CLI 的 `doctor` 子命令始终可用（配置损坏正是它要诊断的场景）。默认开是因为它只读、不改报告产物、不写文件 |
+| 21 | 数据源适配契约 | 行情域三源以三段式适配器+声明式 alias 归一获取，与既有转换函数逐源等价。**默认开启**（内部接缝，开关两种取值下报告数值不变）；置 `false` 即回退既有转换函数 |
+| 22 | 联接基金穿透 | ETF 联接基金按其**目标 ETF** 的持仓与报告期穿透底层资产（联接基金本身不持有股票，其季报股票表按构造为空）；目标 ETF 由基金主页面锚点动态解析。置 `false` 即维持「联接基金无底层资产」 |
 
-**报告章节与增强（面板编号 29-41）**：逐章开关（默认多数关闭），按注册表顺序连续编号——29 `holding_change_review`（持仓变动复盘，独立章）/ 30 `whatif_trade_cost`（What-if 交易成本对比，条件页签/区段）/ 31 `event_window_impact`（事件窗量化对照，新闻章内区块）/ 32 `data_quality`（数据质量仪表盘）/ 33 `industry_beta`（行业Beta子表）/ 34 `candidate_compare`（候选基金比较子表）/ 35 `cost_lots`（成本流水）/ 36 `valuation_percentile`（估值分位）/ 37 `market_temperature`（市场温度）/ 38 `financial_report_digest`（持仓个股财报摘要）/ 39 `market_sentiment`（市场情绪与资金热点）/ 40 `financial_indicator`（财务指标）/ 41 `fund_purchase_limit`（基金申购限购）；其中 `data_quality`、`market_temperature` 与 `fund_purchase_limit` 默认开、其余默认关；开启即新增对应章节/子表/列/行，取值落 `data/config/features.json`。
+**报告章节与增强（面板编号 23-35）**：逐章开关（默认多数关闭），按注册表顺序连续编号——23 `holding_change_review`（持仓变动复盘，独立章）/ 24 `whatif_trade_cost`（What-if 交易成本对比，条件页签/区段）/ 25 `event_window_impact`（事件窗量化对照，新闻章内区块）/ 26 `data_quality`（数据质量仪表盘）/ 27 `industry_beta`（行业Beta子表）/ 28 `candidate_compare`（候选基金比较子表）/ 29 `cost_lots`（成本流水）/ 30 `valuation_percentile`（估值分位）/ 31 `market_temperature`（市场温度）/ 32 `financial_report_digest`（持仓个股财报摘要）/ 33 `market_sentiment`（市场情绪与资金热点）/ 34 `financial_indicator`（财务指标）/ 35 `fund_purchase_limit`（基金申购限购）；其中 `data_quality`、`market_temperature` 与 `fund_purchase_limit` 默认开、其余默认关；开启即新增对应章节/子表/列/行，取值落 `data/config/features.json`。
 
 > **各块的区别**：实验块是「默认关、待验证」的能力，开启会改变报告产物；常规块是「默认开、可关」的常驻能力；**报告章节与增强**块是逐章开关（持仓变动复盘/What-if 交易成本对比/事件窗量化对照/数据质量仪表盘/市场温度/行业Beta子表/候选基金比较/成本流水/估值分位/持仓个股财报摘要/市场情绪/财务指标/申购状态，默认多数关闭，开启即新增对应章节/列/行）。**转正**（某项验证通过）= 移出实验块，目标块按功能形态选——常驻读侧增强挪到常规块并把默认值改为开，章节/页签类挪到报告章节与增强块且默认值保持关（默认产物不变、按需开启）；面板入口随之自动延续，不会因为转正而消失；转正项按注册表顺序追加在目标块**块首**，故既有项编号不位移。
 
@@ -203,16 +203,16 @@
 > |:-------------------|:--------:|:----:|:------|
 > | `llm_debate_procon` | 8 | ⚗ 实验 | 辩论-正反辩论（集中度问答段已内建） |
 > | `decision_reflection` | 9 | ⚗ 实验 | 决策跨期反思闭环 |
-> | `prosperity_framework` | 10 | ⚗ 实验 | 景气度框架诊断 |
-> | `factor_catalog` | 11 | ⚗ 实验 | 因子目录（25 因子五族横截面信号 + 风格与因子分析区区块四） |
-> | `rebalance_schedule_replay` | 12 | ⚗ 实验 | 调仓纪律回放（纪律 vs 放任多期回放：双线图 + 指标对照 + 逐期成本表，type=schedule_replay） |
-> | `deterministic_signal` | 13 | 常规 | 确定性信号模块（原信号预消化 + 确定性信号沉淀合并） |
+> | `factor_catalog` | 10 | ⚗ 实验 | 因子目录（25 因子五族横截面信号 + 风格与因子分析区区块四） |
+> | `rebalance_schedule_replay` | 11 | ⚗ 实验 | 调仓纪律回放（纪律 vs 放任多期回放：双线图 + 指标对照 + 逐期成本表，type=schedule_replay） |
+> | `deterministic_signal` | 12 | 常规 | 确定性信号模块（原信号预消化 + 确定性信号沉淀合并） |
+> | `prosperity_framework` | 13 | 常规 | 景气度框架诊断（六维评分卡；实验转正） |
 > | `module_quality_gate` | 14 | 常规 | 模块级质量分级 |
 > | `decision_header_parse` | 15 | 常规 | 决策头结构化 |
 > | `llm_debate_conditional` | 16 | 常规 | 辩论-条件推理 |
 > | `datasource_credential_ready` | 17 | 常规 | 数据源凭据就绪指引（声明 → 就绪判定 → 可读指引） |
 >
-> 除上表外，`features.json` 还管理量化指标（`metrics_*`，18-24）、交互图表（`enable_interactive_charts`，25）、系统自检上屏（`doctor_check`，26）、数据源适配契约（`datasource_adapter`，27）、联接基金穿透（`feeder_penetration`，28）等；连同注册表的 34 项功能开关共同构成 `features.json` 的键空间（缺省值：实验组默认关、常规组默认开、报告组多数默认关）。完整清单见[配置指引-功能开关 §N](how-to-config.md#n-功能开关featuresjson)。
+> 除上表外，`features.json` 还管理量化指标显示（`metrics_enabled`，18）、交互图表（`enable_interactive_charts`，19）、系统自检上屏（`doctor_check`，20）、数据源适配契约（`datasource_adapter`，21）、联接基金穿透（`feeder_penetration`，22）等；连同注册表的 28 项功能开关共同构成 `features.json` 的键空间（缺省值：实验组默认关、常规组默认开、报告组多数默认关）。完整清单见[配置指引-功能开关 §N](how-to-config.md#n-功能开关featuresjson)。
 > **不在 `features.json` 的开关**：LLM 模块启停与基金深度分析走 `llm_settings.json` 的 `enabled_llm`（本菜单标准模块区，编号 1-7），新闻源走 `config.json` 的 `news_sources`，历史走势与回撤走 `config.json` 的 `enable_history`，匿名化模式走 `config.json` 的 `anonymization.mode`（菜单 **[A]**）。
 
 #### [A] 配置持仓匿名化（代码/名称脱敏）

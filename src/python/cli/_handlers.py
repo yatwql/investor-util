@@ -230,7 +230,67 @@ def _handle_report(args: argparse.Namespace, config: dict) -> int:
     # 运行收尾资源摘要：LLM 成本 + 缓存命中率（无 LLM 调用/缓存读写时各自静默）
     reporter.print_llm_cost_summary()
     reporter.print_cache_hit_summary()
-    return result.exit_code
+
+    # 任务完成/失败通知（尽力而为：未配置静默跳过，任何异常不影响退出码）
+    exit_code = result.exit_code
+    _notify_report_completion(args, config, exit_code, result)
+    return exit_code
+
+
+def _collect_degradation_summary(max_items: int = 10) -> list[str]:
+    """从数据状态跟踪器收集降级摘要（最新在前、按源去重；异常时返回空）。"""
+    try:
+        from src.python.report.data_status import get_tracker
+
+        events = [e for e in get_tracker().get_log() if e.get("degraded")]
+    except Exception:
+        return []
+    lines: list[str] = []
+    seen: set[str] = set()
+    for e in reversed(events):
+        source_key = str(e.get("source_key") or "")
+        if not source_key or source_key in seen:
+            continue
+        seen.add(source_key)
+        failure_type = e.get("failure_type") or "降级"
+        lines.append(f"{source_key}: {failure_type}（累计{e.get('count', 0)}次）")
+        if len(lines) >= max_items:
+            break
+    return lines
+
+
+def _notify_report_completion(args: argparse.Namespace, config: dict, exit_code: int, result: object) -> None:
+    """报告完成/失败通知（门控前置：未配置不构造事件、不碰跟踪器）。
+
+    尽力而为契约：本函数内部任何异常只记 DEBUG 日志，绝不向调用方抛出，
+    退出码由 ``_handle_report`` 原样返回（通知失败不改变命令结果）。
+    """
+    import logging
+
+    logger = logging.getLogger("invest")
+    try:
+        from src.python.core.completion_notify import (
+            build_completion_event,
+            dispatch_completion_notification,
+            should_notify,
+        )
+
+        notify_cfg = (config or {}).get("notify") or {}
+        if not should_notify(notify_cfg, ok=exit_code == 0):
+            return
+        output_dir = args.output or (config or {}).get("output_dir") or "reports"
+        event = build_completion_event(
+            report_type=str(getattr(args, "type", "") or ""),
+            exit_code=exit_code,
+            output_dir=str(output_dir),
+            errors=list(getattr(result, "errors", None) or []),
+            excel_ok=bool(getattr(result, "excel_ok", False)),
+            html_ok=bool(getattr(result, "html_ok", False)),
+            degradations=_collect_degradation_summary(),
+        )
+        dispatch_completion_notification(event, notify_cfg)
+    except Exception:
+        logger.debug("完成通知发送流程异常（非关键，不影响退出码）", exc_info=True)
 
 
 def _handle_cache(args: argparse.Namespace, config: dict) -> int:

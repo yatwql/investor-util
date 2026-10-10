@@ -11,6 +11,11 @@
 > 追加归档：2026-10-07 plan-80 调仓纪律回放（rebalance_schedule_replay）先决门槛三段通过并四迭代完成（见文末章节）
 > 追加归档：2026-10-07 plan-84 发布流程分步编排脚本（release.py 七子命令 + 49 项单测）完成（见文末章节）
 > 追加归档：2026-10-09 plan-83 章节类实验转正批次（三项章节级开关迁报告章节与增强组）完成（见文末章节）
+> 追加归档：2026-10-10 plan-115 量化指标 7 个逐项开关合并为单开关 `metrics_enabled` 完成（见文末章节）
+> 追加归档：2026-10-10 plan-116 市场温度第一因子升级为估值分位（估值历史源 + ERP + 窗口拉长）完成（见文末章节）
+> 追加归档：2026-10-10 plan-49 / plan-71 景气度框架诊断转正判据达成并实验转正入常规组（见文末章节）
+> 追加归档：2026-10-10 plan-89 大类资产收益贡献分解（大类 → 品种两级同口径归因）完成（见文末章节）
+> 追加归档：2026-10-10 plan-100 CLI 定时任务完成/失败通知（notify 三通道）完成（见文末章节）
 > 设计文档索引：plan-72 的设计文档 [`fund-purchase-limit-design.md`](fund-purchase-limit/fund-purchase-limit-design.md) **已随 plan-74 完成一并归档**（本目录 `fund-purchase-limit/`）；plan-73 的 LLM 上下文设计同在 `fund-purchase-limit/fund-purchase-limit-llm-context-design.md`（设计 + 已实施）；plan-76 的快照事件级设计在本目录 `holding-change-review/holding-change-review-design.md`（已实施，§15 实施与验收记录）；plan-77 的 What-if 成本与基准设计在本目录 `whatif-cost-benchmark/whatif-cost-benchmark-design.md`（已实施，§14 门槛与验收记录）；plan-78 的因子目录评测设计在本目录 `factor-zoo-catalog/factor-zoo-catalog-design.md`（已评测·判定转正立项，§13 判定记录）；plan-79 的事件窗设计在本目录 `event-window-impact/event-window-impact-design.md`（已实施，§14 判定记录）；plan-80 的调仓纪律回放设计在本目录 `rebalance-schedule-replay/rebalance-schedule-replay-design.md`（已实施，§14 实施与门槛判定记录）
 
 ---
@@ -288,3 +293,37 @@
 **动作**：转正定义已扩展为「移出实验组、目标组按功能形态选——常驻读侧增强→常规组（默认开），章节/页签类→报告章节与增强组（默认关、按需开）」（注册表注释与三份手册同步）；待真实报告启用积累且用户确认产物质量后，三项分批执行注册表迁移
 
 **完成态（2026-10-09）**：启用记录已积累（三项各 4 次，最近 2026-10-09）且产物经报告浏览器实测（rf-113 ⑤/⑥ 项），三项**单批**迁入 `GROUP_REPORT`（章节类形态同构，分批会拉长面板编号抖动窗口）：注册表三处 `GROUP_EXPERIMENTAL → GROUP_REPORT`（声明位保持原处，报告块块首三项），`DEFAULTS`/`AFFECTS_REPORT` 原样（默认均关）；注册表现状 **34 项 = 实验 5 / 常规 16 / 报告 13**；TUI 面板编号随注册表顺序重推导（实验 8-12 / 常规 13-28 / 报告 29-41，转正三项占 29-31，既有报告项 32-41 不位移）；`--experiment` 取值域与报告自述、启用统计随实验组身份自动移除（`enabled_experimental_features` 派生面不再含三项）；同步 features.py 注释、requirements §11.5 计数与 R-WIF-13/R-HCR 措辞、developer-guide 转正判据首例注记、technical §1.8.11 白名单口径（51 键）、三份手册（TUI 编号/Web 分组行/CLI 取值域/开关表 [P] 说明）与 how-to-config/how-to-start/folders 残留枚举；测试同步（分组断言改报告组 + config 访问器同源不变式改写为「报告组有读取器者同源」+ legacy 读取器保有），定向 1069 项通过 + ruff 全绿。
+
+#### ✅ `plan-115` 量化指标 7 个逐项开关合并为单开关 `metrics_enabled` — 已完成（2026-10-10）
+
+**动机**：菜单 `[S]` 18-24 号七个 `metrics_*` 开关粒度过细、生效面过窄——实际只有雷达图逐轴过滤（`metrics_risk_contribution` 甚至不在雷达过滤名单）与熔断器 FF 联动两处，逐项开关未换来逐项控制价值，面板平白多 6 行
+
+**动作**：注册表 7 条并为 `metrics_enabled`（label「量化指标」，常规组默认开）；`_chart_dataset_factory` / `chart_data_builder` 改传单开关（关闭 → 雷达全轴 N/A，含降级 3 轴路径统一口径）；`circuit_breaker_wrapper` 两份 flag_map 收敛为单常量；旧键按无消费者告警；同步面板编号与计数及各手册表格；补齐欠缺测试；生效面维持现状（不扩到 LLM 指标表/正文，避免提示词指纹变更）
+
+**完成态（2026-10-10）**：注册表 **34 → 28 项（常规 16 → 10）**，TUI 面板 18-24 → 18 单项、后续项前移至 19-22，报告块 29-41 → 23-35（编号由注册表派生自动跟随，Web 面板白名单同源）；雷达过滤由逐轴 `metric_flags` 改为单开关 `metrics_enabled`，**降级 3 轴路径此前不过滤已统一**（关闭 → 全轴 N/A、轴标签与降级标注保留）；熔断器两份 flag_map 收敛为 `_METRICS_FEATURE_FLAG` + `_METRIC_INDICATOR_NAMES` 单点；**修复 `_ff_was_off` 只读不写**（rf-654，「FF 开回时重置断路器」契约从未生效，关闭期残留失败计数会跨开关周期累计）；旧 `features.json` 键按无消费者告警（回归用例锁定不静默）；同步 requirements §11.5、technical §6.7 语义表 + §白名单计数、how-to-config / how-to-use-tui-menu / how-to-use-web-mode / how-to-use-cli-mode / how-to-config-llm 面板编号与计数、folders 统计行与 changelog / review-findings（rf-654）登记；**测试**：新增熔断 FF 联动 6 项（此前零覆盖）+ 降级路径过滤 + 旧键告警回归，同步改写雷达/CLI/TUI/Web/注册表既有用例，`dev-verify` 6474 全绿 + ruff 全绿。
+
+#### ✅ `plan-116` 市场温度第一因子升级为估值分位（估值历史源 + 股债性价比 + 回看窗口拉长） — 已完成（2026-10-10）
+
+**动机**：温度计第一因子原为指数**点位**分位（衡量涨了多少，非贵不贵）且回看窗口仅 750 交易日；对照主流估值派（有知有行/且慢）的关键差距是「估值分位 + 跨周期窗口」。
+
+**完成态（2026-10-10）**：① 新建 `fetcher/index_valuation.py`（akshare 乐咕 `stock_index_pe_lg`/`stock_index_pb_lg`，沪深300 月频 PE/PB 2005 起 259 点；1 周缓存 + 30 天旧缓存兑底；**可选源不向共享 `akshare` 熔断键写失败/成功**——防乐咕故障连坐无风险利率，只读检查）；② `bond_yield` 扩展 `get_risk_free_rate_history`（10Y 全历史 6184 行，`bond_yield_history` 独立键；传输异常才计熔断，空结果/列缺失属代码级不计）；③ 回看窗口 750 → **2000 交易日**（实测腾讯/东财源上限 ≈8 年，2018-07 起；2500 两轮牛熊免费源不可得），并**修复链路文件缓存窗口锁死缺陷**（增量合并从缓存末日补数把短窗口永久钉死——修前实测请求 2000 天只返 91 根；现短于请求窗口且存在文件缓存时自动清缓存全量重取一次，`chain_incremental.clear_incremental_cache` 封装）；④ 第一因子 = PE/PB/ERP 各自历史分位**等权**（样本下限 60；`build_erp_series` 按日期 asof 对齐——修复尾部 zip 会把 2005 年 PE 与近期 rf 错位配对的缺陷，实测 ERP 分位 53.7→77.2），估值序列不可得 → 回落点位分位（`first_factor="price_proxy"`，行为=升级前口径）；契约新增 `valuation_percentile`/`valuation_components`/`first_factor` 三键（16 键），Excel/HTML 三因子行首项按口径动态展示，`TEMPERATURE_DISCLAIMER` 同步；降级链「实时 → 30 天旧缓存 → 点位分位」防源时好时坏导致档位翻跳（实测今日两口径分差 7.6 分、同档）。**测试**：新增 33 项（获取器主/降级/熔断隔离回归 + ERP asof 对齐 + 等权分位 + 编排接线双路径 + 窗口自愈回归），同步既有温度/汇总用例；文档同步 technical 契约注记/数据源表/缓存表/目录树、datasource 两册、folders；plan-next 保持 117。
+
+#### ✅ `plan-71` 景气度框架诊断（prosperity_framework）转正判据明确化 — 已完成（2026-10-10）
+
+**完成态**：转正判据定稿——① 六维中 ≥5 维在真实持仓报告中有非「需核实」数据覆盖；② 评分结论经 1 个发布周期的真实复盘认可、人工比对无显著偏差；③ experiment_stats 启用次数支撑观察。判定执行（2026-10-10）：① 实测 6/6（当日报告全维有数据）；② 24 次运行评分稳定 55/100「部分契合」、降级运行 26/80 折算正确、用户确认口径认可；③ `enabled_count=24`、`last_enabled_date=当日`、跨 09→10 两月界。判据达成 → 随 plan-49 执行转正。
+
+#### ✅ `plan-49` 景气度框架诊断：转正评估（默认开启） — 已完成（2026-10-10）
+
+**完成态（前置条件核验 + 转正执行）**：① 降级矩阵 6 场景全绿（2026-09-16）；② 真实使用 24 天（09-16 → 10-10）、跨月快照 ✓、真实调仓（159222 止盈后清仓）✓、真实数据降级（10-09 单维缺失运行 26/80）✓；③ 用户认可评分口径——关键词表已按持仓风格在 `config.json` 自定义，`concentration_target_pct` 保持 50%（前十大集中度 88.55% 使该维 4/15，属有效风险提示，不调高掩盖）；④ 十守护 + dev-verify 6513 + verify 9225 全绿。执行：`features.py` `GROUP_EXPERIMENTAL → GROUP_STANDARD`、`default False → True`（声明位与评分口径不变）；[S] 面板重排（实验 8-11 / 常规 12-22，prosperity 落 13）；requirements R-PF-01、technical §4.20、五份手册、testplan、README/CLI 示例同步；新增 `TestProsperityFrameworkPromotion` 转正锁定用例。
+   
+   #### ✅ `plan-89` 大类资产收益贡献分解缺失 — 已完成（2026-10-10）
+   
+   **完成态（大类 → 品种两级同口径归因，路线 b）**：大类层按 `core/code_utils.classify_holding_tier` 单源分类（原报告分类页签 `_categorize_holding` 逻辑上移共用，分类判定唯一事实来源）聚合为权益/固收/现金（未知二元组兜底「其他」），与品种 TOP5 共用 Σ|盈亏| 分母（Σ大类 ≡ Σ品种，结构断言锁定）；HTML/Excel 归因子块与智囊团提示词段落三处同源呈现（大类行在前），口径脚注句单源（`ATTRIBUTION_NOTE`，成本口径，非严格区间收益归因）；`holdings_details` 契约新增 `account` 字段（orchestrator 与 `_action_holdings_details` 双路径）；零新数据源（纯本地，无 plan-4 归档所列 3 项缺口）；requirements R-ACT-06 / testplan载体批 12 / technical 契约与语义命名表 / reports-instruction 同步，新增单元用例 6 项 + 扩展渲染断言 2 项
+
+#### ✅ `plan-100` CLI 定时任务无完成/失败通知 — 已完成（2026-10-10）
+
+**完成态（notify 三通道 + CLI 收尾接线）**：新增 `core/completion_notify`——`should_notify` 门控（失败必发、成功需 `notify.on_success`；无 `notify` 节或全通道未配置静默跳过，符合「配置文件不必须存在」惯例）+ `build_completion_event` 载荷构造（报告类型/退出码/产物路径按结果标志经 `LATEST_XLSX_NAME`/`LATEST_HTML_NAME` 命名单源推导/错误数全量+明细截断 20 条/降级摘要）+ `dispatch_completion_notification` 分发（webhook 走 `make_http_client`、SMTP SSL/STARTTLS、notify-send；单通道失败隔离、单次尝试无重试、永不抛出不改退出码）。降级摘要由 `_handlers._collect_degradation_summary` 从数据状态跟踪器收集（最新在前、按源去重 10 条）；`_notify_report_completion` 门控前置（未配置不构造事件不碰跟踪器），整体 try/except 退出码原样。凭据不落日志：webhook URL 异常消息落日志前掩码只记域名。config dict+JSONC 模板新增通知节（dict 段注释 N）；需求 R-OUT-14、testplan 批 13、technical 语义命名表 `completion_notify`、how-to-config「R. 任务完成通知（notify）」、CLI 手册「13.4 任务完成通知（notify）」同步。测试 `test_completion_notify.py` 20 项（载荷/门控/分发隔离/凭据掩码/三通道发送器）+ `test_cli` 接线 3 项（分发透传/未配置静默/通知异常不改退出码）+ 降级摘要 2 项。
+
+#### ✅ `plan-87` 相关性分析为静态单点 — 已完成（2026-10-10）
+
+**完成态（滚动 60/120 端点窗 + 重点品对滚动相关）**：`analysis/correlation.py::compute_rolling_correlations` 纯计算——端点轴 = 品种日期并集，组合平均 = 每端点全部可算两两 Pearson r 均值（重叠 ≥60 期才计入，n_pairs 外送），端点窗 = min(窗口, 该对可得重叠期数)（历史不足按可得区间截断而非整段缺席，`coverage.full_window_from` 记完整窗起始、`notes` 单源标注口径），重点品对（静态 |r| 降序前 3）在自有重叠日期算 r 后 LOCF 对齐同一条端点网格（60/120 与焦点序列共享 labels，渲染层免对齐）；`_pearson_r` 轻量助手（不算 p 值省端点开销）。数据底座：`FETCH_DAYS` 90→260（≥ max(ROLLING_WINDOWS) 由测试锁），并修复**增量链路短缓存永远补不长**的隐患（`chain_incremental`：缓存 < days 时 start_from 置 None 全量补齐，回退路径保持降级不阻断——无此修复滚动趋势会被 90 日短缓存恒定截断）。编排（`_report_aux_metrics.compute_correlation_data`）：静态可用才算滚动，滚动层 try/except 失败仅 rolling=None（分层降级 §1.4.5），序列在编排层经 `report/downsample::downsample_bars` 下采样（避免分析层反向依赖报告层，分层依赖约束）；不可用路径统一携带 rolling=None（契约键恒在）。呈现：HTML `position_structure_section` 滚动子块（canvas + `drawSimpleChart` 多序列、日期映射对齐防御不传 null、重点品对最新值/首→末趋势表、口径句列示）；Excel `_write_correlation_block` 滚动摘要（窗口行 + 品对行 + 完整窗起始/截断标记）与口径句进说明区。需求 R-COR-01、testplan 批 14、technical（C19 契约 11→12 键 + §4.8 区块描述 + 语义命名表 `compute_rolling_correlations`）、reports-instruction 三处同步。测试：分析 8 + 边缘 3 + 渲染/接线 9 + Excel 4 + chain 回归 2（短缓存全量/长缓存增量语义），静态-滚动同源一致性容差断言锁口径。

@@ -20,6 +20,7 @@ from src.python.llm.fact_checker._constants import (
     _PORTFOLIO_KEYWORDS,
     _POSITION_WEIGHT_KEYWORDS,
     _PROFIT_KEYWORDS,
+    _REPLAY_KEYWORDS,
     _SUGGESTION_KEYWORDS,
     _TRIM_TARGET_KEYWORDS,
     _WARNING_THRESHOLD_KEYWORDS,
@@ -35,14 +36,43 @@ def _is_drawdown_context(sentence: str, match_start: int) -> bool:
     但若 match 前 15 字符内有收益关键词（"收益""盈利""累计"等）
     则以收益为主，不判定为回撤语境。15 字 ≈ 5-7 个中文词，
     足以捕获"累计收益率"等紧邻修饰，又不会跨分句读到其他数值的修饰词。
+
+    紧邻优先：若 match 前 8 字符内直接出现回撤词（如"最大回撤 10.28%"），
+    该数值明确修饰回撤幅度，优先判为回撤语境，不受更远处收益词干扰。
+    实盘事故："在回放窗口内收益 -5.35%、最大回撤 10.28%"——10.28 前 15 字符
+    窗口含"收益"（属前一个数值 -5.35% 的修饰词），若据此排除回撤语境，
+    数值会掉入收益率路径被误修正。
     """
     if not any(kw in sentence for kw in _DRAWDOWN_KEYWORDS):
         return False
+    # 紧邻回撤词（≤8 字符）→ 数值直接修饰回撤幅度，优先于远端收益词
+    _tight = sentence[max(0, match_start - 8) : match_start]
+    if any(kw in _tight for kw in _DRAWDOWN_KEYWORDS):
+        return True
     # match 前 15 字符内有收益关键词 → 以收益为主
     _profit_nearby = sentence[max(0, match_start - 15) : match_start]
     if any(kw in _profit_nearby for kw in _PROFIT_KEYWORDS):
         return False
     return True
+
+
+def _is_replay_context(sentence: str) -> bool:
+    """判断整句是否处于策略回放/回测语境（如"回放显示规则A...优于买入持有 -7.16%"）。
+
+    回放面板的区间收益/最大回撤/夏普均为历史净值模拟指标，与持仓品种实际
+    收益率、组合实际最大回撤不同源，不可比较。整句判定（回放句通常整句围绕
+    模拟指标展开），命中即整句跳过，避免模拟数值被全局最近邻兜底归因到
+    无关品种并被自动"修正"（实盘事故：买入持有 -7.16% 被归因到 096001
+    的 9.2%）。
+
+    Args:
+        sentence: 待判定句子。
+
+    Returns:
+        True 表示该句为回放/回测语境，数值不应参与收益率校验。
+    """
+    _lower = sentence.lower()
+    return any(kw in _lower for kw in _REPLAY_KEYWORDS)
 
 
 def _is_change_rate_context(sentence: str, match_start: int) -> bool:

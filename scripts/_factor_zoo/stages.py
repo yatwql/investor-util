@@ -7,9 +7,7 @@ from typing import Any
 import json
 import time
 
-#: 仓库根：scripts/_factor_zoo/<mod>.py → parents[2]（层级固定，勿改浅——改浅会静默扫错目录）
-_PROJECT_ROOT = Path(__file__).resolve().parents[2]
-
+from _factor_zoo import PROJECT_ROOT
 from _factor_zoo.catalog import (
     COLD_SAMPLE_CODES,
     FAMILIES,
@@ -316,7 +314,7 @@ def measure_cold_sample() -> dict[str, Any]:
 
     样本码若已缓存则如实标记（暖值不计入冷均值；全部暖 → 均值不可得）。
     """
-    cache_dir = _PROJECT_ROOT / "data" / "cache"
+    cache_dir = PROJECT_ROOT / "data" / "cache"
     samples: list[dict[str, Any]] = []
     cold_durations: list[float] = []
 

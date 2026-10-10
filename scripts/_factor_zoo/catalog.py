@@ -5,15 +5,13 @@
 
 from __future__ import annotations
 
-from pathlib import Path
 from typing import Any
 
-#: 仓库根：scripts/_factor_zoo/<mod>.py → parents[2]（层级固定，勿改浅——改浅会静默扫错目录）
-_PROJECT_ROOT = Path(__file__).resolve().parents[2]
+from _factor_zoo import PROJECT_ROOT
 
 
 # ── 常量（门槛与口径在判定书中预注册，改这里等于改门槛） ──────────────
-OUT_DIR_DEFAULT = _PROJECT_ROOT / "docs" / "tmp" / "factor-zoo"
+OUT_DIR_DEFAULT = PROJECT_ROOT / "docs" / "tmp" / "factor-zoo"
 THRESH_A = 0.80  # 字段可得率 ≥80%（≥20/25）
 THRESH_B = 0.30  # 低相关（增量）因子占比 ≥30%
 THRESH_C = 0.20  # 耗时增量 ≤20%

@@ -25,6 +25,7 @@ from src.python.llm.fact_checker._context import (
     _is_portfolio_daily_change_context,
     _is_portfolio_level_context,
     _is_position_weight_context,
+    _is_replay_context,
     _is_trim_target_context,
     _is_weight_context,
     _is_win_rate_context,
@@ -305,6 +306,9 @@ def check_numerical_consistency(
     for sentence in _split_sentences(text):
         # 跳过收益归因段落（贡献度占比不可与收益率直接比较）
         if _is_contribution_sentence(sentence):
+            continue
+        # 跳过策略回放/回测段落（模拟指标与实际收益率不同源，不可比较）
+        if _is_replay_context(sentence):
             continue
 
         for match in re.finditer(_PERCENT_PATTERN, sentence):

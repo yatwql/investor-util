@@ -143,19 +143,25 @@ class TestHtmlActionSection(unittest.TestCase):
         self.assertIn("待生成", text)  # 收益归因 available 缺省 → 待生成
 
     def test_attribution_render_when_available(self):
-        """收益归因可用 → 盈利/亏损来源明细（+pp 与 +, 格式）+ 净额合计摘要。"""
+        """收益归因可用 → 大类层 + 盈利/亏损品种明细（+pp 与 +, 格式）+ 净额合计 + 口径脚注。"""
         attr = {
             "available": True,
+            "大类贡献": [{"asset_class": "权益", "profit": 800.0, "contribution_pp": 80.0}],
             "盈利来源": [{"name": "测试基金A", "contribution_pp": 12.3, "profit": 1000.0}],
             "亏损来源": [{"name": "测试基金B", "contribution_pp": -3.5, "profit": -200.0}],
             "summary": "盈利品种合计 +1,000.00，亏损品种合计 -200.00（净+800.00）",
+            "note": "口径：测试脚注（同口径分层）",
         }
         section = self._section(_action_data(attribution=attr))
         text = section.get_text()
+        self.assertIn("大类", text)
+        self.assertIn("权益", text)
+        self.assertIn("+80.0pp", text)
         self.assertIn("+12.3pp", text)
         self.assertIn("-3.5pp", text)
         self.assertIn("净额合计", text)
         self.assertIn("净+800.00", text)
+        self.assertIn("口径：测试脚注（同口径分层）", text)
 
     def test_unavailable_placeholder(self):
         """available=False（无持仓数据）→ 降级占位。"""
@@ -297,6 +303,53 @@ class TestActionSingleSource(unittest.TestCase):
         # 无重复品种行（同一对象渲染两次会产生重复，此处应为 1 行）
         rows = action_sec.select("table tbody tr")
         self.assertLessEqual(len(rows), 1, "单一 action_data 不应产生重复信号行")
+
+
+class TestActionSectionFold(unittest.TestCase):
+    """行动建议章正文默认折叠（details.section-fold）——与新闻关联章同构。
+
+    折叠块包裹 available 分支全部正文（提示条携带行动摘要与展开/收起指引，
+    默认收起；「回到顶部」与 unavailable 占位留在折叠块外）；锚点/打印
+    展开由 fold.js 对全部 details.section-fold 统一生效。
+    """
+
+    def test_fold_wraps_content_and_collapsed_by_default(self):
+        """available=True：正文包在折叠块内且默认收起（无 open 属性）。"""
+        section = _render(_action_data()).find(id="sec-action")
+        details = section.select_one("details.section-fold")
+        self.assertIsNotNone(details, "行动建议章应含 details.section-fold 折叠块")
+        self.assertIsNone(details.get("open"), "折叠块应默认收起（无 open 属性）")
+        summary = details.select_one(":scope > summary.section-fold-summary")
+        self.assertIsNotNone(summary, "summary 提示条应为折叠块首子元素")
+        self.assertIsNotNone(details.select_one(".section-content"), "内容区应在折叠块内")
+
+    def test_summary_line_carries_action_summary(self):
+        """提示条携带行动摘要与展开/收起指引（摘要随折叠块外露）。"""
+        section = _render(_action_data()).find(id="sec-action")
+        text = section.select_one("details.section-fold > summary.section-fold-summary").get_text()
+        self.assertIn("再平衡建议 1 条", text)
+        self.assertIn("点击展开/收起", text)
+
+    def test_summary_fallback_without_action_summary(self):
+        """无行动摘要时提示条用通用兜底文案（提示条非空）。"""
+        section = _render(_action_data(summary="")).find(id="sec-action")
+        text = section.select_one("details.section-fold > summary.section-fold-summary").get_text()
+        self.assertIn("调仓信号与建议明细", text)
+        self.assertIn("点击展开/收起", text)
+
+    def test_back_to_top_stays_outside_fold(self):
+        """「回到顶部」留在折叠块外（收起态仍可点）。"""
+        section = _render(_action_data()).find(id="sec-action")
+        details = section.select_one("details.section-fold")
+        back = section.select_one(".back-to-top-link")
+        self.assertIsNotNone(back)
+        self.assertNotIn(details, list(back.parents), "回到顶部不应位于折叠块内")
+
+    def test_unavailable_branch_not_folded(self):
+        """available=False 占位文案不折叠（异常态常显，不藏在提示条后）。"""
+        section = _render({"available": False}).find(id="sec-action")
+        self.assertIsNone(section.select_one("details.section-fold"), "降级占位不应折叠")
+        self.assertIn("无持仓数据，行动建议无法生成", section.get_text())
 
 
 if __name__ == "__main__":

@@ -162,12 +162,12 @@ class TestConfigLlmModulesExperimentalFlags:
         mock_refresh,
         mock_press,
     ):
-        """输入景气度框架诊断的派生编号 → 切换该实验开关，持久化到 features.json。"""
+        """输入景气度框架诊断的派生编号 → 切换该常规开关（默认开 → 关），持久化到 features.json。"""
         from src.python.tui.handlers_config import _cmd_config_llm_modules
 
         _cmd_config_llm_modules()
 
-        mock_save_overrides.assert_called_once_with({"prosperity_framework": True})
+        mock_save_overrides.assert_called_once_with({"prosperity_framework": False})
         mock_press.assert_called_once()
 
     @patch("src.python.tui.handlers_config.press_any_key")
@@ -227,12 +227,12 @@ class TestConfigLlmModulesExperimentalFlags:
 
     @patch("src.python.tui.handlers_config.press_any_key")
     @patch("src.python.tui.handlers_config.refresh_config")
-    @patch("src.python.tui.handlers_config.input", side_effect=[str(_switch_menu_number("metrics_sharpe")), "0"])
+    @patch("src.python.tui.handlers_config.input", side_effect=[str(_switch_menu_number("metrics_enabled")), "0"])
     @patch("src.python.config.features.save_feature_overrides")
     @patch("src.python.tui.handlers_config.filter_menu_llm_modules", return_value=_STANDARD_LLM_MODULES)
     @patch("src.python.core.registry.get_llm_module_names")
     @patch("src.python.tui.handlers_config._read_llm_settings", return_value=({}, "/fake/llm_settings.json"))
-    def test_menu_number_toggles_first_metrics_switch(
+    def test_menu_number_toggles_metrics_switch(
         self,
         mock_read,
         mock_names,
@@ -242,17 +242,17 @@ class TestConfigLlmModulesExperimentalFlags:
         mock_refresh,
         mock_press,
     ):
-        """输入量化指标首项（夏普比率）的派生编号 → 持久化到 features.json。
+        """输入量化指标单开关的派生编号 → 持久化到 features.json。
 
         常规块内顺序：确定性信号 / 模块级质量分级 / 决策头结构化 / 条件推理 /
-        数据源凭据就绪（转正项）→ 量化指标七项 → …；编号按注册表顺序派生，
-        实验组或常规组增项时自动跟随。
+        数据源凭据就绪（转正项）→ 量化指标（原七项已合并为单开关 metrics_enabled）
+        → …；编号按注册表顺序派生，实验组或常规组增项时自动跟随。
         """
         from src.python.tui.handlers_config import _cmd_config_llm_modules
 
         _cmd_config_llm_modules()
 
-        mock_save_overrides.assert_called_once_with({"metrics_sharpe": False})
+        mock_save_overrides.assert_called_once_with({"metrics_enabled": False})
 
     @patch("src.python.tui.handlers_config.press_any_key")
     @patch("src.python.tui.handlers_config.refresh_config")

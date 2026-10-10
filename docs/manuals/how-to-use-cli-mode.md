@@ -33,7 +33,7 @@ CLI 与 TUI 共享同一套缓存、配置与报告管线，可交替使用。
 | `--output DIR` | 报告输出目录，覆盖 `config.json` 中的 `output_dir`（不存在时自动创建；支持绝对 / 相对路径） |
 | `--verbose` | 详细日志输出到 stderr（默认仅写入 `logs/app.log`） |
 | `--non-interactive` | 跳过首次运行交互式引导（定时任务 / 脚本使用） |
-| `--experiment NAME` | 启用**实验组**功能（只开不关的简写），**仅本次运行生效（不写入 features.json）**。可重复指定；`NAME` 取开关名（如 `prosperity_framework`）或显示名（如 `景气度框架诊断`），`all` = 全部启用 |
+| `--experiment NAME` | 启用**实验组**功能（只开不关的简写），**仅本次运行生效（不写入 features.json）**。可重复指定；`NAME` 取开关名（如 `factor_catalog`）或显示名（如 `因子目录`），`all` = 全部启用 |
 | `--feature NAME=VALUE` | 切换**任意**功能开关（实验组 / 常规组 / 报告章节与增强组均可），**双向**（可开可关）、**仅本次运行生效（不写入 features.json）**。可重复指定；`NAME` 取开关名（如 `doctor_check`），`VALUE` 取 `on`/`off`（也接受 `true`/`false`/`1`/`0`，大小写不敏感）。同名后写覆盖先写 |
 | `--version` | 显示版本号并退出 |
 
@@ -44,7 +44,7 @@ CLI 与 TUI 共享同一套缓存、配置与报告管线，可交替使用。
 > .venv/bin/python -m src.python.cli --experiment llm_debate_procon report --type full
 >
 > # 用显示名指定、可重复叠加
-> .venv/bin/python -m src.python.cli --experiment 决策跨期反思闭环 --experiment 景气度框架诊断 report --type full
+> .venv/bin/python -m src.python.cli --experiment 决策跨期反思闭环 --experiment 因子目录 report --type full
 >
 
 
@@ -60,11 +60,11 @@ CLI 与 TUI 共享同一套缓存、配置与报告管线，可交替使用。
 > # 本次运行关闭系统自检的界面入口（CLI 的 doctor 子命令本就不受该开关约束）
 > .venv/bin/python -m src.python.cli --feature doctor_check=off doctor
 >
-> # 一次运行关掉两个量化指标 + 关闭交互图表（HTML 回退静态渲染）
-> .venv/bin/python -m src.python.cli --feature metrics_hhi=off --feature metrics_beta=off --feature enable_interactive_charts=off report --type full
+> # 本次运行关闭量化指标输出（雷达图各轴 N/A）+ 关闭交互图表（HTML 回退静态渲染）
+> .venv/bin/python -m src.python.cli --feature metrics_enabled=off --feature enable_interactive_charts=off report --type full
 > ```
 >
-> 两个参数可同时使用：`--feature` 在 `--experiment` 之后应用，故 `--experiment all --feature prosperity_framework=off` 表示「其余实验功能全开、只关掉景气度框架诊断」。
+> 两个参数可同时使用：`--feature` 在 `--experiment` 之后应用，故 `--experiment all --feature factor_catalog=off` 表示「其余实验功能全开、只关掉因子目录」。
 
 ---
 
@@ -481,7 +481,29 @@ tail -20 logs/cron.log
 
 ---
 
-## 14. 更多参考
+### 13.4 任务完成通知（notify）
+
+cron / 任务计划运行只有退出码，失败也无人知晓。config.json `notify` 节可配置报告生成完成后的通知推送（也可由 Web 配置面板/TUI 同份配置编辑）：
+
+```jsonc
+"notify": {
+  "on_success": false,     // 成功也发送（失败/部分失败必发，不受此开关影响）
+  "webhook_url": "",       // webhook 地址（HTTP POST JSON），空=不启用；URL 常含凭据，日志只记域名
+  "email": {               // SMTP 邮件（smtp_host 与 to 均非空才启用）
+    "smtp_host": "", "smtp_port": 465, "use_ssl": true,
+    "username": "", "password": "", "to": ""
+  },
+  "desktop": false,         // 桌面通知（Linux notify-send，未安装记日志跳过）
+  "timeout_seconds": 10     // 通道超时（秒）
+}
+```
+
+- **触发**：退出码非 0（部分失败/严重错误）**必发**；成功仅 `on_success: true` 时发
+- **默认关**：无 `notify` 节或全部通道未配置 → 静默跳过，不影响任何其他行为
+- **载荷**：报告类型、退出码、产物路径（latest 最新版名按结果标志列示）、错误数与明细（截断）、数据降级摘要（数据状态跟踪器，最新在前按源去重）
+- **尽力而为**：单次尝试无重试；单通道失败隔离，任何通道失败只记日志（`[notify]` 前缀）、**绝不改变退出码**；webhook URL 异常消息落日志前掩码只留域名
+
+---
 
 - [快速开始](how-to-start.md)「方式三」—— CLI 启动简介
 - [TUI 菜单操作手册](how-to-use-tui-menu.md) —— TUI 等效操作（各菜单详解）

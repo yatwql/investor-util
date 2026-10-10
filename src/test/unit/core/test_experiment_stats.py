@@ -131,7 +131,7 @@ class TestReportEntrypointWiring:
     def test_record_failure_swallowed(self, caplog):
         from src.python.config.features import set_feature_enabled
 
-        set_feature_enabled("prosperity_framework", True)
+        set_feature_enabled("factor_catalog", True)
         try:
             with (
                 patch(
@@ -144,6 +144,6 @@ class TestReportEntrypointWiring:
 
                 log_experimental_features()  # 写盘失败不外抛、落盘失败告警已记录
         finally:
-            set_feature_enabled("prosperity_framework", False)
+            set_feature_enabled("factor_catalog", False)
 
         assert "实验功能使用统计记录失败" in caplog.text and "不影响报告生成" in caplog.text

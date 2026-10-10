@@ -189,15 +189,23 @@ def write_action_sheet(
         placeholder="无再平衡/纪律触发信号，暂无调仓建议",
     )
 
-    # 子块 4：收益归因（TOP5 贡献占比，正负分列 + 净额合计）
+    # 子块 4：收益归因（大类 → 品种两级贡献占比，同口径分层 + 净额合计 + 口径脚注）
     _attr = action_data.get("attribution")
     row += 1
-    row = write_block_title(ws, row, "收益归因（品种贡献占比）")
+    row = write_block_title(ws, row, "收益归因（大类 → 品种贡献占比）")
     row += 1
     if not _attr or not _attr.get("available"):
         row = write_data_row(ws, row, ["待生成", "", "", "", ""])
     else:
-        row = write_header_row(ws, row, ["来源", "品种", "贡献占比", "盈亏金额", ""])
+        row = write_header_row(ws, row, ["来源", "品种 / 大类", "贡献占比", "盈亏金额", ""])
+        for item in _attr.get("大类贡献") or []:
+            _pp = item.get("contribution_pp", 0) or 0
+            _profit = item.get("profit", 0) or 0
+            row = write_data_row(
+                ws,
+                row,
+                ["大类", item.get("asset_class", ""), f"{_pp:+.1f}pp", f"{_profit:+,.2f}", ""],
+            )
         for src in ("盈利来源", "亏损来源"):
             for item in _attr.get(src) or []:
                 _pp = item.get("contribution_pp", 0) or 0
@@ -211,13 +219,17 @@ def write_action_sheet(
         if _summary:
             ws.cell(row=row, column=1, value=f"净额合计：{_summary}").font = _FONT_SUB_BLOCK
             row += 1
+        _note = (_attr.get("note") or "").strip()
+        if _note:
+            ws.cell(row=row, column=1, value=_note).font = _FONT_SUB_BLOCK
+            row += 1
 
     # 子块 5：历史决策复盘（决策跨期反思闭环，非回测）
     if decision_review_data and decision_review_data.get("available"):
         row += 1
         row = _write_review_block(ws, row, decision_review_data, _ncols)
 
-    # 子块 6：景气度框架诊断（实验性功能 prosperity_framework，默认关闭）
+    # 子块 6：景气度框架诊断（常规功能 prosperity_framework，默认开启）
     if prosperity_framework_data and prosperity_framework_data.get("available"):
         row += 1
         row = _write_prosperity_block(ws, row, prosperity_framework_data, _ncols)

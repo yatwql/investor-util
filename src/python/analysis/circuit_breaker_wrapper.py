@@ -50,6 +50,22 @@ _DEFAULT_COOLDOWN_SECS = 86400
 _CIRCUIT_BREAKER_TTL = 86400 * 7
 """持久化记录的超时 TTL（秒，默认 7 天），超过此时间的条目在加载时自动清理。"""
 
+_METRICS_FEATURE_FLAG = "metrics_enabled"
+"""量化指标总开关（features 注册表）——原 metrics_* 七个逐项开关已合并为本单开关。"""
+
+_METRIC_INDICATOR_NAMES = frozenset(
+    {
+        "sharpe_ratio",
+        "calmar_ratio",
+        "hhi",
+        "win_rate",
+        "turnover_rate",
+        "risk_contribution",
+        "beta",
+    }
+)
+"""与量化指标总开关联动的指标名（其余指标无对应开关，默认可用）。"""
+
 
 class IndicatorBreaker:
     """指标级断路器 — 为单个指标计算函数提供断路保护。
@@ -153,17 +169,8 @@ class IndicatorBreaker:
         """
         from src.python.config.features import FEATURE_FLAGS, is_feature_enabled
 
-        # 映射指标名称到 Feature Flag 名称
-        flag_map: dict[str, str] = {
-            "sharpe_ratio": "metrics_sharpe",
-            "calmar_ratio": "metrics_calmar",
-            "hhi": "metrics_hhi",
-            "win_rate": "metrics_winrate",
-            "turnover_rate": "metrics_turnover",
-            "risk_contribution": "metrics_risk_contribution",
-            "beta": "metrics_beta",
-        }
-        flag_name = flag_map.get(indicator_name)
+        # 量化指标总开关覆盖全部指标级开关（原 7 个 metrics_* 已合并为单开关）
+        flag_name = _METRICS_FEATURE_FLAG if indicator_name in _METRIC_INDICATOR_NAMES else None
         if flag_name is None:
             return True  # 没有对应 Feature Flag 的指标默认可用
 
@@ -176,6 +183,12 @@ class IndicatorBreaker:
                 self._save_state()
                 # c: 记录到 DegradationTracker
                 self._log_ff_event(indicator_name, flag_name, False)
+            elif st:
+                # 关闭期到来前的残留失败计数打标：开关回开时清零
+                # （否则旧计数会跨开关周期累计，在开关开启后立即误触发断路）
+                if not st.get("_ff_was_off", False):
+                    st["_ff_was_off"] = True
+                    self._save_state()
 
             # 从 FEATURE_FLAGS 检查是否发生了状态变化
             return False
@@ -232,19 +245,9 @@ class IndicatorBreaker:
 
         feature_flag 关闭时不计失败次数。
         """
-        # 先检查 Feature Flag
         from src.python.config.features import is_feature_enabled
 
-        flag_map: dict[str, str] = {
-            "sharpe_ratio": "metrics_sharpe",
-            "calmar_ratio": "metrics_calmar",
-            "hhi": "metrics_hhi",
-            "win_rate": "metrics_winrate",
-            "turnover_rate": "metrics_turnover",
-            "risk_contribution": "metrics_risk_contribution",
-            "beta": "metrics_beta",
-        }
-        flag_name = flag_map.get(indicator_name)
+        flag_name = _METRICS_FEATURE_FLAG if indicator_name in _METRIC_INDICATOR_NAMES else None
         if flag_name and not is_feature_enabled(flag_name):
             # a: FF 关闭，不计失败
             logger.debug("[breaker] %s FF 关闭（%s），不计失败", indicator_name, flag_name)

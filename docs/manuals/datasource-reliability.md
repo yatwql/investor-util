@@ -146,11 +146,11 @@
 | 字段 | 说明 |
 |------|------|
 | **名称** | akshare 数据封装层 |
-| **用途** | 机构盈利预测（`stock_profit_forecast_em`）、行业资金流向（`stock_sector_fund_flow_rank`）、历史分红（`stock_history_dividend`）、无风险利率（`bond_zh_us_rate`） |
+| **用途** | 机构盈利预测（`stock_profit_forecast_em`）、行业资金流向（`stock_sector_fund_flow_rank`）、历史分红（`stock_history_dividend`）、无风险利率（`bond_zh_us_rate`）、指数 PE/PB 估值历史（`stock_index_pe_lg`/`stock_index_pb_lg`，乐咕） |
 | **接口类型** | Python 库调用（通过 `ThreadPoolExecutor` 超时保护） |
 | **数据频率** | 盈利预测不定期，资金流向交易日实时，分红年度更新，利率每日 |
 | **可靠度** | ★★★☆☆——依赖 akshare 第三方库，接口变更频繁 |
-| **降级目标** | ① akshare 未安装 → 静默降级为空结果 ② 调用超时 → ThreadPoolExecutor 强杀 + 重试 1 次 ③ 无风险利率 → `config.json` 手动设置兜底。**财务指标另有同花顺官方合并报表派生**（需 key，见 §3.10） |
+| **降级目标** | ① akshare 未安装 → 静默降级为空结果 ② 调用超时 → ThreadPoolExecutor 强杀 + 重试 1 次 ③ 无风险利率 → `config.json` 手动设置兜底 ④ 指数估值历史（乐咕）不可得 → 30 天内旧缓存兜底，仍不可得 → 市场温度第一因子回落点位分位（温度行不消失）。**财务指标另有同花顺官方合并报表派生**（需 key，见 §3.10） |
 | **限流规则** | 无限流；内存 TTL 缓存（盈利预测 5min，资金流向 1min，分红 10min） |
 | **免费边界** | 无认证；akshare 库本身开源免费 |
 | **超时设定** | 默认 15s，盈利预测 30s，分红 60s（akshare 同步调用可能阻塞，必须 ThreadPoolExecutor 强杀） |
@@ -277,6 +277,8 @@
 | `history_index_us` | 新浪 K 线（实现存在，但端点对全部代码返回 404/空） | 腾讯 K 线（`gb_*` 代码支持有限，实际取数通常由此承担） | `sina` → `tencent` | 两源均返回空 → 该链路整体取空 |
 | `bond_yield` | akshare | —（配置兵底） | `akshare` | akshare 不可用时回落配置值 |
 | `sentiment` | 同花顺龙虎榜（需 key） | —（单源） | `hithink` | 缺 key 由链路预检跳过（报告写占位）；两源不可用或无命中 → 章节降级占位 |
+
+> **非链路模块——指数估值历史（`idx_valuation`）**：不走 Chain（直接调用 akshare 乐咕 `stock_index_pe_lg`/`stock_index_pb_lg`），只读检查 `akshare` 熔断键（不写入——可选源不计入失败，防乐咕故障连坐无风险利率）；不可得 → 30 天内旧缓存兜底 → 仍不可得则市场温度第一因子回落点位分位（温度行不消失）。
 
 链路失败时逐段采集失败原因（`fetcher/chain_diagnostics.py` 的 `FailureDiagnostics`，经 `fetcher/chain.py` 门面 re-export），以「展示名(原因)」形式随降级事件透传到报告的**数据源可用性矩阵**降级明细，例如 `腾讯财经(连接超时)；新浪财经(返回空)`——用户可直接看出是哪个源、为什么失败，不必翻日志。未采集到可读原因时回落原有的短标识（如 `transport`、`empty`），输出与既往一致。
 

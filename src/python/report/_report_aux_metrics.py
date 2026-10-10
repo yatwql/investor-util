@@ -25,7 +25,12 @@ def compute_market_temperature_data(
     """编排市场温度数据（`market_temperature_data` 数据契约）。
 
     流程：沪深300 指数历史 K 线（Chain + session_cache，腾讯→新浪自动降级，
-    复用既有 history_index 降级链）→ 三因子合成温度计（价格分位+均线偏离+波动率）。
+    复用既有 history_index 降级链）+ 指数 PE/PB 估值历史 + 无风险利率历史
+    → 三因子合成温度计（估值分位[PE/PB/ERP 等权，缺席回落点位分位]
+    + 均线偏离 + 波动率）。
+
+    估值/利率两条序列各自独立降级：任何一条不可得都不阻塞主链路，
+    只降级为点位分位（first_factor="price_proxy"）。
 
     Args:
         config: 完整配置（只读）
@@ -54,7 +59,13 @@ def compute_market_temperature_data(
     try:
         reporter.info("正在计算市场温度...")
         bars = fetch_index_history(DEFAULT_INDEX_CODE, DEFAULT_LOOKBACK_DAYS) or []
-        result = compute_temperature(bars)
+        pe_series, pb_series, erp_values = _fetch_temperature_valuation_inputs(DEFAULT_INDEX_CODE)
+        result = compute_temperature(
+            bars,
+            pe_series=pe_series,
+            pb_series=pb_series,
+            erp_values=erp_values,
+        )
         if not result.get("available"):
             reporter.warn("市场温度：指数 K 线不足，写入占位")
             return unavailable_temperature("insufficient")
@@ -63,11 +74,55 @@ def compute_market_temperature_data(
         result["index_code"] = DEFAULT_INDEX_CODE
         result["index_name"] = DEFAULT_INDEX_NAME
         result["disclaimer"] = TEMPERATURE_DISCLAIMER
-        reporter.ok("市场温度计算完成")
+        if result.get("first_factor") == "valuation":
+            reporter.ok("市场温度计算完成（估值分位）")
+        else:
+            reporter.ok("市场温度计算完成（点位分位回落）")
         return result
     except Exception:
         logger.exception("[temperature] 市场温度编排异常，章节降级")
         return unavailable_temperature("source_failed")
+
+
+def _fetch_temperature_valuation_inputs(
+    index_code: str,
+) -> tuple[list[float] | None, list[float] | None, list[float] | None]:
+    """获取估值分位所需的 PE/PB/ERP 三条历史序列（各自独立缺席降级）。
+
+    Returns:
+        (pe, pb, erp) 三个数值序列（升序）；对应数据源不可得时该位置为 None。
+        全部不可得 → (None, None, None)（消费方回落点位分位，不阻塞）。
+    """
+    pe: list[float] | None = None
+    pb: list[float] | None = None
+    erp: list[float] | None = None
+    pe_rows: list[dict] = []
+
+    try:
+        from src.python.fetcher.index_valuation import fetch_index_valuation_history
+
+        rows = fetch_index_valuation_history(index_code)
+        if rows:
+            pe_rows = rows
+            pe_vals = [r["pe"] for r in rows if r.get("pe") is not None]
+            pb_vals = [r["pb"] for r in rows if r.get("pb") is not None]
+            pe = pe_vals or None
+            pb = pb_vals or None
+    except Exception:
+        logger.warning("[temperature] 指数估值历史获取失败，估值因子缺席", exc_info=True)
+
+    try:
+        from src.python.fetcher.bond_yield import get_risk_free_rate_history
+
+        rf_rows = get_risk_free_rate_history()
+        if pe_rows and rf_rows:
+            from src.python.analysis.market_temperature import build_erp_series
+
+            erp = build_erp_series(pe_rows, rf_rows) or None
+    except Exception:
+        logger.warning("[temperature] 无风险利率历史获取失败，ERP 因子缺席", exc_info=True)
+
+    return pe, pb, erp
 
 
 # ── 持仓相关性矩阵 编排 ──
@@ -80,7 +135,7 @@ def compute_correlation_data(
 ) -> dict | None:
     """编排持仓相关性矩阵并返回数据契约 dict（持仓关系矩阵相关性区块）。
 
-    流程：并行拉取各品种历史 K 线（days=90）→ 转日收益 → 纯计算相关矩阵。
+    流程：并行拉取各品种历史 K 线（days=FETCH_DAYS，覆盖静态窗与滚动趋势底座）→ 转日收益 → 纯计算相关矩阵 + 滚动趋势（失败仅降级滚动层）。
 
     Args:
         holdings: 持仓列表（Holding 对象，含 code/name/shares）
@@ -103,11 +158,14 @@ def compute_correlation_data(
         FETCH_DAYS,
         MIN_HOLDINGS,
         MIN_SAMPLES,
+        ROLLING_FOCUS_COUNT,
         compute_correlation_matrix,
+        compute_rolling_correlations,
         unavailable_result,
     )
     from src.python.analysis.style_factor_regression import klines_to_returns
     from src.python.report._report_factor_metrics import _fetch_holding_bars
+    from src.python.report.downsample import downsample_bars
 
     try:
         reporter.info("正在计算持仓相关性矩阵...")
@@ -132,11 +190,13 @@ def compute_correlation_data(
                 MIN_HOLDINGS,
                 len(returns_by_code),
             )
-            return unavailable_result(
+            _short = unavailable_result(
                 "insufficient",
                 sample_count=0,
                 insufficient_codes=sorted(returns_by_code.keys()),
             )
+            _short["rolling"] = None
+            return _short
 
         names_by_code = {h.code: h.name for h in holdings}
         result = compute_correlation_matrix(
@@ -147,12 +207,32 @@ def compute_correlation_data(
         )
         if result.get("available"):
             reporter.ok("持仓相关性矩阵计算完成")
+            # 滚动趋势（组合平均 + 重点品对）：失败只降级本层，静态矩阵不受影响（§1.4.5）
+            try:
+                _focus = [(p["code_a"], p["code_b"]) for p in result.get("pairs", [])[:ROLLING_FOCUS_COUNT]]
+                rolling = compute_rolling_correlations(
+                    returns_by_code,
+                    names_by_code,
+                    focus_pairs=_focus,
+                )
+                if rolling.get("available"):
+                    # 序列复用 report/downsample 降采样（周/月聚合，analysis 层不反向依赖 report）
+                    rolling["portfolio"] = {wk: downsample_bars(pts) for wk, pts in rolling["portfolio"].items()}
+                    for _fp in rolling["focus_pairs"]:
+                        _fp["series"] = {wk: downsample_bars(pts) for wk, pts in _fp["series"].items()}
+                result["rolling"] = rolling
+            except Exception:
+                logger.warning("[correlation] 滚动趋势计算失败（静态矩阵不受影响）", exc_info=True)
+                result["rolling"] = None
         else:
             reporter.warn(f"持仓相关性数据不足（有效样本 {result.get('sample_count', 0)}）")
+            result["rolling"] = None
         return result
     except Exception:
         logger.exception("[correlation] 相关性矩阵计算异常，章节降级")
-        return unavailable_result("source_failed")
+        _failed = unavailable_result("source_failed")
+        _failed["rolling"] = None
+        return _failed
 
 
 def compute_market_sentiment_data(

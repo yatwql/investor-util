@@ -868,3 +868,73 @@ class TestDocIdLogTag(unittest.TestCase):
         joined = "\n".join(cm.output)
         self.assertIn("[600000]", joined)
         self.assertNotIn("[999001]", joined)
+
+
+# ============================================================
+#  短缓存全量补齐 — 增量续拉永远补不长的回归
+# ============================================================
+
+
+class TestShortCacheFullRefetch(unittest.TestCase):
+    """缓存历史短于请求窗口时的全量补齐行为（滚动窗口数据底座约束）。"""
+
+    def _days(self, n: int, start: str = "2026-01-01") -> list[dict]:
+        from datetime import date, timedelta
+
+        out = []
+        d = date.fromisoformat(start)
+        while len(out) < n:
+            if d.weekday() < 5:
+                out.append({"date": d.isoformat(), "close": 10.0})
+            d += timedelta(days=1)
+        return out
+
+    def test_short_cache_forces_full_fetch(self):
+        """缓存 15 条 < 请求 30 条 → start_from 置 None 全量拉取并整段替换缓存。"""
+        cached = self._days(15, start="2026-01-01")
+        full = self._days(30, start="2025-11-01")  # 起点早于缓存 → 走全量替换分支
+
+        with (
+            patch(
+                "src.python.fetcher.chain_incremental.cache_get",
+                return_value=cached,
+            ),
+            patch("src.python.fetcher.chain_incremental.cache_set") as mock_set,
+            patch(
+                "src.python.fetcher.chain_incremental._try_providers",
+                return_value=full,
+            ) as mock_try,
+        ):
+            result = fetch_with_incremental_fallback("history_stock", "600000", 30)
+
+        # start_from=None（第 6 个位置参数）→ provider 从头拉满 days 条
+        self.assertIsNone(mock_try.call_args[0][5])
+        self.assertEqual(len(result), 30)
+        mock_set.assert_called()
+
+    def test_long_cache_keeps_incremental(self):
+        """缓存 ≥ 请求窗口 → 维持增量语义（start_from = 缓存末日），不触发全量。"""
+        cached = self._days(40, start="2026-01-01")
+        last = cached[-1]["date"]
+        new_bars = [{"date": "2026-03-16", "close": 10.5}]
+
+        with (
+            patch(
+                "src.python.fetcher.chain_incremental.cache_get",
+                return_value=cached,
+            ),
+            patch("src.python.fetcher.chain_incremental.cache_set"),
+            # 连续性校验会走交易日历（测试隔离环境不建真实日历连接）
+            patch(
+                "src.python.fetcher.chain_incremental._validate_continuity",
+                return_value=False,
+            ),
+            patch(
+                "src.python.fetcher.chain_incremental._try_providers",
+                return_value=new_bars,
+            ) as mock_try,
+        ):
+            result = fetch_with_incremental_fallback("history_stock", "600000", 30)
+
+        self.assertEqual(mock_try.call_args[0][5], last)
+        self.assertEqual(len(result), 30)

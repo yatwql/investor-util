@@ -549,3 +549,104 @@ class TestWritePositionStructureSheet(unittest.TestCase):
         self.assertIn("二、持仓相关性矩阵", col_a)
         self.assertIn("三、持仓集中度监控", col_a)
         self.assertIn("招商中证白酒", col_a)
+
+
+# ═══════════════════════════════════════════════════════════════
+#  滚动趋势摘要（区块二可选子块）
+# ═══════════════════════════════════════════════════════════════
+
+
+def _rolling_data(**extra) -> dict:
+    """滚动趋势契约 mock（2 窗 + 1 焦点品对）。"""
+    d = {
+        "available": True,
+        "status": "ok",
+        "windows": [60, 120],
+        "min_samples": 60,
+        "portfolio": {
+            "60": [
+                {"date": "2026-09-01", "value": 0.60, "n_pairs": 2},
+                {"date": "2026-09-05", "value": 0.80, "n_pairs": 2},
+            ],
+            "120": [
+                {"date": "2026-09-01", "value": 0.55, "n_pairs": 2},
+                {"date": "2026-09-05", "value": 0.70, "n_pairs": 2},
+            ],
+        },
+        "focus_pairs": [
+            {
+                "code_a": "b",
+                "name_a": "资产B",
+                "code_b": "a",
+                "name_b": "资产A",
+                "series": {
+                    "60": [
+                        {"date": "2026-09-01", "value": 0.90},
+                        {"date": "2026-09-05", "value": 0.95},
+                    ],
+                    "120": [
+                        {"date": "2026-09-01", "value": 0.85},
+                        {"date": "2026-09-05", "value": 0.88},
+                    ],
+                },
+            }
+        ],
+        "coverage": {
+            "dates": 120,
+            "first_date": "2026-04-01",
+            "last_date": "2026-09-05",
+            "full_window_from": {"60": "2026-07-01", "120": "2026-09-01"},
+        },
+        "notes": ["组合平均相关性 = 每个滚动端点上全部两两 Pearson r 的均值"],
+    }
+    d.update(extra)
+    return d
+
+
+class TestExcelRollingTrend(unittest.TestCase):
+    """相关性区块·滚动趋势摘要 Excel 呈现。"""
+
+    def _write(self, correlation_data):
+        from openpyxl import Workbook
+
+        from src.python.report.position_structure_sheet import write_position_structure_sheet
+
+        wb = Workbook()
+        ws = wb.active
+        write_position_structure_sheet(ws, overlap_result=None, correlation_data=correlation_data)
+        return ws
+
+    def _flat(self, ws) -> list[str]:
+        return [str(c.value) if c.value is not None else "" for row in ws.iter_rows() for c in row]
+
+    def test_rolling_summary_written_when_available(self):
+        """滚动就绪 → 摘要标题 + 窗口行 + 焦点品对行 + notes 进说明区。"""
+        data = _correlation_data(rolling=_rolling_data())
+        flat = self._flat(self._write(data))
+        self.assertTrue(any("滚动趋势：组合平均相关性" in v for v in flat), flat)
+        self.assertTrue(any(v == "60 日" for v in flat), flat)
+        self.assertTrue(any(v == "120 日" for v in flat), flat)
+        self.assertTrue(any("重点品对：" in v and "资产B" in v for v in flat), flat)
+        self.assertTrue(any("每个滚动端点上全部两两 Pearson" in v for v in flat), flat)
+        # 最新值/首值入表
+        self.assertIn("0.8", flat)
+        self.assertIn("0.6", flat)
+
+    def test_full_window_from_marker(self):
+        """完整窗起始日入表；120 窗 full_from 缺失时标注按可得区间截断。"""
+        rolling = _rolling_data()
+        rolling["coverage"]["full_window_from"] = {"60": "2026-07-01", "120": None}
+        flat = self._flat(self._write(_correlation_data(rolling=rolling)))
+        self.assertTrue(any("2026-07-01" in v for v in flat), flat)
+        self.assertTrue(any("按可得区间截断" in v for v in flat), flat)
+
+    def test_rolling_absent_keeps_static_only(self):
+        """无 rolling 键（既有契约）→ 静态区块照常、无滚动摘要。"""
+        flat = self._flat(self._write(_correlation_data()))
+        self.assertFalse(any("滚动趋势" in v for v in flat), flat)
+
+    def test_rolling_unavailable_omits_summary(self):
+        """rolling.available=False → 滚动摘要不写、静态矩阵照常。"""
+        flat = self._flat(self._write(_correlation_data(rolling=_rolling_data(available=False))))
+        self.assertFalse(any("滚动趋势" in v for v in flat), flat)
+        self.assertTrue(any("配对明细" in v for v in flat), flat)

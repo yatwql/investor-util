@@ -21,7 +21,7 @@
 - 🔁 **决策有闭环** — 建议 → 登记 → 真实行情结算命中率 → 教训回灌提示词，越用越懂你的组合
 - 🔒 **隐私优先** — 数据全部本地处理，支持 4 档匿名化，凭据永不落日志与报告
 
-> 当前版本：0.12.8（[版本历史](docs/managements/changelog.md)）
+> 当前版本：0.12.9（[版本历史](docs/managements/changelog.md)）
 
 ## ✨ 核心亮点
 
@@ -100,7 +100,7 @@ git clone https://github.com/yatwql/investor-util.git && cd investor-util
 .venv/bin/python -m src.python.cli doctor
 
 # 单次运行启用实验功能（仅本次生效，不写入 features.json）
-.venv/bin/python -m src.python.cli --experiment prosperity_framework report --type full
+.venv/bin/python -m src.python.cli --experiment factor_catalog report --type full
 ```
 
 完整命令参考、退出码与定时任务配置见 [CLI 命令行模式使用指南](docs/manuals/how-to-use-cli-mode.md)。

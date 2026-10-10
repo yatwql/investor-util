@@ -47,16 +47,9 @@ EVOLUTION_CHART_KEYS = (
 # 统一提供（色盲安全 palette，§4.8），避免 Python/JS 调色板漂移。
 _CATEGORY_ORDER = ("股票", "基金", "债券", "现金", "其他")
 
-# ── 雷达轴 → metrics_* 功能开关（Feature Flag）映射 ──────
-# 子开关逐个过滤雷达轴：Flag 关闭 → 该轴值转为 "N/A"（非 0）。
-_RADAR_FLAG_MAP = {
-    "sharpe_ratio": "metrics_sharpe",
-    "calmar_ratio": "metrics_calmar",
-    "win_rate": "metrics_winrate",
-    "turnover_rate": "metrics_turnover",
-    "portfolio_beta": "metrics_beta",
-    "hhi": "metrics_hhi",
-}
+# ── 雷达图量化指标轴 ──────────────────────────────
+# 量化指标总开关（features.metrics_enabled）关闭 → 全部雷达轴值转 "N/A"（非 0），
+# 含 all_metrics 全量轴与 risk_metrics/history_data 降级轴（单开关、无逐轴差异）。
 
 # 降级雷达的 3 个基本轴（risk_metrics / history_data 兜底共用）
 _BASIC_RADAR_AXES = (
@@ -73,13 +66,13 @@ def build_chart_datasets(
     details: list | None = None,
     risk_metrics: dict | None = None,
     all_metrics: dict | None = None,
-    metric_flags: dict | None = None,
+    metrics_enabled: bool | None = None,
 ) -> dict:
     """构建 6 张图的数据集，返回 dict → template context（渲染数据经 context 传递）。
 
     关键数据源：risk_metrics（5 基本字段，full）/ all_metrics（14 项全量，full）/
-    metric_flags（metrics_* 功能开关，关闭 → "N/A"）；both 路径传入 None 时，radar 从
-    history_data 提取 3 个基本轴兜底。
+    metrics_enabled（量化指标总开关，关闭 → radar 各轴 "N/A"）；both 路径传入 None
+    时，radar 从 history_data 提取 3 个基本轴兜底。
     ⚠ 每个 dataset 独立 try/except——单图脏数据失败仅跳过该图，不影响整份报告。
     """
     datasets: dict[str, Any] = {}
@@ -112,7 +105,7 @@ def build_chart_datasets(
     # ⚠ radar 放在所有条件之外，仅依赖 all_metrics / risk_metrics / history_data
     # 三源独立判断——history_data 不可用但 all_metrics 有值时，radar 仍应渲染。
     try:
-        datasets["radar"] = _build_radar_dataset(history_data, all_metrics, risk_metrics, metric_flags)
+        datasets["radar"] = _build_radar_dataset(history_data, all_metrics, risk_metrics, metrics_enabled)
     except Exception as e:  # radar 失败 → 空占位，不影响其他图
         logger.warning("[chart] radar 构建失败，跳过该图: %s", e)
         datasets["radar"] = _empty_dataset()
@@ -397,7 +390,7 @@ def _build_radar_dataset(
     history_data: dict | None,
     all_metrics: dict | None,
     risk_metrics: dict | None,
-    metric_flags: dict | None = None,
+    metrics_enabled: bool | None = None,
 ) -> dict:
     """量化指标 Radar — 三级降级优先级：
 
@@ -407,12 +400,12 @@ def _build_radar_dataset(
        双路径均有——确保 both 路径也能显示 3 个基本轴）
 
     数据最小化：只传指标数值，不含内部明细。
-    Flag 过滤（metrics_* 功能开关）：metrics_* 关闭 → 该轴值转为 "N/A"（非 0）。
+    开关过滤：``metrics_enabled`` 为 False → 全部轴（含降级 3 轴）值转 "N/A"
+    （非 0）；True / None（未启用交互图表等）→ 按数据原值渲染。
     降级标注：risk_metrics / history_data 兜底时 datasets[0]["note"]="仅限基础指标"。
     """
     degraded = False
     if all_metrics:
-        # all_metrics 全量轴，逐轴应用 metrics_* Flag 过滤
         axes = []
         for key, name in (
             ("sharpe_ratio", "夏普比率"),
@@ -425,9 +418,6 @@ def _build_radar_dataset(
             value = all_metrics.get(key)
             if key == "win_rate":
                 value = _extract_rate(value)
-            flag = _RADAR_FLAG_MAP.get(key)
-            if flag and metric_flags is not None and not metric_flags.get(flag, True):
-                value = None  # Flag 关闭 → N/A
             axes.append((key, name, value))
     else:
         # risk_metrics / history_data 兜底 → 3 个基本轴（降级标注）
@@ -439,7 +429,11 @@ def _build_radar_dataset(
             return _empty_dataset()
         degraded = True
 
-    # 保留全部轴；None → "N/A"（非 0，§4.12 / §6.6 契约：Flag 关闭或缺失显示 N/A）
+    # 量化指标总开关关闭 → 全轴 N/A（全量与降级路径同一口径，轴标签保留，§6.6）
+    if metrics_enabled is False:
+        axes = [(key, name, None) for key, name, _value in axes]
+
+    # 保留全部轴；None → "N/A"（非 0，§4.12 / §6.6 契约：开关关闭或缺失显示 N/A）
     labels = [name for _, name, _ in axes]
     values = [float(value) if _is_valid_metric(value) else "N/A" for _, _, value in axes]
 

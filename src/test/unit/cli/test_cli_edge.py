@@ -184,16 +184,16 @@ class TestCliEdge:
         """同名重复取值按最后一次生效（幂等，不报错）。"""
         from src.python.config import features as feat
 
-        monkeypatch.setitem(feat.FEATURE_FLAGS, "metrics_hhi", True)
-        _apply_cli_switches([("metrics_hhi", False), ("metrics_hhi", False)])
-        assert feat.FEATURE_FLAGS["metrics_hhi"] is False
+        monkeypatch.setitem(feat.FEATURE_FLAGS, "metrics_enabled", True)
+        _apply_cli_switches([("metrics_enabled", False), ("metrics_enabled", False)])
+        assert feat.FEATURE_FLAGS["metrics_enabled"] is False
 
     @pytest.mark.edge
     def test_apply_switches_none_and_empty_are_noop(self, monkeypatch):
         """None / 空列表不触碰任何开关。"""
         from src.python.config import features as feat
 
-        monkeypatch.setitem(feat.FEATURE_FLAGS, "metrics_hhi", True)
+        monkeypatch.setitem(feat.FEATURE_FLAGS, "metrics_enabled", True)
         _apply_cli_switches(None)
         _apply_cli_switches([])
-        assert feat.FEATURE_FLAGS["metrics_hhi"] is True
+        assert feat.FEATURE_FLAGS["metrics_enabled"] is True

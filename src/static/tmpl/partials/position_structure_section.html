@@ -222,6 +222,109 @@
             </table>
             {% endif %}
 
+            {#── 滚动趋势（组合平均 + 重点品对）：数据源自 rolling 契约，口径句经 notes 单源外送；不满足时整块不渲染 ──#}
+            {% set _rolling = position_relationship_data.get("rolling") %}
+            {% if _rolling and _rolling.get("available") and _rolling["portfolio"].get("60") %}
+            <div class="corr-rolling-trend" style="margin-top: 16px;">
+                <div style="font-weight: 600; margin: 16px 0 8px;">滚动趋势：分散化是否随时间失效</div>
+                <canvas id="corrRollingChart" width="800" height="260" style="width:100%;height:260px;" aria-label="组合平均相关性滚动趋势图（60/120 日端点窗）" role="img">图表无法显示，数据见下方重点品对表</canvas>
+                {% set _focus_pairs = _rolling["focus_pairs"] %}
+                {% if _focus_pairs %}
+                <table style="width: 100%; border-collapse: collapse; font-size: var(--fs-table-sm); margin-top: 8px;">
+                    <thead>
+                        <tr>
+                            <th class="text-left">重点品对（按静态 |r| 降序）</th>
+                            <th class="text-right">最新 60 日 r</th>
+                            <th class="text-right">最新 120 日 r</th>
+                            <th class="text-right">60 日趋势（首 → 末）</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for fp in _focus_pairs %}
+                        {% set s60 = fp.series["60"] %}
+                        {% set s120 = fp.series["120"] %}
+                        <tr>
+                            <td class="text-left">{{ fp.name_a }}({{ fp.code_a | anon_code }}) × {{ fp.name_b }}({{ fp.code_b | anon_code }})</td>
+                            <td class="text-right">{{ "%.2f"|format(s60[-1].value) if s60 else "--" }}</td>
+                            <td class="text-right">{{ "%.2f"|format(s120[-1].value) if s120 else "--" }}</td>
+                            <td class="text-right">{{ "%.2f → %.2f"|format(s60[0].value, s60[-1].value) if s60 else "--" }}</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+                {% endif %}
+                <div class="penetration-notes" style="margin-top: 8px;">
+                    {% for _n in _rolling["notes"] %}
+                    <div>* {{ _n }}</div>
+                    {% endfor %}
+                    <div>* 覆盖区间 {{ _rolling["coverage"]["first_date"] }} ~ {{ _rolling["coverage"]["last_date"] }}（{{ _rolling["coverage"]["dates"] }} 个端点日）；序列超长时已按周/月下采样（曲点取期末值）</div>
+                </div>
+            </div>
+            <script>
+            (function () {
+                var rolling = {{ _rolling | tojson }};
+                if (!window.drawSimpleChart || !rolling || !rolling.portfolio) return;
+                var p60 = rolling.portfolio["60"] || [];
+                var p120 = rolling.portfolio["120"] || [];
+                var base = p60.length ? p60 : p120;
+                if (!base.length) return;
+                var baseDates = base.map(function (pt) { return pt.date; });
+                var baseSet = {};
+                for (var bi = 0; bi < baseDates.length; bi++) { baseSet[baseDates[bi]] = true; }
+
+                /* 各序列按日期映射到公共端点轴（对齐层已保证同轴，此处防御日期缺位
+                   ——缺位序列整体退出，绝不向 drawSimpleChart 传 null（null 会污染极值轴）*/
+                var cands = [
+                    { label: "组合平均 60日", pts: p60, color: "#2E75B6", width: 2, dash: [] },
+                    { label: "组合平均 120日", pts: p120, color: "#2E75B6", width: 2, dash: [6, 4] }
+                ];
+                var pairColors = ["#CC0000", "#E68A00", "#2E7D32"];
+                var focus = rolling.focus_pairs || [];
+                for (var fi = 0; fi < focus.length; fi++) {
+                    var f60 = (focus[fi].series || {})["60"] || [];
+                    cands.push({
+                        label: focus[fi].name_a + "×" + focus[fi].name_b,
+                        pts: f60,
+                        color: pairColors[fi % pairColors.length],
+                        width: 1.5,
+                        dash: [5, 3]
+                    });
+                }
+
+                var mapped = [], i, j;
+                for (i = 0; i < cands.length; i++) {
+                    if (!cands[i].pts.length) continue;
+                    var m = {};
+                    for (j = 0; j < cands[i].pts.length; j++) { m[cands[i].pts[j].date] = cands[i].pts[j].value; }
+                    /* 入选条件：序列起点落在公共端点轴上（晚起点品对合法，公共起点统一下标后移） */
+                    if (cands[i].pts[0].date in baseSet) {
+                        mapped.push({ label: cands[i].label, m: m, color: cands[i].color, width: cands[i].width, dash: cands[i].dash });
+                    }
+                }
+                if (!mapped.length) return;
+
+                /* 公共起点：所有入选序列均覆盖的最后一个起始下标（其后按构造连续） */
+                var start = 0;
+                for (i = 0; i < baseDates.length; i++) {
+                    var all = true;
+                    for (j = 0; j < mapped.length; j++) { if (!(baseDates[i] in mapped[j].m)) { all = false; break; } }
+                    if (all) { start = i; break; }
+                    start = -1;
+                }
+                if (start < 0) return;
+                var labels = baseDates.slice(start);
+                if (labels.length < 2) return;
+                var datasets = [];
+                for (i = 0; i < mapped.length; i++) {
+                    var vals = [];
+                    for (j = start; j < baseDates.length; j++) { vals.push(mapped[i].m[baseDates[j]]); }
+                    datasets.push({ label: mapped[i].label, values: vals, color: mapped[i].color, width: mapped[i].width, dash: mapped[i].dash });
+                }
+                window.drawSimpleChart("corrRollingChart", datasets, { labels: labels });
+            })();
+            </script>
+            {% endif %}
+
             {% if position_relationship_data.get("insufficient_codes") %}
             <div class="penetration-notes">
                 <div style="color:var(--warn-text);">* 下列品种重叠样本不足 {{ position_relationship_data["window"] }} 期，相关性格标为 N/A（灰色）：{{ position_relationship_data["insufficient_codes"] | map("anon_code") | join("、") }}</div>

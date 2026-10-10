@@ -17,7 +17,8 @@
 | 机构盈利预测 | akshare `stock_profit_forecast_em()` 全量获取 | — | `profit_forecast_` | 基础类 |
 | 行业资金流向 | akshare `stock_sector_fund_flow_rank()` 今日排名 | — | `sector_flow_` | 基础类 |
 | 股票历史分红 | akshare `stock_history_dividend()` 无参全量拉取后按代码过滤 | — | `dividend_` | 基础类 |
-| 无风险利率（Rf） | akshare `bond_zh_us_rate`（国债收益率） | config.json 手动配置兜底 | `bond_yield_rf`¹ | 基础类 |
+| 无风险利率（Rf） | akshare `bond_zh_us_rate`（国债收益率，单值 + 历史序列双键） | config.json 手动配置兜底 | `bond_yield_rf`/`bond_yield_history`¹ | 基础类 |
+| 指数估值历史（市场温度估值因子） | akshare 乐咕 `stock_index_pe_lg`/`stock_index_pb_lg`（沪深300 月频 PE/PB，2005 起） | 过期缓存兜底（30 天）→ 仍不可得时温度第一因子回落点位分位 | `idx_valuation_` | 基础类 |
 | 财经新闻（5 源聚合） | 新浪 + 东方财富 + 财联社 + 华尔街见闻 + akshare 并行获取，统一聚合去重 | — | `news_` | 基础类 |
 | 股票/ETF 历史日线 | 腾讯财经 K 线接口 | 新浪财经 K 线接口 → **同花顺官方日 K**（前复权，需 key；支持增量起点） | `history_stock_` | 历史走势 |
 | 场外基金历史净值 | 天天基金 `pingzhongdata/{code}.js` | 东方财富 `api.fund.eastmoney.com/f10/lsjz`（分页获取） | `history_fund_otc_` | 历史走势 |
@@ -30,7 +31,7 @@
 | A 股行情 / 财务 / 基金 / **市场情绪** | 同花顺金融数据服务 `fuyao.aicubes.cn`（官方源，**需用户自备 key**） | — | 行情/持仓/情绪面各域前缀（其中龙虎榜与连板天梯为 `sentiment` 类别**唯一源**） | 基础类 / 分析类 |
 
 > **缓存前缀**列对应 `data/cache/` 目录下的文件名前缀，同一前缀的文件按 TTL 统一管理。持仓重合度为运行时推导模块（复用 `fund_hold_` 缓存），无独立缓存前缀。
-> ¹ `bond_yield_rf` 为精确缓存键名（`exact_cache_keys`），非前缀匹配，单独管理。
+> ¹ `bond_yield_rf`/`bond_yield_history` 为精确缓存键名（`exact_cache_keys`），非前缀匹配，单独管理。
 > 表中仅含具有 `cache_prefixes` 或 `exact_cache_keys` 的数据模块。此外还有少数 `exact_cache_keys` 模块，使用具体键名而非前缀匹配，不受 TTL 扫描清除影响（如 `trading_calendar`、`fund_benchmarks`、`holdings_tracking`、`fund_concentration_snapshot`、`fund_style_snapshot`、`fund_manager_snapshot`、`fund_purchase_status_table`）。其中 `fund_benchmarks`、`fund_manager_snapshot` 等仍归属于缓存分组，可通过菜单 `[1]` 刷新。申购状态总表为单键全量缓存（键 `fund_purchase_status_table`，data_type `fund_purchase` 已登记 `exact_cache_keys`，TTL 与官方净值同源 `CACHE_DAILY` 24h），未登记 `cache_prefixes`、不入菜单刷新组（大表不随菜单 `[1]`/`[2]` 强抓），按 TTL 过期；单次报告生成内经会话缓存只经链 1 次。
 > **分组**列对应菜单 `[1]`（基础类）/ `[2]`（持仓类）的缓存刷新范围。历史走势类不受菜单缓存命令影响，仅按 TTL 过期。
 > **行业名归一化**：行业分类数据在入库时剥离行业名末尾的申万层级后缀（Ⅰ/Ⅱ/Ⅲ/Ⅳ，如「银行Ⅱ」「白酒Ⅱ」）——该后缀是申万分层命名标记，对零售报告读者是纯噪声，报告展示统一用剥离后的行业名（如「银行」「白酒」）。
@@ -58,6 +59,8 @@ LLM 分析结果独立缓存，通过指纹自动失效，不占用数据源请�
 ### 指数历史 K 线
 
 由 `fetcher/index.py` 通过 Provider Chain 获取（`fetch_with_incremental_fallback`）：
+
+> **增量链路通用语义**（`history_stock` / `history_fund_otc` / `history_index` 共用）：缓存命中时从缓存末日起增量续拉、按日期合并后返回末 `days` 条；**当缓存历史短于请求条数时自动改为从头全量拉取一次**（增量永远补不长短缓存，否则滚动窗口类消费会拿到恒定短历史），全量失败回退短缓存降级不阻断；连续性校验（新旧 K 线跳空 > 5 个交易日）同样触发全量刷新。
 
 - **A 股指数** → `history_index` 通道：腾讯财经 → 东方财富 `push2his`（免 key 的独立厂商备源）→ 新浪财经 → 同花顺官方日 K（需 key）。新浪 `getKLineData` 端点实测不可用，故东方财富为实际第二可用源；各 provider 内置传输级退避重试（历史链无链级重试）
 - **美股指数** → `history_index_us` 通道：新浪财经 → 腾讯财经。两者共用指数 K 线函数（`fetch_index_kline`），新浪侧实现位于 `providers/sina_kline.py`，但其 `getKLineData` 端点对全部代码返回 404/空，实际取数通常由腾讯完成；而腾讯 K 线接口对 `gb_*` 代码支持有限，因此该通道可能整链取空——空结果按正常降级记录（成因与现状见 `datasource-reliability.md` §4.2）
@@ -120,6 +123,7 @@ LLM 分析结果独立缓存，通过指纹自动失效，不占用数据源请�
 | 机构盈利预测 | 不定期更新 | 基于券商研报汇总，时效性取决于研报发布时间 |
 | 行业资金流向 | 交易日实时 | akshare 今日排名，非交易日或盘前为空 |
 | 无风险利率 | 每日更新 | akshare 获取中国 10Y 国债收益率，config 可手动覆盖 |
+| 指数估值历史 | 每周（月频数据 + 7 天缓存） | akshare 获取沪深300 PE/PB 月频历史，源不可得时用 30 天内旧缓存兜底 |
 | 股票/ETF 历史日线 | 交易日更新 | 包含前复权数据（腾讯/新浪为主，同花顺官方前复权为第三链路），含开高低收与成交量（涨跌幅由相邻交易日收盘价推得；换手率另由组合两期持仓计算，取自行情 K 线之外） |
 | 个股财报全文 | 定期报告披露后（法定延迟，QDII 更晚） | DataSinking 转 Markdown，来源为官方披露平台（cninfo/DART/EDINET/MOPS），仅 A 股；**取最新报告期（跨文种：年报/半年报/一季报/三季报）**，章节按文档实际清单匹配（季报自动取「主要财务数据」类章节）；报告期由接口返回，正文按配置截断；需自备 key |
 | 个股财务指标 | 季报/年报披露后（随定期报告） | akshare 转结构化关键指标（营收/净利/同比/毛利率/ROE/负债率/现金流/EPS/每股净资产）；金额单位元、比率小数比例；无需凭据。备用支路从 DataSinking「公司简介和主要财务指标」章节解析；第三链路为**同花顺官方合并报表派生**（多期、口径与主源一致；报告期按财季归一到季末）。**PE/PB 口径**：官方源给出 `pe_ttm`/`pb_mrq` 时优先采用（TTM 口径），否则回退「现价 ÷ 报告期 EPS/BVPS」自算——跨源比较估值倍数前先看口径 |

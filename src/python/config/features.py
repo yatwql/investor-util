@@ -44,8 +44,9 @@ FEATURES_FILE = os.path.join(PROJECT_ROOT, "data/config/features.json")
 # 入常规组并把 default 改 True；章节/页签类入报告章节与增强组且 default 保持
 # False（默认产物不变、按需开启）。此前「默认值」与
 # 「是否实验项」是同一件事的两个名字：转正会连带摘掉面板入口（doctor_check 转正
-# 后只剩手改 features.json 一条关闭途径），而从未被标为实验项的 metrics_* 则从来
-# 没有过任何界面入口。分组把这两件事拆开——可见性由分组决定、取值由 default 决定。
+# 后只剩手改 features.json 一条关闭途径），而从未被标为实验项的指标开关（原
+# metrics_* 七项，现并入单开关 metrics_enabled）则从来没有过任何界面入口。
+# 分组把这两件事拆开——可见性由分组决定、取值由 default 决定。
 
 GROUP_EXPERIMENTAL = "experimental"
 GROUP_STANDARD = "standard"
@@ -126,12 +127,12 @@ feature_switch_registry: dict[str, FeatureSwitchDef] = {
         True,
         True,
     ),
-    # ── 实验性功能：投资方法框架（借展开源骨架，需真实组合样本验证评分口径） ──
+    # ── 常规功能：投资方法框架（实验转正项：真实组合样本验证评分口径达成，移入常规组、默认开）──
     "prosperity_framework": FeatureSwitchDef(
         "景气度框架诊断",
         "六维评分卡（景气方向/ROE 低位弹性/全球比较优势/流动性/集中度与周期拼接/业绩回撤印证）评估组合契合度，缺数据维度标记需核实",
-        GROUP_EXPERIMENTAL,
-        False,
+        GROUP_STANDARD,
+        True,
         True,
     ),
     # ── 报告章节与增强：持仓变动复盘（章节类转正项：移出实验组、default 保持 False）──
@@ -205,16 +206,17 @@ feature_switch_registry: dict[str, FeatureSwitchDef] = {
         True,
         True,
     ),
-    # ── 常规开关：量化指标（关闭即报告少一项指标） ──
-    "metrics_sharpe": FeatureSwitchDef("量化指标-夏普比率", "报告输出夏普比率", GROUP_STANDARD, True, True),
-    "metrics_calmar": FeatureSwitchDef("量化指标-卡玛比率", "报告输出卡玛比率", GROUP_STANDARD, True, True),
-    "metrics_hhi": FeatureSwitchDef("量化指标-HHI 集中度", "报告输出 HHI 集中度", GROUP_STANDARD, True, True),
-    "metrics_winrate": FeatureSwitchDef("量化指标-胜率", "报告输出胜率", GROUP_STANDARD, True, True),
-    "metrics_turnover": FeatureSwitchDef("量化指标-换手率", "报告输出换手率", GROUP_STANDARD, True, True),
-    "metrics_risk_contribution": FeatureSwitchDef(
-        "量化指标-风险贡献", "报告输出各持仓风险贡献", GROUP_STANDARD, True, True
+    # ── 常规开关：量化指标（原 metrics_* 七项逐项开关，已合并为单一总开关）──
+    # 七项指标始终全量计算，开关只表达「量化指标画像是否输出」：关闭即雷达图
+    # 各轴转 "N/A"（含降级 3 轴路径）+ 熔断器暂停指标失败计数，指标之间无差异化
+    # 生效面，逐项开关未换来逐项控制价值，故收敛为一项（面板 7 行 → 1 行）。
+    "metrics_enabled": FeatureSwitchDef(
+        "量化指标显示",
+        "报告量化指标是否输出（雷达图各轴）；关闭即各轴显示 N/A、熔断器暂停指标失败计数（指标始终全量计算）",
+        GROUP_STANDARD,
+        True,
+        True,
     ),
-    "metrics_beta": FeatureSwitchDef("量化指标-Beta", "报告输出组合 Beta", GROUP_STANDARD, True, True),
     # ── 常规开关：功能特性 ──
     "enable_interactive_charts": FeatureSwitchDef(
         "报告图表交互",
@@ -589,7 +591,7 @@ def load_feature_overrides() -> None:
     JSON 格式：
       {
         "enable_interactive_charts": false,
-        "metrics_hhi": true
+        "metrics_enabled": true
       }
     """
     if not os.path.exists(FEATURES_FILE):

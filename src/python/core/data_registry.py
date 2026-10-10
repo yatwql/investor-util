@@ -324,8 +324,16 @@ _MODULE_REGISTRY: tuple[DataModuleDef, ...] = (
     DataModuleDef(
         "无风险利率",
         "bond_yield",
-        exact_cache_keys=("bond_yield_rf",),
+        exact_cache_keys=("bond_yield_rf", "bond_yield_history"),  # 历史序列：ERP 分位因子数据底座
         cache_ttl=CACHE_DAILY,
+        cache_groups=("refresh",),
+    ),
+    # ── 指数估值历史（乐咕 PE/PB 月频；不随菜单刷新强抓，仅按 TTL 过期）──
+    DataModuleDef(
+        "指数估值历史",
+        "idx_valuation",
+        cache_prefixes=("idx_valuation_",),
+        cache_ttl=CACHE_WEEKLY,
         cache_groups=("refresh",),
     ),
 )
@@ -385,6 +393,7 @@ def get_known_llm_settings_keys() -> set[str]:
         "pricing",
         "llm_max_concurrency",
         "llm_max_thinking_concurrency",
+        "llm_full_fail_retry_delay",
         "news_correlation_top_n",
         "debate",
         "fact_check",

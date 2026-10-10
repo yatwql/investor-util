@@ -98,7 +98,10 @@ def _build_profit_attribution_block(holdings_details: list[dict] | None) -> str:
     if not data:
         return ""
 
-    lines = ["【收益归因】（以下数值为贡献占比 pp，非个股收益率，两者不可混用）"]
+    lines = ["【收益归因】（贡献占比 pp = 盈亏 ÷ Σ|盈亏|，按持仓成本口径；非个股收益率，两者不可混用）"]
+    asset_parts = [f"{i['asset_class']}({i['contribution_pp']:+.1f}pp)" for i in data["大类贡献"]]
+    if asset_parts:
+        lines.append(f"大类贡献: {'、'.join(asset_parts)}")
     pos = data["盈利来源"]
     neg = data["亏损来源"]
     if pos:

@@ -16,7 +16,13 @@ from unittest.mock import MagicMock, patch
 import pytest
 from openpyxl import Workbook
 
-pytestmark = [pytest.mark.unit, pytest.mark.unit_report]
+pytestmark = [
+    pytest.mark.unit,
+    pytest.mark.unit_report,
+    # 附带依赖（指数估值历史 / 无风险利率历史）非本文件测试目标，
+    # 模块级声明离线：akshare 换空桩（缺席降级路径），不发起真实网络
+    pytest.mark.usefixtures("offline_external_sources"),
+]
 
 
 class TestBuildTemperatureDisplay(unittest.TestCase):
@@ -56,10 +62,32 @@ class TestBuildTemperatureDisplay(unittest.TestCase):
         assert d["tier"] == "合理"
         assert d["components"] == {
             "price_percentile": "42.5%",
+            "valuation_percentile": None,
+            "first_label": "价格分位",
+            "first_value": "42.5%",
             "ma_deviation": "+3.5%",
             "volatility": "18.0%",
         }
         assert d["index_name"] == "沪深300"
+
+    def test_available_with_valuation_prefers_valuation_label(self):
+        """估值分位可用时第一因子标签优先展示估值而非价格。"""
+        from src.python.report.html_writer import _build_temperature_display
+
+        data = {
+            "available": True,
+            "price_percentile": 65.0,
+            "valuation_percentile": 50.1,
+            "ma_deviation": 0.035,
+            "volatility": 0.18,
+            "score": 52,
+            "tier": "合理",
+            "index_name": "沪深300",
+        }
+        d = _build_temperature_display(data)
+        assert d["components"]["first_label"] == "估值分位"
+        assert d["components"]["first_value"] == "50.1%"
+        assert d["components"]["valuation_percentile"] == "50.1%"
 
     def test_available_missing_factor(self):
         from src.python.report.html_writer import _build_temperature_display
@@ -264,6 +292,25 @@ class TestWriteMarketTemperature(unittest.TestCase):
         assert ws.cell(row=8, column=1).value == "注"
         assert row == 9
 
+    def test_valuation_label_when_available(self):
+        """估值分位可用 → 三因子行首项展示估值分位（而非价格分位）。"""
+        from src.python.report.summary import _write_market_temperature
+
+        ws = self._make_ws()
+        data = {
+            "available": True,
+            "score": 52,
+            "tier": "合理",
+            "price_percentile": 65.3,
+            "valuation_percentile": 50.1,
+            "ma_deviation": 0.032,
+            "volatility": 0.15,
+            "index_name": "沪深300",
+        }
+        row = _write_market_temperature(ws, 5, data)
+        assert ws.cell(row=7, column=2).value.startswith("估值分位 50.1%")
+        assert row == 9
+
 
 class TestComputeValuationData(unittest.TestCase):
     """compute_valuation_data：编排估值分位数据契约。"""
@@ -434,6 +481,66 @@ class TestComputeMarketTemperatureData(unittest.TestCase):
             result = compute_market_temperature_data(config, MagicMock())
         assert result["available"] is False
         assert result["status"] == "insufficient"
+
+    @staticmethod
+    def _valuation_rows(n: int = 60) -> tuple[list[dict], list[dict]]:
+        """60 个月频 PE/PB 点 + 同日期 rf 序列（≥ MIN_VAL_SAMPLES）。"""
+        months = [f"{2019 + i // 12}-{i % 12 + 1:02d}-28" for i in range(n)]
+        pe_rows = [{"date": d, "pe": 8.0 + i * 0.1, "pb": 1.0 + i * 0.01} for i, d in enumerate(months)]
+        rf_rows = [{"date": d, "rate": 0.03} for d in months]
+        return pe_rows, rf_rows
+
+    def test_valuation_path_when_sources_available(self):
+        """估值序列可用 → first_factor=valuation，契约带估值键。"""
+        from src.python.report.orchestrator import compute_market_temperature_data
+
+        from src.python.config.features import set_feature_enabled
+
+        set_feature_enabled("market_temperature", True)
+        bars = [{"date": f"2024-01-{i:02d}", "close": 100.0} for i in range(1, 91)]
+        pe_rows, rf_rows = self._valuation_rows()
+        with (
+            patch("src.python.fetcher.index.fetch_index_history", return_value=bars),
+            patch(
+                "src.python.fetcher.index_valuation.fetch_index_valuation_history",
+                return_value=pe_rows,
+            ),
+            patch(
+                "src.python.fetcher.bond_yield.get_risk_free_rate_history",
+                return_value=rf_rows,
+            ),
+        ):
+            result = compute_market_temperature_data({}, MagicMock())
+        assert result["available"] is True
+        assert result["status"] == "ok"
+        assert result["first_factor"] == "valuation"
+        assert result["valuation_percentile"] is not None
+        assert result["valuation_components"]["pe"] is not None
+        assert result["price_percentile"] is not None  # 双轨保留（展示/回落）
+
+    def test_price_proxy_when_valuation_sources_down(self):
+        """估值/利率源均不可得 → 回落价格分位，行仍可用（=改造前行为）。"""
+        from src.python.report.orchestrator import compute_market_temperature_data
+
+        from src.python.config.features import set_feature_enabled
+
+        set_feature_enabled("market_temperature", True)
+        bars = [{"date": f"2024-01-{i:02d}", "close": 100.0} for i in range(1, 91)]
+        with (
+            patch("src.python.fetcher.index.fetch_index_history", return_value=bars),
+            patch(
+                "src.python.fetcher.index_valuation.fetch_index_valuation_history",
+                return_value=None,
+            ),
+            patch(
+                "src.python.fetcher.bond_yield.get_risk_free_rate_history",
+                return_value=None,
+            ),
+        ):
+            result = compute_market_temperature_data({}, MagicMock())
+        assert result["available"] is True
+        assert result["first_factor"] == "price_proxy"
+        assert result["valuation_percentile"] is None
 
     def test_switch_on_exception(self):
         """编排异常 → source_failed 占位。"""

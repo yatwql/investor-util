@@ -223,6 +223,21 @@ _DEFAULT_CONFIG = {
         "tiantian": 0.5,
         "eastmoney_industry": 0.05,
     },
+    # ── N. 任务完成通知（无人值守；缺省全关 = 静默跳过，符合「配置文件不必须存在」）──
+    "notify": {
+        "on_success": False,  # 成功也发送（失败/部分失败必发，不受此开关影响）
+        "webhook_url": "",  # webhook 地址（POST JSON），空=不启用；URL 常含凭据，日志只记域名
+        "email": {  # SMTP 邮件通道（smtp_host 或 to 为空 = 不启用）
+            "smtp_host": "",
+            "smtp_port": 465,
+            "use_ssl": True,
+            "username": "",
+            "password": "",
+            "to": "",
+        },
+        "desktop": False,  # 桌面通知（notify-send，Linux；未安装时记日志跳过）
+        "timeout_seconds": 10,  # 通道超时（秒）
+    },
 }
 
 
@@ -374,6 +389,16 @@ def _build_template_from_defaults() -> str:
         f'    "eastmoney": {d["batch_rate_limit"]["eastmoney"]},  // 东方财富行情（100ms）',
         f'    "tiantian": {d["batch_rate_limit"]["tiantian"]},  // 天天基金（500ms）',
         f'    "eastmoney_industry": {d["batch_rate_limit"]["eastmoney_industry"]}  // 东方财富行业（50ms）',
+        "  },",
+        "",
+        # ── N ──
+        "  // ── N. 任务完成通知（无人值守；缺省全关=静默跳过）──",
+        '  "notify": {',
+        f'    "on_success": {json.dumps(d["notify"]["on_success"])},  // 成功也发送（失败/部分失败必发）',
+        f'    "webhook_url": {json.dumps(d["notify"]["webhook_url"])},  // webhook 地址（POST JSON），空=不启用；URL 常含凭据，日志只记域名',
+        f'    "email": {json.dumps(d["notify"]["email"], ensure_ascii=False, indent=2).replace(chr(10), chr(10) + "    ")},  // SMTP 邮件通道（smtp_host 或 to 为空=不启用）',
+        f'    "desktop": {json.dumps(d["notify"]["desktop"])},  // 桌面通知（notify-send，Linux）',
+        f'    "timeout_seconds": {d["notify"]["timeout_seconds"]}  // 通道超时（秒）',
         "  }",
         "}",
     ]

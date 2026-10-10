@@ -51,6 +51,7 @@ _CARRIER_PATH_RE = re.compile(r"`(src/test/[\w/\-]+\.py)(?:::[\w\[\]:\- ,]+)?`")
 #: 已完成「需求 ID → 验证载体」映射的域前缀（六批已完成，与 `_ALL_DOMAINS` 一致）
 _COVERED_DOMAINS: tuple[str, ...] = (
     "R-CCH",
+    "R-COR",
     "R-ERR",
     "R-DIAG",
     "R-BRK",
@@ -93,6 +94,7 @@ _COVERED_DOMAINS: tuple[str, ...] = (
 #: requirements.md 中全部需求域前缀（真值来源；与 `_COVERED_DOMAINS` 比对即得覆盖进度）
 _ALL_DOMAINS: tuple[str, ...] = (
     "R-CCH",
+    "R-COR",
     "R-ERR",
     "R-DIAG",
     "R-BRK",

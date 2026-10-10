@@ -161,21 +161,21 @@ class TestApplyFeaturesWrite:
     def test_standard_switch_write_takes_effect(self, app_client):
         """常规开关（量化指标）写：features.json 含覆写，运行时开关生效。
 
-        缺陷场景：``metrics_*`` 与 ``enable_interactive_charts`` 从未出现在任何
-        界面通道内，用户只能手改 features.json 才能关掉一项指标；本用例锁定
+        缺陷场景：量化指标开关与 ``enable_interactive_charts`` 从未出现在任何
+        界面通道内，用户只能手改 features.json 才能关掉量化指标输出；本用例锁定
         Web 面板对常规组的写入路径与实验组同源可用。
         """
         from src.python.config.features import FEATURES_FILE, is_feature_enabled
 
-        assert is_feature_enabled("metrics_hhi") is True  # 默认开
+        assert is_feature_enabled("metrics_enabled") is True  # 默认开
 
-        resp = app_client.post("/api/config/edit", json={"key": "metrics_hhi", "value": False})
+        resp = app_client.post("/api/config/edit", json={"key": "metrics_enabled", "value": False})
         assert resp.status_code == 200
         assert resp.get_json()["data"]["value"] is False
-        assert is_feature_enabled("metrics_hhi") is False
+        assert is_feature_enabled("metrics_enabled") is False
 
         raw = open(FEATURES_FILE, encoding="utf-8").read()
-        assert '"metrics_hhi": false' in raw
+        assert '"metrics_enabled": false' in raw
 
     def test_doctor_check_can_be_disabled_from_panel(self, app_client):
         """系统自检转正后仍可从面板关闭——转正不再连入口一起摘掉（回归）。"""

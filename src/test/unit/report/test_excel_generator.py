@@ -142,11 +142,16 @@ class TestGenerateExcelReport(unittest.TestCase):
         self.mock_fetch_idx = self.idx_patcher.start()
         self.us_idx_patcher = patch("src.python.fetcher.index.fetch_us_indices", return_value={})
         self.mock_fetch_us_idx = self.us_idx_patcher.start()
+        # 本类测主流程接线，不测景气度块（其显隐由 wiring 用例覆盖）；
+        # 转正后该开关默认开，就地构建会触发历史行情取数，这里关掉以隔离主流程
+        self.pf_patcher = patch.dict("src.python.config.features.FEATURE_FLAGS", {"prosperity_framework": False})
+        self.pf_patcher.start()
 
     def tearDown(self) -> None:
         self.sheets.stop()
         self.idx_patcher.stop()
         self.us_idx_patcher.stop()
+        self.pf_patcher.stop()
 
     # ── 基本路径 ──
 

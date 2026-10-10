@@ -25,10 +25,11 @@
         <span style="font-size: var(--fs-table-sm);font-weight:400;opacity:0.8;margin-left:8px;">再平衡信号 · 交易纪律 · 调仓建议 · 收益归因</span>
     </div>
     {% if _action.get("available") %}
+    <details class="section-fold">
+        <summary class="section-fold-summary">
+            {% if _action.get("summary") %}{{ _action["summary"] }}{% else %}调仓信号与建议明细{% endif %} —— 点击展开/收起再平衡信号、调仓清单与收益归因
+        </summary>
     <div class="section-content">
-        {% if _action.get("summary") %}
-        <div class="summary-tag" style="margin-bottom: 8px;">{{ _action["summary"] }}</div>
-        {% endif %}
 
         <!-- ① 再平衡信号（单品占比超警戒线） -->
         {% set _rb = _action.get("rebalance_signals") or [] %}
@@ -110,16 +111,25 @@
         <div class="empty-note"><p>暂无触发</p></div>
         {% endif %}
 
-        <!-- ④ 收益归因（品种贡献占比，TOP5 正负分列 + 净额合计） -->
+        <!-- ④ 收益归因（大类 → 品种两级贡献占比，同口径分层 + 净额合计 + 口径脚注） -->
         {% set _attr = _action.get("attribution") %}
-        <div style="font-weight: bold; font-size: var(--fs-body); margin: 18px 0 6px;">④ 收益归因（品种贡献占比）</div>
+        <div style="font-weight: bold; font-size: var(--fs-body); margin: 18px 0 6px;">④ 收益归因（大类 → 品种贡献占比）</div>
         {% if _attr and _attr.get("available") %}
         <div style="overflow-x:auto;">
         <table>
             <thead>
-                <tr><th>来源</th><th>品种</th><th>贡献占比</th><th>盈亏金额</th><th></th></tr>
+                <tr><th>来源</th><th>品种 / 大类</th><th>贡献占比</th><th>盈亏金额</th><th></th></tr>
             </thead>
             <tbody>
+                {% for item in (_attr.get("大类贡献") or []) %}
+                <tr>
+                    <td>大类</td>
+                    <td class="text-left">{{ item.get("asset_class", "") }}</td>
+                    <td style="text-align:right;">{{ "{:+.1f}".format(item.get("contribution_pp", 0) or 0) }}pp</td>
+                    <td style="text-align:right;">{{ "{:+,.2f}".format(item.get("profit", 0) or 0) }}</td>
+                    <td></td>
+                </tr>
+                {% endfor %}
                 {% for src in ("盈利来源", "亏损来源") %}
                 {% for item in (_attr.get(src) or []) %}
                 <tr>
@@ -136,6 +146,9 @@
         </div>
         {% if _attr.get("summary") %}
         <div class="summary-tag" style="margin-top: 8px;">净额合计：{{ _attr["summary"] }}</div>
+        {% endif %}
+        {% if _attr.get("note") %}
+        <div class="penetration-notes" style="margin-top: 6px;">{{ _attr["note"] }}</div>
         {% endif %}
         {% else %}
         <div class="empty-note"><p>待生成</p></div>
@@ -311,6 +324,7 @@
         {% endif %}
         {% endif %}
     </div>
+    </details>
     {% else %}
     <div class="section-content">
         <div class="empty-note">

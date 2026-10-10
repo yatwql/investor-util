@@ -351,10 +351,9 @@ def _write_market_temperature(ws: Worksheet, row: int, temperature: dict | None)
         logger.info("[summary] 市场温度不可用，本行静默省略")
         return row
     row = write_block_title(ws, row, "【市场温度】")
-    disclaimer = (
-        temperature.get("disclaimer")
-        or "市场温度为价格分位、均线偏离与波动率三因子合成的信号，仅供参考，不构成任何仓位建议"
-    )
+    from src.python.analysis.market_temperature import TEMPERATURE_DISCLAIMER
+
+    disclaimer = temperature.get("disclaimer") or TEMPERATURE_DISCLAIMER
 
     score = temperature.get("score")
     tier = temperature.get("tier") or "合理"
@@ -362,18 +361,26 @@ def _write_market_temperature(ws: Worksheet, row: int, temperature: dict | None)
     pct = temperature.get("price_percentile")
     dev = temperature.get("ma_deviation")
     vol = temperature.get("volatility")
+    # 第一因子：估值分位（PE/PB/ERP 等权）可用时优先，否则点位分位代理
+    val_pct = temperature.get("valuation_percentile")
+    if val_pct is not None:
+        first_text = f"估值分位 {val_pct:.1f}%"
+    elif pct is not None:
+        first_text = f"价格分位 {pct:.1f}%"
+    else:
+        first_text = ""
     if score is not None:
         write_data_row(ws, row, ["市场温度", f"{score:.0f} / 100（{tier}）"])
     else:
         write_data_row(ws, row, ["市场温度", f"--（{tier}）"])
     row += 1
-    if all(v is not None for v in (pct, dev, vol)):
+    if first_text and dev is not None and vol is not None:
         # 分位为 0~100，均线偏离/波动率为小数比例（0.032=3.2%），转百分数展示
         row = _write_kv_row(
             ws,
             row,
             f"三因子（{index_name}）",
-            f"价格分位 {pct:.1f}% · 20日均线偏离 {dev * 100:+.1f}% · 年化波动率 {vol * 100:.1f}%",
+            f"{first_text} · 20日均线偏离 {dev * 100:+.1f}% · 年化波动率 {vol * 100:.1f}%",
         )
     else:
         row = _write_kv_row(ws, row, f"三因子（{index_name}）", "因子数据不完整")

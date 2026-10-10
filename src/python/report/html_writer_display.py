@@ -68,11 +68,20 @@ def _build_temperature_display(market_temperature_data: dict | None) -> dict | N
     pct = market_temperature_data.get("price_percentile")
     dev = market_temperature_data.get("ma_deviation")
     vol = market_temperature_data.get("volatility")
+    val_pct = market_temperature_data.get("valuation_percentile")
     components = None
-    if all(v is not None for v in (pct, dev, vol)):
+    if dev is not None and vol is not None and (val_pct is not None or pct is not None):
         # 分位为 0~100，均线偏离/波动率为小数比例（0.032=3.2%），转百分数展示
+        # 第一因子：估值分位（PE/PB/ERP 等权）优先，点位分位代理回落
+        if val_pct is not None:
+            first_label, first_value = "估值分位", f"{val_pct:.1f}%"
+        else:
+            first_label, first_value = "价格分位", f"{pct:.1f}%"
         components = {
-            "price_percentile": f"{pct:.1f}%",
+            "price_percentile": f"{pct:.1f}%" if pct is not None else None,
+            "valuation_percentile": f"{val_pct:.1f}%" if val_pct is not None else None,
+            "first_label": first_label,
+            "first_value": first_value,
             "ma_deviation": f"{dev * 100:+.1f}%",
             "volatility": f"{vol * 100:.1f}%",
         }

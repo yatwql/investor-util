@@ -28,6 +28,7 @@ from src.python.cli import (
     main,
     run_cli,
 )
+from src.python.cli._handlers import _collect_degradation_summary
 from src.python.core.constants import PROJECT_ROOT
 from src.python.report.whatif_operations import WhatifRunResult
 
@@ -142,9 +143,9 @@ class TestArgparse:
     def test_experiment_repeatable(self):
         """--experiment 可重复指定，逐项独立解析。"""
         args = _build_parser().parse_args(
-            ["--experiment", "decision_reflection", "--experiment", "prosperity_framework", "report"]
+            ["--experiment", "decision_reflection", "--experiment", "factor_catalog", "report"]
         )
-        assert args.experiment == [("decision_reflection",), ("prosperity_framework",)]
+        assert args.experiment == [("decision_reflection",), ("factor_catalog",)]
 
     def test_experiment_all(self):
         """--experiment all 展开为全部实验功能。"""
@@ -219,8 +220,10 @@ class TestArgparseFeatureOverrides:
 
     def test_feature_repeatable(self):
         """可重复指定，逐项独立解析并保留顺序。"""
-        args = _build_parser().parse_args(["--feature", "metrics_hhi=off", "--feature", "metrics_beta=off", "report"])
-        assert args.feature == [("metrics_hhi", False), ("metrics_beta", False)]
+        args = _build_parser().parse_args(
+            ["--feature", "metrics_enabled=off", "--feature", "enable_interactive_charts=off", "report"]
+        )
+        assert args.feature == [("metrics_enabled", False), ("enable_interactive_charts", False)]
 
     def test_feature_unknown_name_rejected(self):
         """未知开关名 → SystemExit(2)（解析期报错，不留到运行时静默失效）。"""
@@ -314,19 +317,19 @@ class TestApplyCliSwitches:
         """同一次运行内双向覆写互不干扰。"""
         from src.python.config import features as feat
 
-        monkeypatch.setitem(feat.FEATURE_FLAGS, "metrics_hhi", True)
+        monkeypatch.setitem(feat.FEATURE_FLAGS, "metrics_enabled", True)
         monkeypatch.setitem(feat.FEATURE_FLAGS, "deterministic_signal", False)
-        _apply_cli_switches([("metrics_hhi", False), ("deterministic_signal", True)])
-        assert feat.FEATURE_FLAGS["metrics_hhi"] is False
+        _apply_cli_switches([("metrics_enabled", False), ("deterministic_signal", True)])
+        assert feat.FEATURE_FLAGS["metrics_enabled"] is False
         assert feat.FEATURE_FLAGS["deterministic_signal"] is True
 
     def test_duplicate_key_last_wins(self, monkeypatch):
         """同名重复以最后一次为准（命令行从左到右覆盖）。"""
         from src.python.config import features as feat
 
-        monkeypatch.setitem(feat.FEATURE_FLAGS, "metrics_beta", True)
-        _apply_cli_switches([("metrics_beta", False), ("metrics_beta", True)])
-        assert feat.FEATURE_FLAGS["metrics_beta"] is True
+        monkeypatch.setitem(feat.FEATURE_FLAGS, "metrics_enabled", True)
+        _apply_cli_switches([("metrics_enabled", False), ("metrics_enabled", True)])
+        assert feat.FEATURE_FLAGS["metrics_enabled"] is True
 
     def test_not_persisted(self, monkeypatch):
         """仅本次运行生效，不写 features.json（实验开关的关闭路径仍走面板/文件）。"""
@@ -605,6 +608,115 @@ class TestHandleReport:
         assert code == 0
         mock_reporter.print_llm_cost_summary.assert_called_once()
         mock_reporter.print_cache_hit_summary.assert_called_once()
+
+    def test_notify_dispatched_on_completion(self):
+        """通知门控通过 → 构造事件并分发（报告类型/退出码/结果标志透传）。"""
+        mock_result = MagicMock()
+        mock_result.exit_code = 0
+        mock_result.errors = []
+        mock_result.excel_ok = True
+        mock_result.html_ok = False
+        cfg = {"notify": {"webhook_url": "https://hooks.example.test/x", "on_success": True}}
+        with (
+            patch(
+                "src.python.cli._handlers._cli_read_holdings_with_flows",
+                return_value=([MagicMock()], [], []),
+            ),
+            patch("src.python.report.cli_progress.CliProgressReporter"),
+            patch("src.python.report.orchestrator.generate_report", return_value=mock_result),
+            patch("src.python.core.completion_notify.dispatch_completion_notification") as mock_dispatch,
+        ):
+            args = MagicMock()
+            args.type = "both"
+            args.history = "auto"
+            args.force_llm = False
+            args.output = None
+            args.verbose = False
+            code = _handle_report(args, cfg)
+        assert code == 0
+        mock_dispatch.assert_called_once()
+        event, notify_cfg = mock_dispatch.call_args[0]
+        assert event["report_type"] == "both"
+        assert event["ok"] is True
+        assert event["exit_code"] == 0
+        assert event["artifacts"], "excel_ok=True 应列示产物路径"
+        assert notify_cfg["webhook_url"] == "https://hooks.example.test/x"
+
+    def test_notify_silent_when_unconfigured(self):
+        """config 无 notify 节 → 门控前置，不触达分发（静默跳过）。"""
+        mock_result = MagicMock()
+        mock_result.exit_code = 0
+        with (
+            patch(
+                "src.python.cli._handlers._cli_read_holdings_with_flows",
+                return_value=([MagicMock()], [], []),
+            ),
+            patch("src.python.report.cli_progress.CliProgressReporter"),
+            patch("src.python.report.orchestrator.generate_report", return_value=mock_result),
+            patch("src.python.core.completion_notify.dispatch_completion_notification") as mock_dispatch,
+        ):
+            args = MagicMock()
+            args.type = "basic"
+            args.history = "auto"
+            args.force_llm = False
+            args.output = None
+            args.verbose = False
+            code = _handle_report(args, {})
+        assert code == 0
+        mock_dispatch.assert_not_called()
+
+    def test_notify_failure_never_changes_exit_code(self):
+        """通知流程内部抛异常 → 退出码原样返回（尽力而为契约）。"""
+        mock_result = MagicMock()
+        mock_result.exit_code = 0
+        mock_result.errors = []
+        cfg = {"notify": {"webhook_url": "https://hooks.example.test/x", "on_success": True}}
+        with (
+            patch(
+                "src.python.cli._handlers._cli_read_holdings_with_flows",
+                return_value=([MagicMock()], [], []),
+            ),
+            patch("src.python.report.cli_progress.CliProgressReporter"),
+            patch("src.python.report.orchestrator.generate_report", return_value=mock_result),
+            patch(
+                "src.python.core.completion_notify.build_completion_event",
+                side_effect=RuntimeError("事件构造爆炸"),
+            ),
+        ):
+            args = MagicMock()
+            args.type = "full"
+            args.history = "auto"
+            args.force_llm = False
+            args.output = None
+            args.verbose = False
+            code = _handle_report(args, cfg)
+        assert code == 0
+
+
+class TestDegradationSummary:
+    """_collect_degradation_summary：跟踪器降级事件 → 摘要行（最新在前、按源去重）。"""
+
+    def test_dedupes_latest_first(self):
+        """同源多事件只留最新一条；未降级事件不入摘要。"""
+        events = [
+            {"source_key": "tencent", "degraded": True, "failure_type": "timeout", "count": 1},
+            {"source_key": "akshare", "degraded": True, "failure_type": "circuit", "count": 3},
+            {"source_key": "tencent", "degraded": True, "failure_type": "timeout", "count": 5},
+            {"source_key": "sina", "degraded": False, "failure_type": None, "count": 0},
+        ]
+        tracker = MagicMock()
+        tracker.get_log.return_value = events
+        with patch("src.python.report.data_status.get_tracker", return_value=tracker):
+            lines = _collect_degradation_summary()
+        assert lines == [
+            "tencent: timeout（累计5次）",
+            "akshare: circuit（累计3次）",
+        ]
+
+    def test_tracker_failure_returns_empty(self):
+        """跟踪器异常 → 返回空列表（通知摘要非关键，不拖垮收尾）。"""
+        with patch("src.python.report.data_status.get_tracker", side_effect=RuntimeError("boom")):
+            assert _collect_degradation_summary() == []
 
 
 # ═══════════════════════════════════════════════════════════════
@@ -902,7 +1014,7 @@ class TestMainEarlyExitExperiments:
             patch_target,
         )
         assert seen["decision_reflection"] is True
-        assert seen["prosperity_framework"] is False  # 未指定的开关不受影响
+        assert seen["factor_catalog"] is False  # 未指定的实验开关不受影响
 
     def test_without_experiment_flag_keeps_defaults(self):
         """不传开关参数 → 实验组保持默认关闭（对照组，防误判为恒真）。"""

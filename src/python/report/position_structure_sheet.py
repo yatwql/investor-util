@@ -304,7 +304,46 @@ def _write_correlation_block(
                 _corr_cell.font = _FONT_GREY
             row += 1
 
-    # ── 3. 说明区 ──
+    # ── 3. 滚动趋势摘要（可选：滚动契约就绪时才写） ──
+    rolling = correlation_data.get("rolling")
+    if rolling and rolling.get("available") and (rolling.get("portfolio") or {}).get("60"):
+        row += 2
+        row = write_title_row(ws, row, "滚动趋势：组合平均相关性（60/120 日端点窗）", ncols=ncols)
+        row = write_header_row(ws, row, ["窗口", "最新值", "区间首值", "端点数", "完整窗起始", "口径"])
+        _coverage = rolling.get("coverage") or {}
+        _full_from = _coverage.get("full_window_from") or {}
+        for _w in rolling.get("windows", []):
+            _pts = (rolling.get("portfolio") or {}).get(str(_w), [])
+            if not _pts:
+                continue
+            _full = _full_from.get(str(_w)) or "—（按可得区间截断）"
+            _note = "完整窗" if _full != "—（按可得区间截断）" else "历史不足，按可得区间"
+            row_data = [
+                f"{_w} 日",
+                _pts[-1].get("value"),
+                _pts[0].get("value"),
+                len(_pts),
+                _full,
+                _note,
+            ]
+            write_data_row(ws, row, row_data, formats=[None, "0.00", "0.00", None, None, None])
+            row += 1
+        for _fp in rolling.get("focus_pairs", []):
+            _s60 = (_fp.get("series") or {}).get("60") or []
+            if not _s60:
+                continue
+            row_data = [
+                f"重点品对：{_fp.get('name_a', '')} ({_fp.get('code_a', '')}) × {_fp.get('name_b', '')} ({_fp.get('code_b', '')})",
+                _s60[-1].get("value"),
+                _s60[0].get("value"),
+                len(_s60),
+                "—",
+                "60 日窗滚动 r（首 → 末见前两列）",
+            ]
+            write_data_row(ws, row, row_data, formats=[None, "0.00", "0.00", None, None, None])
+            row += 1
+
+    # ── 4. 说明区 ──
     row += 2
     row = write_title_row(ws, row, "说明", ncols=ncols)
     notes = [
@@ -312,6 +351,10 @@ def _write_correlation_block(
         "相关系数 r = 两品种日收益率的 Pearson 相关系数；显著列为 95% 双尾 t 检验结果（p < 0.05）",
         "红=正相关（同向波动，伪分散风险），蓝=负相关（反向对冲），白=不显著，灰=重叠样本不足",
     ]
+    if rolling and rolling.get("available"):
+        for _n in rolling.get("notes", []):
+            notes.append(_n)
+        notes.append("滚动趋势序列超长时按周/月下采样（曲点取期末值），覆盖区间见滚动摘要端点数")
     insufficient = correlation_data.get("insufficient_codes") or []
     if insufficient:
         notes.append(f"下列品种重叠样本不足窗口期，相关性格标为 N/A（灰色）：{'、'.join(insufficient)}")
