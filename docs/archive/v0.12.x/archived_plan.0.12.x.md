@@ -11,6 +11,7 @@
 > 追加归档：2026-10-07 plan-80 调仓纪律回放（rebalance_schedule_replay）先决门槛三段通过并四迭代完成（见文末章节）
 > 追加归档：2026-10-07 plan-84 发布流程分步编排脚本（release.py 七子命令 + 49 项单测）完成（见文末章节）
 > 追加归档：2026-10-09 plan-83 章节类实验转正批次（三项章节级开关迁报告章节与增强组）完成（见文末章节）
+> 追加归档：2026-10-10 plan-115 量化指标 7 个逐项开关合并为单开关 `metrics_enabled` 完成（见文末章节）
 > 设计文档索引：plan-72 的设计文档 [`fund-purchase-limit-design.md`](fund-purchase-limit/fund-purchase-limit-design.md) **已随 plan-74 完成一并归档**（本目录 `fund-purchase-limit/`）；plan-73 的 LLM 上下文设计同在 `fund-purchase-limit/fund-purchase-limit-llm-context-design.md`（设计 + 已实施）；plan-76 的快照事件级设计在本目录 `holding-change-review/holding-change-review-design.md`（已实施，§15 实施与验收记录）；plan-77 的 What-if 成本与基准设计在本目录 `whatif-cost-benchmark/whatif-cost-benchmark-design.md`（已实施，§14 门槛与验收记录）；plan-78 的因子目录评测设计在本目录 `factor-zoo-catalog/factor-zoo-catalog-design.md`（已评测·判定转正立项，§13 判定记录）；plan-79 的事件窗设计在本目录 `event-window-impact/event-window-impact-design.md`（已实施，§14 判定记录）；plan-80 的调仓纪律回放设计在本目录 `rebalance-schedule-replay/rebalance-schedule-replay-design.md`（已实施，§14 实施与门槛判定记录）
 
 ---
@@ -288,3 +289,11 @@
 **动作**：转正定义已扩展为「移出实验组、目标组按功能形态选——常驻读侧增强→常规组（默认开），章节/页签类→报告章节与增强组（默认关、按需开）」（注册表注释与三份手册同步）；待真实报告启用积累且用户确认产物质量后，三项分批执行注册表迁移
 
 **完成态（2026-10-09）**：启用记录已积累（三项各 4 次，最近 2026-10-09）且产物经报告浏览器实测（rf-113 ⑤/⑥ 项），三项**单批**迁入 `GROUP_REPORT`（章节类形态同构，分批会拉长面板编号抖动窗口）：注册表三处 `GROUP_EXPERIMENTAL → GROUP_REPORT`（声明位保持原处，报告块块首三项），`DEFAULTS`/`AFFECTS_REPORT` 原样（默认均关）；注册表现状 **34 项 = 实验 5 / 常规 16 / 报告 13**；TUI 面板编号随注册表顺序重推导（实验 8-12 / 常规 13-28 / 报告 29-41，转正三项占 29-31，既有报告项 32-41 不位移）；`--experiment` 取值域与报告自述、启用统计随实验组身份自动移除（`enabled_experimental_features` 派生面不再含三项）；同步 features.py 注释、requirements §11.5 计数与 R-WIF-13/R-HCR 措辞、developer-guide 转正判据首例注记、technical §1.8.11 白名单口径（51 键）、三份手册（TUI 编号/Web 分组行/CLI 取值域/开关表 [P] 说明）与 how-to-config/how-to-start/folders 残留枚举；测试同步（分组断言改报告组 + config 访问器同源不变式改写为「报告组有读取器者同源」+ legacy 读取器保有），定向 1069 项通过 + ruff 全绿。
+
+#### ✅ `plan-115` 量化指标 7 个逐项开关合并为单开关 `metrics_enabled` — 已完成（2026-10-10）
+
+**动机**：菜单 `[S]` 18-24 号七个 `metrics_*` 开关粒度过细、生效面过窄——实际只有雷达图逐轴过滤（`metrics_risk_contribution` 甚至不在雷达过滤名单）与熔断器 FF 联动两处，逐项开关未换来逐项控制价值，面板平白多 6 行
+
+**动作**：注册表 7 条并为 `metrics_enabled`（label「量化指标」，常规组默认开）；`_chart_dataset_factory` / `chart_data_builder` 改传单开关（关闭 → 雷达全轴 N/A，含降级 3 轴路径统一口径）；`circuit_breaker_wrapper` 两份 flag_map 收敛为单常量；旧键按无消费者告警；同步面板编号与计数及各手册表格；补齐欠缺测试；生效面维持现状（不扩到 LLM 指标表/正文，避免提示词指纹变更）
+
+**完成态（2026-10-10）**：注册表 **34 → 28 项（常规 16 → 10）**，TUI 面板 18-24 → 18 单项、后续项前移至 19-22，报告块 29-41 → 23-35（编号由注册表派生自动跟随，Web 面板白名单同源）；雷达过滤由逐轴 `metric_flags` 改为单开关 `metrics_enabled`，**降级 3 轴路径此前不过滤已统一**（关闭 → 全轴 N/A、轴标签与降级标注保留）；熔断器两份 flag_map 收敛为 `_METRICS_FEATURE_FLAG` + `_METRIC_INDICATOR_NAMES` 单点；**修复 `_ff_was_off` 只读不写**（rf-654，「FF 开回时重置断路器」契约从未生效，关闭期残留失败计数会跨开关周期累计）；旧 `features.json` 键按无消费者告警（回归用例锁定不静默）；同步 requirements §11.5、technical §6.7 语义表 + §白名单计数、how-to-config / how-to-use-tui-menu / how-to-use-web-mode / how-to-use-cli-mode / how-to-config-llm 面板编号与计数、folders 统计行与 changelog / review-findings（rf-654）登记；**测试**：新增熔断 FF 联动 6 项（此前零覆盖）+ 降级路径过滤 + 旧键告警回归，同步改写雷达/CLI/TUI/Web/注册表既有用例，`dev-verify` 6474 全绿 + ruff 全绿。

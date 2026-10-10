@@ -60,8 +60,8 @@ CLI 与 TUI 共享同一套缓存、配置与报告管线，可交替使用。
 > # 本次运行关闭系统自检的界面入口（CLI 的 doctor 子命令本就不受该开关约束）
 > .venv/bin/python -m src.python.cli --feature doctor_check=off doctor
 >
-> # 一次运行关掉两个量化指标 + 关闭交互图表（HTML 回退静态渲染）
-> .venv/bin/python -m src.python.cli --feature metrics_hhi=off --feature metrics_beta=off --feature enable_interactive_charts=off report --type full
+> # 本次运行关闭量化指标输出（雷达图各轴 N/A）+ 关闭交互图表（HTML 回退静态渲染）
+> .venv/bin/python -m src.python.cli --feature metrics_enabled=off --feature enable_interactive_charts=off report --type full
 > ```
 >
 > 两个参数可同时使用：`--feature` 在 `--experiment` 之后应用，故 `--experiment all --feature prosperity_framework=off` 表示「其余实验功能全开、只关掉景气度框架诊断」。

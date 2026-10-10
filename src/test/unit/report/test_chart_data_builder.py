@@ -509,58 +509,39 @@ class TestRadar:
             "集中度 HHI",
         ]
 
-    def test_radar_flag_off_shows_na(self) -> None:
-        """metrics_* 功能开关：metrics_sharpe=False → 该指标输出 "N/A"（非 0）。"""
+    def test_radar_metrics_switch_off_shows_na(self) -> None:
+        """量化指标总开关关闭 → 6 个全量轴全部输出 "N/A"（非 0），轴标签保留。"""
         ds = build_chart_datasets(
             history_data=None,
             all_metrics=self._ALL_METRICS,
-            metric_flags={"metrics_sharpe": False},
-        )
-        chart = ds["radar"]
-        assert chart["labels"][0] == "夏普比率"
-        assert chart["datasets"][0]["data"][0] == "N/A"
-        # 其余轴不受影响
-        assert chart["datasets"][0]["data"][1] == 0.8
-
-    def test_radar_flag_map_all_axes(self) -> None:
-        """metrics_* 功能开关：6 个雷达轴均被 metrics_* Flag 覆盖（映射完整）。"""
-        flags = {
-            "metrics_sharpe": False,
-            "metrics_calmar": False,
-            "metrics_winrate": False,
-            "metrics_turnover": False,
-            "metrics_beta": False,
-            "metrics_hhi": False,
-        }
-        ds = build_chart_datasets(
-            history_data=None,
-            all_metrics=self._ALL_METRICS,
-            metric_flags=flags,
-        )
-        chart = ds["radar"]
-        assert chart["datasets"][0]["data"] == ["N/A"] * 6
-
-    def test_radar_all_na_placeholder_axes_kept(self) -> None:
-        """全 N/A → 轴保留，数据 "N/A"（§6.6：Flag 全关仍显示轴标签）。"""
-        flags = {
-            f: False
-            for f in (
-                "metrics_sharpe",
-                "metrics_calmar",
-                "metrics_winrate",
-                "metrics_turnover",
-                "metrics_beta",
-                "metrics_hhi",
-            )
-        }
-        ds = build_chart_datasets(
-            history_data=_history_ok(),
-            all_metrics=self._ALL_METRICS,
-            metric_flags=flags,
+            metrics_enabled=False,
         )
         chart = ds["radar"]
         assert chart["labels"] == ["夏普比率", "卡玛比率", "胜率", "换手率", "组合 Beta", "集中度 HHI"]
         assert chart["datasets"][0]["data"] == ["N/A"] * 6
+
+    def test_radar_metrics_switch_on_keeps_values(self) -> None:
+        """量化指标总开关开启 → 各轴按数据原值渲染（含 win_rate dict 提取）。"""
+        ds = build_chart_datasets(
+            history_data=None,
+            all_metrics=self._ALL_METRICS,
+            metrics_enabled=True,
+        )
+        chart = ds["radar"]
+        assert chart["datasets"][0]["data"] == [1.2, 0.8, 0.55, 0.3, 0.9, 0.2]
+
+    def test_radar_metrics_switch_off_degraded_axes_na(self) -> None:
+        """降级 3 轴路径同样受总开关约束 → 关闭时全轴 "N/A"，降级标注保留。"""
+        rm = {"annualized_volatility": 0.18, "max_drawdown_pct": -0.05, "total_return_pct": 0.1}
+        ds = build_chart_datasets(
+            history_data=_history_ok(),
+            risk_metrics=rm,
+            metrics_enabled=False,
+        )
+        chart = ds["radar"]
+        assert chart["labels"] == ["年化波动率", "最大回撤", "累计收益"]
+        assert chart["datasets"][0]["data"] == ["N/A"] * 3
+        assert chart["datasets"][0]["note"] == "仅限基础指标"
 
     def test_radar_degraded_note_risk_metrics(self) -> None:
         """降级标注：仅 risk_metrics 可用时 note="仅限基础指标" + degraded=True。"""

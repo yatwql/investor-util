@@ -219,8 +219,10 @@ class TestArgparseFeatureOverrides:
 
     def test_feature_repeatable(self):
         """可重复指定，逐项独立解析并保留顺序。"""
-        args = _build_parser().parse_args(["--feature", "metrics_hhi=off", "--feature", "metrics_beta=off", "report"])
-        assert args.feature == [("metrics_hhi", False), ("metrics_beta", False)]
+        args = _build_parser().parse_args(
+            ["--feature", "metrics_enabled=off", "--feature", "enable_interactive_charts=off", "report"]
+        )
+        assert args.feature == [("metrics_enabled", False), ("enable_interactive_charts", False)]
 
     def test_feature_unknown_name_rejected(self):
         """未知开关名 → SystemExit(2)（解析期报错，不留到运行时静默失效）。"""
@@ -314,19 +316,19 @@ class TestApplyCliSwitches:
         """同一次运行内双向覆写互不干扰。"""
         from src.python.config import features as feat
 
-        monkeypatch.setitem(feat.FEATURE_FLAGS, "metrics_hhi", True)
+        monkeypatch.setitem(feat.FEATURE_FLAGS, "metrics_enabled", True)
         monkeypatch.setitem(feat.FEATURE_FLAGS, "deterministic_signal", False)
-        _apply_cli_switches([("metrics_hhi", False), ("deterministic_signal", True)])
-        assert feat.FEATURE_FLAGS["metrics_hhi"] is False
+        _apply_cli_switches([("metrics_enabled", False), ("deterministic_signal", True)])
+        assert feat.FEATURE_FLAGS["metrics_enabled"] is False
         assert feat.FEATURE_FLAGS["deterministic_signal"] is True
 
     def test_duplicate_key_last_wins(self, monkeypatch):
         """同名重复以最后一次为准（命令行从左到右覆盖）。"""
         from src.python.config import features as feat
 
-        monkeypatch.setitem(feat.FEATURE_FLAGS, "metrics_beta", True)
-        _apply_cli_switches([("metrics_beta", False), ("metrics_beta", True)])
-        assert feat.FEATURE_FLAGS["metrics_beta"] is True
+        monkeypatch.setitem(feat.FEATURE_FLAGS, "metrics_enabled", True)
+        _apply_cli_switches([("metrics_enabled", False), ("metrics_enabled", True)])
+        assert feat.FEATURE_FLAGS["metrics_enabled"] is True
 
     def test_not_persisted(self, monkeypatch):
         """仅本次运行生效，不写 features.json（实验开关的关闭路径仍走面板/文件）。"""

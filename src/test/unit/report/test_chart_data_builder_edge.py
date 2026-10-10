@@ -102,8 +102,8 @@ def test_radar_all_metrics_none_with_history() -> None:
     assert chart["datasets"][0]["note"] == "仅限基础指标"
 
 
-def test_radar_flag_off_for_missing_flag_name() -> None:
-    """metric_flags 含未知 flag 名 → 不影响该轴（映射外的指标默认可用）。"""
+def test_radar_metrics_switch_unset_keeps_values() -> None:
+    """metrics_enabled 未传（None，如交互图表关闭路径）→ 不过滤，轴值按原样保留。"""
     am = {
         "sharpe_ratio": 1.2,
         "calmar_ratio": 0.8,
@@ -111,7 +111,6 @@ def test_radar_flag_off_for_missing_flag_name() -> None:
     ds = build_chart_datasets(
         history_data=None,
         all_metrics=am,
-        metric_flags={"metrics_unknown_flag": False},
     )
     chart = ds["radar"]
     assert chart["datasets"][0]["data"][0] == 1.2

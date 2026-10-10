@@ -1,6 +1,6 @@
 # 投资复盘助手 - 自我审查问题记录
 > 文档版本：0.12.9-dev
-> **编号源**：`rf-next = 654`（新增问题取此编号，完成后更新为 +1；已用最大 rf-653，递增保证唯一，归档不回收。若与历史归档冲突，运行 `scripts/check-task-numbering.py` 校验）
+> **编号源**：`rf-next = 655`（新增问题取此编号，完成后更新为 +1；已用最大 rf-654，递增保证唯一，归档不回收。若与历史归档冲突，运行 `scripts/check-task-numbering.py` 校验）
 
 ---
 
@@ -52,6 +52,8 @@
 - rf-653 已处置（2026-10-10，过去 72h 实现技术债核查：BASE=`424f25b5^..HEAD`，78 提交）：三项修复——① **LLM 429 行为变更后文档未同步**：rf-647 把 429 由「可重试」改判 `quota` 终态（首试即 600s 长冷却熔断、零退避重试），但 `llm-technical.md`（§4.2 与 403 的配合 / §6.1「四层容错」/ §6.2 重试表 / §6.3 失败原因表）、`requirements.md`（R-LLM-10 + `max_retries` 说明）、`technical.md`（LLM 降级 + C26）、`developer-guide.md`（测试载体描述）仍写 429 重试——按实现改写，并把 429 长冷却与「全链延迟重试（`llm_full_fail_retry_delay`）」补入容错层次与失败原因表；② **`llm_full_fail_retry_delay` 未登记为已知键**：`skeleton._execute_llm_with_finalize` 直接读取该键，但 `_DEFAULT_LLM_SETTINGS` 与 `get_known_llm_settings_keys()` 均无——用户在 `llm_settings.json` 设置会被判「未知配置项…请删除」，与消费端读取矛盾；补入默认集/模板/已知键集，并加结构回归（默认集 ⊆ 已知键集 + 设置该键不产生未知键告警）；③ **`_factor_zoo` 包内根路径三处重复计算**：`catalog/metrics/stages` 各自 `Path(__file__).resolve().parents[2]`（rf-636 同类「拆包后层级算错静默失效」风险），收敛为包 `__init__.py` 的 `PROJECT_ROOT` 单一来源。
 
 ### 归档档案
+
+- rf-654 已修复（2026-10-10，量化指标开关合并（plan-115）实施中自查）：**熔断器 `_ff_was_off` 标记只读不写**——`_check_feature_flag` 的「Feature Flag 打开时自动重置断路器状态」分支依赖 `_ff_was_off`，但全仓无任何写入点，该契约从未生效；关闭期到来前的残留失败计数会跨开关周期累计，开关刚打开即可能误触发断路。修复：关闭期为已有状态写入标记（解熔路径保持原语义），开回时清零残留；并补 6 项熔断 FF 联动用例（关闭不计失败 / 开启正常计数断路 / 关闭自动解熔 / 开回清残留 / 映射外指标不受约束 / 关闭时不执行计算——此前该联动零覆盖）。
 
 - [`archived_review-findings.0.12.x.md`](../archive/v0.12.x/archived_review-findings.0.12.x.md) — v0.12.1 ~ v0.12.8 批次（2026-10-03 ~ 2026-10-09）
 - [`archived_review-findings.0.11.x.md`](../archive/v0.11.x/archived_review-findings.0.11.x.md) — v0.11.0 ~ v0.11.11  （2026-09-18 ~ 2026-10-02）
