@@ -211,8 +211,8 @@ feature_switch_registry: dict[str, FeatureSwitchDef] = {
     # 各轴转 "N/A"（含降级 3 轴路径）+ 熔断器暂停指标失败计数，指标之间无差异化
     # 生效面，逐项开关未换来逐项控制价值，故收敛为一项（面板 7 行 → 1 行）。
     "metrics_enabled": FeatureSwitchDef(
-        "量化指标",
-        "报告输出量化指标画像（雷达图各轴）；关闭即各轴显示 N/A、熔断器暂停指标失败计数",
+        "量化指标显示",
+        "报告量化指标是否输出（雷达图各轴）；关闭即各轴显示 N/A、熔断器暂停指标失败计数（指标始终全量计算）",
         GROUP_STANDARD,
         True,
         True,
