@@ -28,6 +28,7 @@ from src.python.cli import (
     main,
     run_cli,
 )
+from src.python.cli._handlers import _collect_degradation_summary
 from src.python.core.constants import PROJECT_ROOT
 from src.python.report.whatif_operations import WhatifRunResult
 
@@ -607,6 +608,115 @@ class TestHandleReport:
         assert code == 0
         mock_reporter.print_llm_cost_summary.assert_called_once()
         mock_reporter.print_cache_hit_summary.assert_called_once()
+
+    def test_notify_dispatched_on_completion(self):
+        """通知门控通过 → 构造事件并分发（报告类型/退出码/结果标志透传）。"""
+        mock_result = MagicMock()
+        mock_result.exit_code = 0
+        mock_result.errors = []
+        mock_result.excel_ok = True
+        mock_result.html_ok = False
+        cfg = {"notify": {"webhook_url": "https://hooks.example.test/x", "on_success": True}}
+        with (
+            patch(
+                "src.python.cli._handlers._cli_read_holdings_with_flows",
+                return_value=([MagicMock()], [], []),
+            ),
+            patch("src.python.report.cli_progress.CliProgressReporter"),
+            patch("src.python.report.orchestrator.generate_report", return_value=mock_result),
+            patch("src.python.core.completion_notify.dispatch_completion_notification") as mock_dispatch,
+        ):
+            args = MagicMock()
+            args.type = "both"
+            args.history = "auto"
+            args.force_llm = False
+            args.output = None
+            args.verbose = False
+            code = _handle_report(args, cfg)
+        assert code == 0
+        mock_dispatch.assert_called_once()
+        event, notify_cfg = mock_dispatch.call_args[0]
+        assert event["report_type"] == "both"
+        assert event["ok"] is True
+        assert event["exit_code"] == 0
+        assert event["artifacts"], "excel_ok=True 应列示产物路径"
+        assert notify_cfg["webhook_url"] == "https://hooks.example.test/x"
+
+    def test_notify_silent_when_unconfigured(self):
+        """config 无 notify 节 → 门控前置，不触达分发（静默跳过）。"""
+        mock_result = MagicMock()
+        mock_result.exit_code = 0
+        with (
+            patch(
+                "src.python.cli._handlers._cli_read_holdings_with_flows",
+                return_value=([MagicMock()], [], []),
+            ),
+            patch("src.python.report.cli_progress.CliProgressReporter"),
+            patch("src.python.report.orchestrator.generate_report", return_value=mock_result),
+            patch("src.python.core.completion_notify.dispatch_completion_notification") as mock_dispatch,
+        ):
+            args = MagicMock()
+            args.type = "basic"
+            args.history = "auto"
+            args.force_llm = False
+            args.output = None
+            args.verbose = False
+            code = _handle_report(args, {})
+        assert code == 0
+        mock_dispatch.assert_not_called()
+
+    def test_notify_failure_never_changes_exit_code(self):
+        """通知流程内部抛异常 → 退出码原样返回（尽力而为契约）。"""
+        mock_result = MagicMock()
+        mock_result.exit_code = 0
+        mock_result.errors = []
+        cfg = {"notify": {"webhook_url": "https://hooks.example.test/x", "on_success": True}}
+        with (
+            patch(
+                "src.python.cli._handlers._cli_read_holdings_with_flows",
+                return_value=([MagicMock()], [], []),
+            ),
+            patch("src.python.report.cli_progress.CliProgressReporter"),
+            patch("src.python.report.orchestrator.generate_report", return_value=mock_result),
+            patch(
+                "src.python.core.completion_notify.build_completion_event",
+                side_effect=RuntimeError("事件构造爆炸"),
+            ),
+        ):
+            args = MagicMock()
+            args.type = "full"
+            args.history = "auto"
+            args.force_llm = False
+            args.output = None
+            args.verbose = False
+            code = _handle_report(args, cfg)
+        assert code == 0
+
+
+class TestDegradationSummary:
+    """_collect_degradation_summary：跟踪器降级事件 → 摘要行（最新在前、按源去重）。"""
+
+    def test_dedupes_latest_first(self):
+        """同源多事件只留最新一条；未降级事件不入摘要。"""
+        events = [
+            {"source_key": "tencent", "degraded": True, "failure_type": "timeout", "count": 1},
+            {"source_key": "akshare", "degraded": True, "failure_type": "circuit", "count": 3},
+            {"source_key": "tencent", "degraded": True, "failure_type": "timeout", "count": 5},
+            {"source_key": "sina", "degraded": False, "failure_type": None, "count": 0},
+        ]
+        tracker = MagicMock()
+        tracker.get_log.return_value = events
+        with patch("src.python.report.data_status.get_tracker", return_value=tracker):
+            lines = _collect_degradation_summary()
+        assert lines == [
+            "tencent: timeout（累计5次）",
+            "akshare: circuit（累计3次）",
+        ]
+
+    def test_tracker_failure_returns_empty(self):
+        """跟踪器异常 → 返回空列表（通知摘要非关键，不拖垮收尾）。"""
+        with patch("src.python.report.data_status.get_tracker", side_effect=RuntimeError("boom")):
+            assert _collect_degradation_summary() == []
 
 
 # ═══════════════════════════════════════════════════════════════

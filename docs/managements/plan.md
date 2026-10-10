@@ -8,7 +8,7 @@
 
 本文档记录项目的实现计划。已完成的历史版本计划已归档，此处仅跟踪当前迭代中的工作。
 
-**当前迭代**：在办 15 项按「价值 / 收益 / 风险」分三档（2026-10-07 重排，档位定义见「当前迭代待办」）——P1 4 项（风险/核心价值改进 **plan-99/85/91/95**）、P2 7 项（**plan-55** 等待条件型 + 改进批 **plan-88/90/92/93/100/101**）、P3 4 项（**plan-70** 死线观察，已有落地设计 `decision-reflection-shadow-design.md`；择机 **plan-87/94/102**）；scripts 核查批 **plan-110/111/112/113/114** 五项**已完成并归档**（2026-10-08 立项当批实施）；量化指标开关合并 **plan-115** **已完成并归档**（2026-10-10）；章节类实验转正批 **plan-83** **已完成并归档**（2026-10-09）；景气度框架诊断转正批 **plan-49 / plan-71** **已完成并归档**（2026-10-10）；大类资产收益贡献分解 **plan-89** **已完成并归档**（2026-10-10）；**plan-85 ~ plan-102** 为 2026-10-07 自审改进盘点迁入批（18 项）；**plan-103 ~ plan-109** Web 展示借鉴批 7 项**已全部完成并归档**（awesome-design-md 研究：2026-10-07 首批 6 项 + 2026-10-08 HTML 报告专项补研追加 plan-109，立项映射见 [`awesome-design-md-borrow-candidates-research.md`](../archive/v0.12.x/awesome-design-md-borrow-candidates-research.md)）；历史批次（**plan-59 ~ plan-84**，含 Vibe-Trading / gs-quant / 工程效能 / TradingAgents-CN 借鉴批）已全部收口，完成态与未采纳记录随档见 [`archived_plan.0.11.x.md`](../archive/v0.11.x/archived_plan.0.11.x.md) 与 [`archived_plan.0.12.x.md`](../archive/v0.12.x/archived_plan.0.12.x.md)，借鉴批研究文档随档在 `docs/archive/v0.12.x/`（plan-66 ~ plan-68 候选现状见「P3」）。
+**当前迭代**：在办 14 项按「价值 / 收益 / 风险」分三档（2026-10-07 重排，档位定义见「当前迭代待办」）——P1 4 项（风险/核心价值改进 **plan-99/85/91/95**）、P2 6 项（**plan-55** 等待条件型 + 改进批 **plan-88/90/92/93/101**）、P3 4 项（**plan-70** 死线观察，已有落地设计 `decision-reflection-shadow-design.md`；择机 **plan-87/94/102**）；scripts 核查批 **plan-110/111/112/113/114** 五项**已完成并归档**（2026-10-08 立项当批实施）；量化指标开关合并 **plan-115** **已完成并归档**（2026-10-10）；章节类实验转正批 **plan-83** **已完成并归档**（2026-10-09）；景气度框架诊断转正批 **plan-49 / plan-71** **已完成并归档**（2026-10-10）；大类资产收益贡献分解 **plan-89** **已完成并归档**（2026-10-10）；CLI 完成/失败通知 **plan-100** **已完成并归档**（2026-10-10）；**plan-85 ~ plan-102** 为 2026-10-07 自审改进盘点迁入批（18 项）；**plan-103 ~ plan-109** Web 展示借鉴批 7 项**已全部完成并归档**（awesome-design-md 研究：2026-10-07 首批 6 项 + 2026-10-08 HTML 报告专项补研追加 plan-109，立项映射见 [`awesome-design-md-borrow-candidates-research.md`](../archive/v0.12.x/awesome-design-md-borrow-candidates-research.md)）；历史批次（**plan-59 ~ plan-84**，含 Vibe-Trading / gs-quant / 工程效能 / TradingAgents-CN 借鉴批）已全部收口，完成态与未采纳记录随档见 [`archived_plan.0.11.x.md`](../archive/v0.11.x/archived_plan.0.11.x.md) 与 [`archived_plan.0.12.x.md`](../archive/v0.12.x/archived_plan.0.12.x.md)，借鉴批研究文档随档在 `docs/archive/v0.12.x/`（plan-66 ~ plan-68 候选现状见「P3」）。
 
 > **命名纪律（强制）**：重构/新增的变量名、函数名、注释与文档表述必须与新章节语义相关（如 `position_relationship`/`portfolio_history_drawdown`/`style_factor`/`action`），**绝对禁止用任务编号命名**（F 系列、plan-N、rf-N 等）。任务编号仅在本表作链接锚点，不进入实现层。
 
@@ -100,12 +100,6 @@
 **现状与问题**（2026-10-07 自审迁入）：`html_save` 按日期归档到子目录但不生成 index；TUI 无「最近报告」菜单项（grep 历史报告/报告列表 = 0）；Web 有运行历史但 HTML 归档目录本身不可浏览——找上期报告靠翻文件系统
 
 **动作**：生成/刷新 `output_dir/index.html`（按日期列出 Excel/HTML 产物与打开链接），TUI 加「打开输出目录 / 最近报告」入口（与 rf-636 联动）；索引页不泄漏路径以外的本地信息，匿名化口径与报告一致
-
-#### 🔲 `plan-100` CLI 定时任务无完成/失败通知
-
-**现状与问题**（2026-10-07 自审迁入）：无人值守场景只有退出码与日志，成功/失败都要人工翻日志；全仓无 webhook/邮件/系统通知通道
-
-**动作**：可配置通知钩子（webhook URL / 邮件 / 桌面通知，失败必发、成功可选发），载荷含报告类型、产物路径、降级摘要、错误数；未配置时静默跳过（默认关，符合「配置文件不必须存在」惯例）
 
 ### P3 — 预期实施，有空时安排
 

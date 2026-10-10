@@ -15,6 +15,7 @@
 > 追加归档：2026-10-10 plan-116 市场温度第一因子升级为估值分位（估值历史源 + ERP + 窗口拉长）完成（见文末章节）
 > 追加归档：2026-10-10 plan-49 / plan-71 景气度框架诊断转正判据达成并实验转正入常规组（见文末章节）
 > 追加归档：2026-10-10 plan-89 大类资产收益贡献分解（大类 → 品种两级同口径归因）完成（见文末章节）
+> 追加归档：2026-10-10 plan-100 CLI 定时任务完成/失败通知（notify 三通道）完成（见文末章节）
 > 设计文档索引：plan-72 的设计文档 [`fund-purchase-limit-design.md`](fund-purchase-limit/fund-purchase-limit-design.md) **已随 plan-74 完成一并归档**（本目录 `fund-purchase-limit/`）；plan-73 的 LLM 上下文设计同在 `fund-purchase-limit/fund-purchase-limit-llm-context-design.md`（设计 + 已实施）；plan-76 的快照事件级设计在本目录 `holding-change-review/holding-change-review-design.md`（已实施，§15 实施与验收记录）；plan-77 的 What-if 成本与基准设计在本目录 `whatif-cost-benchmark/whatif-cost-benchmark-design.md`（已实施，§14 门槛与验收记录）；plan-78 的因子目录评测设计在本目录 `factor-zoo-catalog/factor-zoo-catalog-design.md`（已评测·判定转正立项，§13 判定记录）；plan-79 的事件窗设计在本目录 `event-window-impact/event-window-impact-design.md`（已实施，§14 判定记录）；plan-80 的调仓纪律回放设计在本目录 `rebalance-schedule-replay/rebalance-schedule-replay-design.md`（已实施，§14 实施与门槛判定记录）
 
 ---
@@ -318,3 +319,7 @@
    #### ✅ `plan-89` 大类资产收益贡献分解缺失 — 已完成（2026-10-10）
    
    **完成态（大类 → 品种两级同口径归因，路线 b）**：大类层按 `core/code_utils.classify_holding_tier` 单源分类（原报告分类页签 `_categorize_holding` 逻辑上移共用，分类判定唯一事实来源）聚合为权益/固收/现金（未知二元组兜底「其他」），与品种 TOP5 共用 Σ|盈亏| 分母（Σ大类 ≡ Σ品种，结构断言锁定）；HTML/Excel 归因子块与智囊团提示词段落三处同源呈现（大类行在前），口径脚注句单源（`ATTRIBUTION_NOTE`，成本口径，非严格区间收益归因）；`holdings_details` 契约新增 `account` 字段（orchestrator 与 `_action_holdings_details` 双路径）；零新数据源（纯本地，无 plan-4 归档所列 3 项缺口）；requirements R-ACT-06 / testplan载体批 12 / technical 契约与语义命名表 / reports-instruction 同步，新增单元用例 6 项 + 扩展渲染断言 2 项
+
+#### ✅ `plan-100` CLI 定时任务无完成/失败通知 — 已完成（2026-10-10）
+
+**完成态（notify 三通道 + CLI 收尾接线）**：新增 `core/completion_notify`——`should_notify` 门控（失败必发、成功需 `notify.on_success`；无 `notify` 节或全通道未配置静默跳过，符合「配置文件不必须存在」惯例）+ `build_completion_event` 载荷构造（报告类型/退出码/产物路径按结果标志经 `LATEST_XLSX_NAME`/`LATEST_HTML_NAME` 命名单源推导/错误数全量+明细截断 20 条/降级摘要）+ `dispatch_completion_notification` 分发（webhook 走 `make_http_client`、SMTP SSL/STARTTLS、notify-send；单通道失败隔离、单次尝试无重试、永不抛出不改退出码）。降级摘要由 `_handlers._collect_degradation_summary` 从数据状态跟踪器收集（最新在前、按源去重 10 条）；`_notify_report_completion` 门控前置（未配置不构造事件不碰跟踪器），整体 try/except 退出码原样。凭据不落日志：webhook URL 异常消息落日志前掩码只记域名。config dict+JSONC 模板新增通知节（dict 段注释 N）；需求 R-OUT-14、testplan 批 13、technical 语义命名表 `completion_notify`、how-to-config「R. 任务完成通知（notify）」、CLI 手册「13.4 任务完成通知（notify）」同步。测试 `test_completion_notify.py` 20 项（载荷/门控/分发隔离/凭据掩码/三通道发送器）+ `test_cli` 接线 3 项（分发透传/未配置静默/通知异常不改退出码）+ 降级摘要 2 项。

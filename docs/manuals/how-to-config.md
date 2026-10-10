@@ -138,7 +138,7 @@
 - [D. 市场时段与缓存](#d-市场时段与缓存) · [E. 行为调优](#e-行为调优) · [F. 业绩基准与无风险利率](#f-业绩基准与无风险利率)
 - [G. 组合历史走势与持仓快照](#g-组合历史走势与持仓快照) · [H. 业绩评价配置](#h-业绩评价配置) · [I. 再平衡配置](#i-再平衡配置) · [J. 交易纪律配置](#j-交易纪律配置)
 - [K. 流动性配置](#k-流动性配置) · [L. 匿名化配置](#l-匿名化配置) · [M. 批量并行调度](#m-批量并行调度)
-- [N. 功能开关（features.json）](#n-功能开关featuresjson) · [O. 缓存分组](#o-缓存分组) · [P. 机器本地状态（非 config.json）](#p-机器本地状态非-configjson) · [Q. Web 模式配置编辑](#q-web-模式配置编辑)
+- [N. 功能开关（features.json）](#n-功能开关featuresjson) · [O. 缓存分组](#o-缓存分组) · [P. 机器本地状态（非 config.json）](#p-机器本地状态非-configjson) · [Q. Web 模式配置编辑](#q-web-模式配置编辑) · [R. 任务完成通知（notify）](#r-任务完成通知notify)
 - [与菜单命令的对应关系](#与菜单命令的对应关系)
 
 ## 字段说明
@@ -199,6 +199,10 @@
 | `enable_portfolio_evolution` | `true` | 组合演进章节可见性，关闭后对应章节完全隐藏。持仓快照仍照常记录，仅影响报告展示 | 菜单 `P` |
 | `enable_action` | `true` | 行动建议章节可见性，**默认开启**，关闭后隐藏 再平衡信号/交易纪律/调仓建议/收益归因 行动板块（纯算法，basic/both/full 均可见）。智囊团深度复盘同步隐藏「行动摘要」子块 | 菜单 `P` |
 | `comparison_candidates` | `[]` | 候选基金比较子表的候选基金代码列表（6 位基金代码，≤10 只）。需配合功能开关 `candidate_compare` 开启；非法代码自动忽略，超过 10 只仅比较前 10 只 | 手动编辑 |
+| `notify.on_success` | `false` | 任务完成通知：成功也发送（失败/部分失败必发，不受此开关影响）；缺省全关=静默跳过 | 手动编辑 |
+| `notify.webhook_url` | `""` | 任务完成通知 webhook 地址（HTTP POST JSON 事件），空=不启用；URL 常含路径凭据，日志只记域名 | 手动编辑 |
+| `notify.email` | `{smtp_host:"",...}` | 任务完成通知邮件通道（`smtp_host` 与 `to`均非空才启用；`use_ssl` 切 SSL/STARTTLS；`to` 支持逗号/分号多地址） | 手动编辑 |
+| `notify.desktop` | `false` | 任务完成通知桌面通道（Linux notify-send；未安装时记日志跳过） | 手动编辑 |
 
 > 以上两条同样作用于 **Web 试算快照域**（`data/history/snapshots/web/`）：Web「临时试算」的快照按相同保留天数与上限在试算域内独立清理，与共享主目录互不影响。Web 模式无新增配置键。
 
@@ -833,6 +837,38 @@ Web 模式（浏览器界面）提供「配置编辑」面板，可修改的配�
 - 写共享配置文件**前自动备份**为 `{文件}.bak`（单槽轮转，仅保留最近一份），可手动还原：将 `.bak` 改回原文件名即可。
 - Web 与 TUI / CLI 编辑的是**同一份配置**。请避免 Web 与 TUI 同时修改配置（两者属不同进程，跨进程并发读-改-写可能互相覆盖）；`.bak` 提供最近一份回滚。
 - 隐藏项说明：LLM 辩论三模块（`debate_pro` / `debate_con` / `debate_synthesis`）为内部注册项，TUI 与 Web 面板均不展示，辩论输出由下方三个实验开关控制。
+
+---
+
+### R. 任务完成通知（notify）
+
+无人值守（cron / 任务计划）运行只有退出码与日志，成功/失败都要人工翻日志。`notify` 节配置报告生成完成后的通知推送：**失败（退出码非 0）必发、成功需 `on_success: true`**；缺省全关 = 静默跳过（不配置该节完全不影响其他功能）。
+
+| 键 | 默认值 | 说明 |
+|:---|:------:|:-----|
+| `notify.on_success` | `false` | 成功也发送（失败/部分失败必发，不受此开关影响） |
+| `notify.webhook_url` | `""` | webhook 地址（HTTP POST JSON 事件），空=不启用；URL 常含路径凭据，日志只记域名 |
+| `notify.email.smtp_host` / `to` | `""` | SMTP 服务器与收件人（**两者均非空**才启用邮件通道）；`to` 支持逗号/分号多地址 |
+| `notify.email.smtp_port` / `use_ssl` | `465` / `true` | 端口与加密（`false` 时走 STARTTLS） |
+| `notify.email.username` / `password` | `""` | 登录凭据（留空 = 匿名发信；口令不入任何日志） |
+| `notify.desktop` | `false` | 桌面通知（Linux notify-send；未安装记日志跳过） |
+| `notify.timeout_seconds` | `10` | 通道超时（秒） |
+
+```jsonc
+"notify": {
+  "on_success": false,
+  "webhook_url": "",
+  "email": {"smtp_host": "", "smtp_port": 465, "use_ssl": true, "username": "", "password": "", "to": ""},
+  "desktop": false,
+  "timeout_seconds": 10
+}
+```
+
+**载荷**：报告类型 / 退出码 / 产物路径（`LATEST_XLSX_NAME`/`LATEST_HTML_NAME` 命名单源，按结果标志列示）/ 错误数（全量）与明细（截断 20 条）/ 数据降级摘要（数据状态跟踪器，最新在前按源去重 10 条）。
+
+**可靠性**：单次尝试无重试（收尾路径不引入退避等待）；单通道失败隔离，任何通道失败只记日志（`[notify]` 前缀）、**绝不改变退出码**（尽力而为）；webhook URL 异常消息落日志前掩码只留域名。CLI 用法见 [how-to-use-cli-mode.md](how-to-use-cli-mode.md)「13.4 任务完成通知（notify）」。
+
+---
 
 ### 与菜单命令的对应关系
 

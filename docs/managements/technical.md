@@ -3447,6 +3447,7 @@ make_http_client(timeout=10.0) → httpx.Client
 | `num_utils` | 数值归一原语（`safe_num` 显式拦下 NaN/±inf，替代失效的 `try: float()` 兜底） | 诊断 | 数据获取 | 无（模块级，A 通道无开关） |
 | `retry` | 重试与退避唯一原语（`RetryPolicy` 策略算式——固定/线性/指数/**显式序列**、`is_transient_exception` 瞬时判据、`retry_transient` 执行器；取数链路、各 provider 与 LLM 调用骨架共用） | 诊断 | 数据获取 | 无（模块级） |
 | `throttle` | 按名最小间隔节流唯一原语（`RateLimiter` + `interval_delay` 抖动算式；数据层限速/批量调度/LLM 端点节流三层共用） | 诊断 | 数据获取 | 无（模块级） |
+| `completion_notify` | 任务完成通知（CLI 报告收尾按 `notify` 配置分发 webhook/邮件/桌面三通道事件——失败必发、成功需 `on_success`；无配置静默跳过；单通道失败隔离、永不抛出不改退出码；webhook URL 日志只记域名） | 诊断 | 报告 | 随 `notify` 配置节 |
 | `doctor` | 系统自检（环境/配置/目录/功能开关/数据源适配/数据源凭据/数据源七组，失败项附可执行建议，自身永不抛异常） | 诊断 | 诊断 | 开关 `doctor_check`（默认开；CLI `doctor` 子命令不受开关约束） |
 | `doctor_check` | 自检功能上屏门控（TUI 菜单 [T] 与 Web 状态区自检卡片可见性） | 诊断 | 诊断 | 开关 `doctor_check`（默认开，非实验项） |
 | `datasource_fields` | 数据域标准字段记录（`schemas/datasource_fields.py`，类型注解即缺省语义） | 数据源适配 | 数据获取 | 随 `datasource_adapter` |

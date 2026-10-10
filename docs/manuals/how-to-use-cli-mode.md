@@ -481,7 +481,29 @@ tail -20 logs/cron.log
 
 ---
 
-## 14. 更多参考
+### 13.4 任务完成通知（notify）
+
+cron / 任务计划运行只有退出码，失败也无人知晓。config.json `notify` 节可配置报告生成完成后的通知推送（也可由 Web 配置面板/TUI 同份配置编辑）：
+
+```jsonc
+"notify": {
+  "on_success": false,     // 成功也发送（失败/部分失败必发，不受此开关影响）
+  "webhook_url": "",       // webhook 地址（HTTP POST JSON），空=不启用；URL 常含凭据，日志只记域名
+  "email": {               // SMTP 邮件（smtp_host 与 to 均非空才启用）
+    "smtp_host": "", "smtp_port": 465, "use_ssl": true,
+    "username": "", "password": "", "to": ""
+  },
+  "desktop": false,         // 桌面通知（Linux notify-send，未安装记日志跳过）
+  "timeout_seconds": 10     // 通道超时（秒）
+}
+```
+
+- **触发**：退出码非 0（部分失败/严重错误）**必发**；成功仅 `on_success: true` 时发
+- **默认关**：无 `notify` 节或全部通道未配置 → 静默跳过，不影响任何其他行为
+- **载荷**：报告类型、退出码、产物路径（latest 最新版名按结果标志列示）、错误数与明细（截断）、数据降级摘要（数据状态跟踪器，最新在前按源去重）
+- **尽力而为**：单次尝试无重试；单通道失败隔离，任何通道失败只记日志（`[notify]` 前缀）、**绝不改变退出码**；webhook URL 异常消息落日志前掩码只留域名
+
+---
 
 - [快速开始](how-to-start.md)「方式三」—— CLI 启动简介
 - [TUI 菜单操作手册](how-to-use-tui-menu.md) —— TUI 等效操作（各菜单详解）
