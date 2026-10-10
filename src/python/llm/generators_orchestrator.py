@@ -258,6 +258,39 @@ def extract_event_impact_block(pipeline_data: dict | None) -> str:
     return str(((pipeline_data or {}).get("event_impact_data") or {}).get("prompt_block") or "")
 
 
+def extract_historical_codes(pipeline_data: dict | None) -> set[str]:
+    """从管线数据提取历史（已清仓/已变动）品种代码，供事实校验品种存在性白名单。
+
+    LLM 提示词含两类历史代码来源：
+      - 【环比变化】块（``pipeline_data["diff"]`` 的 removed/added 行，如
+        "清仓: 易方达国证自由现金流ETF(159222)"）——进 expert_review / health_check；
+      - 统一附录【持仓变动复盘】块（``holding_change_data.events`` 的 code，
+        含跨期变动品种）——进四个模块。
+
+    这些代码非当前持仓，但属 LLM 合法引用的历史语境（如"环比看，清仓某品种(159222)
+    后…"）。不纳入有效集会被品种存在性校验误报"不在当前持仓中"。
+
+    Args:
+        pipeline_data: 管线数据字典（可为 None）。
+
+    Returns:
+        历史品种代码集合（无数据时为空集）。
+    """
+    codes: set[str] = set()
+    _data = pipeline_data or {}
+    _diff = _data.get("diff") or {}
+    for _side in ("removed", "added"):
+        for _item in _diff.get(_side) or []:
+            _code = (_item or {}).get("code") or ""
+            if _code:
+                codes.add(str(_code))
+    for _ev in (_data.get("holding_change_data") or {}).get("events") or []:
+        _code = (_ev or {}).get("code") or ""
+        if _code:
+            codes.add(str(_code))
+    return codes
+
+
 def extract_schedule_replay_block(pipeline_data: dict | None) -> str:
     """从管线数据提取调仓纪律回放引用提示词块（契约字段 ``prompt_block`` 的唯一提取点）。
 
@@ -490,13 +523,16 @@ def generate_all_llm(
     _fc_overrides: dict = _fc_cfg.get("tolerance_overrides", {})
 
     # 提取穿透资产中的股票代码（用于穿透分析的品种存在性校验）
-
-    # 提取穿透资产中的股票代码（用于穿透分析的品种存在性校验）
     _penetrated_codes: set[str] = set()
     if penetrated_assets:
         for _asset in penetrated_assets:
             _codes = _asset.get("codes") or []
             _penetrated_codes.update(_codes)
+
+    # 历史（已清仓/已变动）品种代码：LLM 提示词含【环比变化】清仓行与统一附录
+    # 【持仓变动复盘】块，引用这些代码属合法历史语境（如"环比看，清仓某品种(159222) 后…"），
+    # 不纳入有效集会被品种存在性校验误报"不在当前持仓中"。
+    _historical_codes = extract_historical_codes(pipeline_data)
 
     if holdings_details and any(r is not None for r in (gm_r, er_r, hc_r, pd_r)):
         for _mk, _result, _cached in [
@@ -516,9 +552,12 @@ def generate_all_llm(
                     # 300750、阳光电源 300274）——它们非直接持仓但属于组合穿透范围，
                     # 品种存在性校验时须作为额外有效代码，否则误报"不在当前持仓中"。
                     # 全球政经（global_macro）提示词不含穿透数据，保持严格校验。
-                    extra_valid_codes=_penetrated_codes
-                    if _mk in ("penetration_deep", "expert_review", "health_check")
-                    else None,
+                    # 历史代码（已清仓/已变动）经统一附录进四个模块，故对所有模块均有效。
+                    extra_valid_codes=(
+                        (_penetrated_codes if _mk in ("penetration_deep", "expert_review", "health_check") else set())
+                        | _historical_codes
+                    )
+                    or None,
                     is_penetration_module=_mk == "penetration_deep",
                     tolerance_pct=_mod_tolerance,
                     history_data=history_data,

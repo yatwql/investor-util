@@ -98,21 +98,65 @@ def _claimed_code(sentence: str, match: re.Match) -> str | None:
     return _nearest_code(sentence, 0, len(sentence), m_start)
 
 
+def _near_tie_note(claim_type: str, n: int, code: str, sorted_holdings: list[dict]) -> str:
+    """近并列排名注记：声称品种与声称名次品种市值差 <1% 时提示快照时点敏感。
+
+    排名校验按市值快照排序，当两只品种市值极接近（如差 147 元 / 组合 0.05%）时，
+    排名会随盘中价格微动翻转——LLM 基于生成时快照的声称在事后校验时可能"错"，
+    但差异无实质意义。此时在告警文案后附加差距注记（不改变严重级别，仍为告警），
+    供人工判断是真实错误还是快照时点差异。
+
+    Args:
+        claim_type: 声称类型（max / ordinal / top）。
+        n: 声称名次（max 为 0）。
+        code: 声称所指品种代码。
+        sorted_holdings: 按市值降序的持仓列表。
+
+    Returns:
+        注记文本（差距 ≥1% 或无法计算时为空串）。
+    """
+    if not sorted_holdings:
+        return ""
+    # 声称名次对应的槽位索引：max → 0；ordinal → n-1；top-N → n-1（前 N 名末位）
+    idx = 0 if claim_type == "max" else n - 1
+    if idx < 0 or idx >= len(sorted_holdings):
+        return ""
+    boundary = sorted_holdings[idx]
+    if boundary.get("code", "") == code:
+        return ""
+    total_mv = sum((d.get("market_value", 0) or 0) for d in sorted_holdings)
+    if total_mv <= 0:
+        return ""
+    claimed_mv = next(
+        ((d.get("market_value", 0) or 0) for d in sorted_holdings if d.get("code", "") == code),
+        None,
+    )
+    if claimed_mv is None:
+        return ""
+    gap_pct = abs(claimed_mv - (boundary.get("market_value", 0) or 0)) / total_mv * 100
+    if gap_pct >= 1.0:
+        return ""
+    return f"（近并列：与第{idx + 1}名市值差仅占组合 {gap_pct:.2f}%，排名对价格快照时点敏感）"
+
+
 def _build_issue(claim_type: str, n: int, code: str, sorted_holdings: list[dict]) -> str:
-    """按声称类型构建告警文案。"""
+    """按声称类型构建告警文案（近并列时附加差距注记）。"""
+    note = _near_tie_note(claim_type, n, code, sorted_holdings)
     if claim_type == "max" or (claim_type == "ordinal" and n == 1):
         # "最大持仓"/"第一重仓" 均指市值第一
         top = sorted_holdings[0]
-        return f"声称 {code} 为最大持仓，但实际最大持仓为 {top.get('code', '')}（{top.get('name', '')}）"
+        return f"声称 {code} 为最大持仓，但实际最大持仓为 {top.get('code', '')}（{top.get('name', '')}）{note}"
     if claim_type == "ordinal":
         idx = n - 1
         if idx >= len(sorted_holdings):
             return f"声称 {code} 为第{n}大持仓，但持仓品种不足 {n} 只"
         target = sorted_holdings[idx]
-        return f"声称 {code} 为第{n}大持仓，但实际第{n}大持仓为 {target.get('code', '')}（{target.get('name', '')}）"
+        return (
+            f"声称 {code} 为第{n}大持仓，但实际第{n}大持仓为 {target.get('code', '')}（{target.get('name', '')}）{note}"
+        )
     # top-N 声称
     top_n = "、".join(f"{d.get('code', '')}（{d.get('name', '')}）" for d in sorted_holdings[:n])
-    return f"声称 {code} 为前{n}大持仓，但实际前{n}大持仓为 {top_n}，不含 {code}"
+    return f"声称 {code} 为前{n}大持仓，但实际前{n}大持仓为 {top_n}，不含 {code}{note}"
 
 
 def check_ranking_correctness(
