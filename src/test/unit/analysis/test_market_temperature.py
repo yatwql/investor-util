@@ -75,9 +75,9 @@ class TestVolatility:
 
 class TestTemperatureScore:
     def test_mid_scale(self):
-        """pct=50, ma_dev=0, vol=0.18 → 与解析解一致（误差 <0.5）。"""
+        """pct=50, ma_dev=0, vol=0.18 → 与解析解一致（误差 <0.5；vol 分量反向）。"""
         score = temperature_score(50.0, 0.0, 0.18)
-        expected = 0.5 * 50.0 + 0.3 * 50.0 + 0.2 * (0.18 / 0.5 * 100.0)
+        expected = 0.5 * 50.0 + 0.3 * 50.0 + 0.2 * ((1.0 - 0.18 / 0.5) * 100.0)
         assert abs(score - expected) < 0.5
 
     def test_high_extreme_clamped(self):
@@ -89,10 +89,19 @@ class TestTemperatureScore:
         assert 0.0 <= score <= 100.0
 
     def test_hot_series_scores_high(self):
-        """高位 + 正偏离 + 高波动 → 温度偏高。"""
+        """高位 + 正偏离主导 → 温度偏高（波动率反向后不改变主导结论）。"""
         hot = temperature_score(90.0, 0.1, 0.3)
         cold = temperature_score(10.0, -0.1, 0.05)
         assert hot > cold
+
+    def test_volatility_direction_reversed(self):
+        """波动率分量反向：其余因子相同，波动越高温度越低（恐慌降温口径回归锁定）。"""
+        calm = temperature_score(50.0, 0.0, 0.05)
+        panicked = temperature_score(50.0, 0.0, 0.45)
+        assert panicked < calm
+
+        # 同向旧口径陷阱回归：高波动不得再抬高温度（曾把低估区推高 +20 分）
+        assert temperature_score(20.0, -0.1, 0.5) < temperature_score(20.0, -0.1, 0.0)
 
 
 class TestComputeTemperature:
