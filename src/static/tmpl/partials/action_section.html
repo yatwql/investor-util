@@ -25,10 +25,11 @@
         <span style="font-size: var(--fs-table-sm);font-weight:400;opacity:0.8;margin-left:8px;">再平衡信号 · 交易纪律 · 调仓建议 · 收益归因</span>
     </div>
     {% if _action.get("available") %}
+    <details class="section-fold">
+        <summary class="section-fold-summary">
+            {% if _action.get("summary") %}{{ _action["summary"] }}{% else %}调仓信号与建议明细{% endif %} —— 点击展开/收起再平衡信号、调仓清单与收益归因
+        </summary>
     <div class="section-content">
-        {% if _action.get("summary") %}
-        <div class="summary-tag" style="margin-bottom: 8px;">{{ _action["summary"] }}</div>
-        {% endif %}
 
         <!-- ① 再平衡信号（单品占比超警戒线） -->
         {% set _rb = _action.get("rebalance_signals") or [] %}
@@ -311,6 +312,7 @@
         {% endif %}
         {% endif %}
     </div>
+    </details>
     {% else %}
     <div class="section-content">
         <div class="empty-note">

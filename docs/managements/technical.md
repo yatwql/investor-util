@@ -2919,11 +2919,12 @@ llm/skeleton.py                 # 教训区块注入专家复盘提示词（开�
 | 数据源可用性矩阵 | `data_source_status` | 数据源数 |
 | 持仓变动复盘 | `holding_change` | `title_summary`（事件清单与结构演变） |
 | 调仓纪律回放 | `schedule_replay` | `title_summary`（回放对照） |
+| 行动建议 | `action` | 行动摘要（调仓信号与建议清单；降级占位分支不折叠） |
 
 - **缺省一律收起**：模板不写 `open` 属性（收起是原生行为、不依赖 JS）；`fold.js` 初始 load 不执行锚点展开——打开报告（地址带 `#sec-…` / 浏览器恢复会话）全部收起，仅会话内 `hashchange`（点击目录原生锚点链接）自动展开目标章折叠块保证跳转后可见；回归用例 `test_fold_js_keeps_collapsed_on_initial_load` 锁死初始不展开。
 - **打印**：`beforeprint` 以捕获阶段注册（先于 chart-print.js 快照）全展开 + 同步 resize 内部 Chart.js 图表（收起态 canvas 为 0 尺寸），`afterprint` 恢复用户原折叠状态；`@media print` 隐藏 `summary` 提示条并去边框/背景，打印稿不显示提示条。
 - **手动展开**：`details` 的 `toggle` 事件逐块绑定，展开时对内部 canvas `resize()`（ResizeObserver 兜底）。
-- **载体**：`details.section-fold` 共 10 处，全部位于章节 partial（模板拆分后主模板仅剩 CSS 注释与 fold.js 装配）：9 个章节各 1 处（`portfolio_history_drawdown_section` / `news_correlation_section` / `holding_change_section` / `schedule_replay_section` / `position_structure_section` / `style_factor_section` / `data_source_status_section` / `evolution_section` / `fundamental_snapshot_section`）+ 章内块级 1 处（`event_impact_section` 事件窗对照块）；结构回归 `TestSectionFold`（历史章）+ `TestSectionFoldMoreChapters`（`_FOLD_KEYS` 八个章节逐章遍历五类断言：包裹收起/summary 首元素/标题回顶在外/关键摘要/初始收起）。需求 `R-OUT-12`。
+- **载体**：`details.section-fold` 共 11 处，全部位于章节 partial（模板拆分后主模板仅剩 CSS 注释与 fold.js 装配）：10 个章节各 1 处（`portfolio_history_drawdown_section` / `news_correlation_section` / `holding_change_section` / `schedule_replay_section` / `position_structure_section` / `style_factor_section` / `data_source_status_section` / `evolution_section` / `fundamental_snapshot_section` / `action_section`）+ 章内块级 1 处（`event_impact_section` 事件窗对照块）；结构回归 `TestSectionFold`（历史章）+ `TestSectionFoldMoreChapters`（`_FOLD_KEYS` 八个章节逐章遍历五类断言：包裹收起/summary 首元素/标题回顶在外/关键摘要/初始收起）+ `test_action_html.py::TestActionSectionFold`（行动建议章折叠，含降级占位不折叠与回顶在外）。需求 `R-OUT-12`。
 
 ### 4.22 章节-区块矩阵
 

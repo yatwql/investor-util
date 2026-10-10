@@ -299,5 +299,52 @@ class TestActionSingleSource(unittest.TestCase):
         self.assertLessEqual(len(rows), 1, "单一 action_data 不应产生重复信号行")
 
 
+class TestActionSectionFold(unittest.TestCase):
+    """行动建议章正文默认折叠（details.section-fold）——与新闻关联章同构。
+
+    折叠块包裹 available 分支全部正文（提示条携带行动摘要与展开/收起指引，
+    默认收起；「回到顶部」与 unavailable 占位留在折叠块外）；锚点/打印
+    展开由 fold.js 对全部 details.section-fold 统一生效。
+    """
+
+    def test_fold_wraps_content_and_collapsed_by_default(self):
+        """available=True：正文包在折叠块内且默认收起（无 open 属性）。"""
+        section = _render(_action_data()).find(id="sec-action")
+        details = section.select_one("details.section-fold")
+        self.assertIsNotNone(details, "行动建议章应含 details.section-fold 折叠块")
+        self.assertIsNone(details.get("open"), "折叠块应默认收起（无 open 属性）")
+        summary = details.select_one(":scope > summary.section-fold-summary")
+        self.assertIsNotNone(summary, "summary 提示条应为折叠块首子元素")
+        self.assertIsNotNone(details.select_one(".section-content"), "内容区应在折叠块内")
+
+    def test_summary_line_carries_action_summary(self):
+        """提示条携带行动摘要与展开/收起指引（摘要随折叠块外露）。"""
+        section = _render(_action_data()).find(id="sec-action")
+        text = section.select_one("details.section-fold > summary.section-fold-summary").get_text()
+        self.assertIn("再平衡建议 1 条", text)
+        self.assertIn("点击展开/收起", text)
+
+    def test_summary_fallback_without_action_summary(self):
+        """无行动摘要时提示条用通用兜底文案（提示条非空）。"""
+        section = _render(_action_data(summary="")).find(id="sec-action")
+        text = section.select_one("details.section-fold > summary.section-fold-summary").get_text()
+        self.assertIn("调仓信号与建议明细", text)
+        self.assertIn("点击展开/收起", text)
+
+    def test_back_to_top_stays_outside_fold(self):
+        """「回到顶部」留在折叠块外（收起态仍可点）。"""
+        section = _render(_action_data()).find(id="sec-action")
+        details = section.select_one("details.section-fold")
+        back = section.select_one(".back-to-top-link")
+        self.assertIsNotNone(back)
+        self.assertNotIn(details, list(back.parents), "回到顶部不应位于折叠块内")
+
+    def test_unavailable_branch_not_folded(self):
+        """available=False 占位文案不折叠（异常态常显，不藏在提示条后）。"""
+        section = _render({"available": False}).find(id="sec-action")
+        self.assertIsNone(section.select_one("details.section-fold"), "降级占位不应折叠")
+        self.assertIn("无持仓数据，行动建议无法生成", section.get_text())
+
+
 if __name__ == "__main__":
     unittest.main()
