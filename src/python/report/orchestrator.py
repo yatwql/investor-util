@@ -219,6 +219,10 @@ def prepare_report_data(
             # 供调仓建议可行化层按渠道计算份额取整与费用（场外整数份+赎回费）；
             # getattr 兼容缺 account 的 detail 对象（测试 fixture 简化版）
             "channel": "场外" if is_offsite_fund(getattr(d, "account", "")) else "场内",
+            # 账户名原值：收益归因大类分解需 classify_holding_tier 单源分类的
+            # 场外渠道判定（场外/场内二值已丢失渠道关键词）；测试 fixture 缺省
+            # detail 对象无 account 时按空串兼容（归因层 getattr 兜底）
+            "account": getattr(d, "account", ""),
         }
         for d in details
     ]

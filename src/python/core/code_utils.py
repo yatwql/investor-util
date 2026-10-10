@@ -371,6 +371,68 @@ def is_a_share_stock(name: str, code: str) -> bool:
     return is_a_share_code(code) and not is_otc_fund_by_name(name, code)
 
 
+def classify_holding_tier(name: str, code: str, account: str) -> tuple[str, str]:
+    """持仓分类单源：将持仓映射到 (资产属性, 投资分类) 二元组。
+
+    报告持仓分类页签与行动建议收益归因的大类分解共用本实现（分类判定唯一
+    事实来源，关键词原语与判定规则同居本模块；消费方不得自行复制规则）。
+
+    分类逻辑（按优先级）：
+      1. QDII（名称含 QDII）→ 基金 / QDII
+      2. 名称含固收关键词 → 债券 / 纯债
+      3. 名称含货币关键词 → 现金 / 货币
+      4. 场外渠道且名称含指数关键词 → 基金 / 被动
+      5. 场外渠道 → 基金 / 主动
+      6. 场内ETF（名称含ETF或代码5/1开头）→ 基金 / 指数
+      7. 场内股票（代码6/0/3开头）→ 股票 / A股
+      8. 其余 → 基金 / 混合
+
+    Args:
+        name: 持仓名称
+        code: 6 位证券代码
+        account: 账户/渠道名（场外渠道判定依据；空串按未命中场外处理）
+
+    Returns:
+        (资产属性, 投资分类)
+    """
+    name = name.strip()
+    code = code.strip()
+    account = account.strip()
+
+    # 1) QDII
+    if is_qdii_extended(name):
+        return ("基金", "QDII")
+
+    # 2) 固收类
+    if is_bond_fund_by_name(name):
+        return ("债券", "纯债")
+
+    # 3) 货币类
+    if is_money_fund_by_name(name):
+        return ("现金", "货币")
+
+    # 4) 场外渠道
+    if is_offsite_fund(account):
+        if is_index_fund_by_name(name):
+            return ("基金", "被动")
+        return ("基金", "主动")
+
+    # 5) 场内 ETF（名称含ETF或代码5/1开头）
+    if is_etf_by_name_or_code(name, code):
+        return ("基金", "指数")
+
+    # 5b) 00 代码场外基金（名称匹配基金特征，与 A 股 00 前缀重叠区）
+    if is_otc_fund_by_name(name, code):
+        return ("基金", "混合")
+
+    # 6) 场内股票（A股或港股通）
+    if is_a_share_code(code) or is_hk_stock_code(code):
+        return ("股票", "A股")
+
+    # 7) 其余归为基金/混合
+    return ("基金", "混合")
+
+
 # ── 场外基金赎回天数类型默认档（非实测）──
 # 供流动性维在场外品种未配置单日赎回上限（config.json `redemption_limits`）时给出
 # 类型分级默认档，使场外为主的组合在流动性维有区分度。档位为经验口径而非实测：

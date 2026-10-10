@@ -14,6 +14,7 @@
 > 追加归档：2026-10-10 plan-115 量化指标 7 个逐项开关合并为单开关 `metrics_enabled` 完成（见文末章节）
 > 追加归档：2026-10-10 plan-116 市场温度第一因子升级为估值分位（估值历史源 + ERP + 窗口拉长）完成（见文末章节）
 > 追加归档：2026-10-10 plan-49 / plan-71 景气度框架诊断转正判据达成并实验转正入常规组（见文末章节）
+> 追加归档：2026-10-10 plan-89 大类资产收益贡献分解（大类 → 品种两级同口径归因）完成（见文末章节）
 > 设计文档索引：plan-72 的设计文档 [`fund-purchase-limit-design.md`](fund-purchase-limit/fund-purchase-limit-design.md) **已随 plan-74 完成一并归档**（本目录 `fund-purchase-limit/`）；plan-73 的 LLM 上下文设计同在 `fund-purchase-limit/fund-purchase-limit-llm-context-design.md`（设计 + 已实施）；plan-76 的快照事件级设计在本目录 `holding-change-review/holding-change-review-design.md`（已实施，§15 实施与验收记录）；plan-77 的 What-if 成本与基准设计在本目录 `whatif-cost-benchmark/whatif-cost-benchmark-design.md`（已实施，§14 门槛与验收记录）；plan-78 的因子目录评测设计在本目录 `factor-zoo-catalog/factor-zoo-catalog-design.md`（已评测·判定转正立项，§13 判定记录）；plan-79 的事件窗设计在本目录 `event-window-impact/event-window-impact-design.md`（已实施，§14 判定记录）；plan-80 的调仓纪律回放设计在本目录 `rebalance-schedule-replay/rebalance-schedule-replay-design.md`（已实施，§14 实施与门槛判定记录）
 
 ---
@@ -313,3 +314,7 @@
 #### ✅ `plan-49` 景气度框架诊断：转正评估（默认开启） — 已完成（2026-10-10）
 
 **完成态（前置条件核验 + 转正执行）**：① 降级矩阵 6 场景全绿（2026-09-16）；② 真实使用 24 天（09-16 → 10-10）、跨月快照 ✓、真实调仓（159222 止盈后清仓）✓、真实数据降级（10-09 单维缺失运行 26/80）✓；③ 用户认可评分口径——关键词表已按持仓风格在 `config.json` 自定义，`concentration_target_pct` 保持 50%（前十大集中度 88.55% 使该维 4/15，属有效风险提示，不调高掩盖）；④ 十守护 + dev-verify 6513 + verify 9225 全绿。执行：`features.py` `GROUP_EXPERIMENTAL → GROUP_STANDARD`、`default False → True`（声明位与评分口径不变）；[S] 面板重排（实验 8-11 / 常规 12-22，prosperity 落 13）；requirements R-PF-01、technical §4.20、五份手册、testplan、README/CLI 示例同步；新增 `TestProsperityFrameworkPromotion` 转正锁定用例。
+   
+   #### ✅ `plan-89` 大类资产收益贡献分解缺失 — 已完成（2026-10-10）
+   
+   **完成态（大类 → 品种两级同口径归因，路线 b）**：大类层按 `core/code_utils.classify_holding_tier` 单源分类（原报告分类页签 `_categorize_holding` 逻辑上移共用，分类判定唯一事实来源）聚合为权益/固收/现金（未知二元组兜底「其他」），与品种 TOP5 共用 Σ|盈亏| 分母（Σ大类 ≡ Σ品种，结构断言锁定）；HTML/Excel 归因子块与智囊团提示词段落三处同源呈现（大类行在前），口径脚注句单源（`ATTRIBUTION_NOTE`，成本口径，非严格区间收益归因）；`holdings_details` 契约新增 `account` 字段（orchestrator 与 `_action_holdings_details` 双路径）；零新数据源（纯本地，无 plan-4 归档所列 3 项缺口）；requirements R-ACT-06 / testplan载体批 12 / technical 契约与语义命名表 / reports-instruction 同步，新增单元用例 6 项 + 扩展渲染断言 2 项

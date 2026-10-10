@@ -166,7 +166,8 @@ def _action_holdings_details(details: list, transactions: list | None = None) ->
     交易纪律依赖收益率数据（profit_rate），统一换算为百分数（小数 ×100）；
     shares/price 供调仓建议可行化层计算可执行卖出份额与金额；
     channel 为场内/场外渠道上下文（按账户关键词判定），供可行化层按渠道
-    计算份额取整与费用（场外整数份 + 赎回费）。
+    计算份额取整与费用（场外整数份 + 赎回费）；account 为账户名原值，供
+    收益归因大类分解的单源分类判定场外渠道。
 
     Args:
         details: DetailRow 列表。
@@ -187,6 +188,9 @@ def _action_holdings_details(details: list, transactions: list | None = None) ->
             "price": d.price,
             # getattr 兼容缺 account 的 detail 对象（测试 fixture 简化版）
             "channel": "场外" if is_offsite_fund(getattr(d, "account", "")) else "场内",
+            # 账户名原值：收益归因大类分解需 classify_holding_tier 单源分类的
+            # 场外渠道判定（orchestrator 组装路径同字段，数据契约一致）
+            "account": getattr(d, "account", ""),
         }
         for d in details
     ]

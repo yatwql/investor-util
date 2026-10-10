@@ -490,6 +490,7 @@
 | R-ACT-03 | `src/test/unit/analysis/test_rebalance.py` | 批 4 |
 | R-ACT-04 | `src/test/unit/report/test_action_sheet.py` + `src/test/unit/analysis/test_return_attribution.py` | 批 4 |
 | R-ACT-05 | `src/test/unit/report/test_action_html.py` + `src/test/unit/report/test_section_visibility.py` | 批 4 |
+| R-ACT-06 | `src/test/unit/analysis/test_return_attribution.py` + `src/test/unit/report/test_action_sheet.py` + `src/test/unit/report/test_action_html.py` | 批 12 |
 | R-RBL-01 | `src/test/unit/analysis/test_rebalance.py` | 批 4 |
 | R-RBL-02 | `src/test/unit/analysis/test_rebalance.py` | 批 4 |
 | R-RBL-03 | `src/test/unit/analysis/test_rebalance.py` + `src/test/unit/config/test_config.py` | 批 4 |
